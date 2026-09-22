@@ -344,3 +344,52 @@ to the old one.
 - Emulator itself proved unstable during this session (crashed twice
   before a run stuck; SystemUI ANR once mid-test) — unrelated to the
   app, worth knowing if this dev machine keeps doing it.
+
+### Milestone 1.2 — App shell & navigation
+- Added `go_router` (16.3.0) and built the real app shell: a
+  `StatefulShellRoute.indexedStack` with six branches (Documents, Chat,
+  Graph, Board, Playground, Settings) behind a single persistent
+  `AppBottomNav`, replacing the per-screen decorative bottom nav bars
+  built during the wireframe milestone (Board's `_BottomNavBar`,
+  Playground's `PlaygroundBottomNav`, Settings' `_BottomNavBar` — all
+  three deleted, their shape promoted into `shared/widgets/app_bottom_nav.dart`).
+- Auth guard: `computeRedirect()` in `lib/app/router.dart` is a pure
+  function (unit-tested directly, no `BuildContext`/router needed) —
+  unauthenticated users are sent to `/sign-in` from any protected
+  route, authenticated users are sent away from `/sign-in`/`/sign-up`
+  to `/documents`. Wired into `GoRouter.redirect` via a small
+  `ChangeNotifier` bridging `authNotifierProvider`'s stream into
+  go_router's `refreshListenable`, so a sign-in or sign-out re-routes
+  automatically — no manual `context.go` call from either auth screen.
+- Added placeholder `DocumentsScreen`/`ChatScreen` so every nav
+  destination has a real screen instead of a dangling route; both are
+  explicitly temporary (real Documents is Phase 2, Chat is unscoped).
+- Wired Settings' previously-stubbed sign-out button to
+  `authNotifierProvider.notifier.signOut()` — this is what actually
+  exercises the auth-guard redirect on sign-out, not just on launch.
+- Removed `DebugLauncherScreen`/`TokenShowcaseScreen` from `main.dart`
+  and their test (`test/widget_test.dart`) — served their purpose
+  during Milestone 0.2 (visual comparison against web's component
+  sheet) and Milestone 1.2 (screen index before real nav existed);
+  every screen they linked to is now reachable through the real shell
+  or the auth flow.
+- Fixed a real (if minor) layout bug found writing these tests: the
+  promoted `AppBottomNav`'s active-item circle badge overflowed its
+  `SizedBox(height: 64)` by 2px in certain render passes — bumped to
+  68px.
+- Tests: 1 router-redirect unit test file (7 cases, pure function,
+  covers every `AuthState` variant × route combination), 1 app-shell
+  widget test file (7 cases — lands on Documents by default, each of
+  the 6 destinations renders its expected screen, sign-out redirects
+  to Sign in), 1 router-guard widget test file (launching
+  unauthenticated cannot reach `/documents` even via a direct
+  `router.go()` deep link, not just by UI navigation). All pass.
+- Live-verified on the Android emulator: a fresh unauthenticated
+  launch lands on Sign in with no path to the shell (screenshot:
+  `docs/screenshots/milestone-1.2-unauthenticated-redirect.png`). The
+  authenticated-shell side (all 6 destinations, sign-out) was **not**
+  separately live-verified — no confirmed test account's password was
+  available in this session, same Supabase email-confirmation rate
+  limit blocking Milestone 1.1's remaining live checks. Covered
+  instead by the automated widget-test suite above, which is
+  comprehensive for this milestone's exit criteria.

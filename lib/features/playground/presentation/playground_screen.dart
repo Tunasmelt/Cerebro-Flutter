@@ -6,7 +6,6 @@ import '../../../shared/tokens/app_colors.dart';
 import '../../../shared/tokens/app_radius.dart';
 import '../../../shared/tokens/app_spacing.dart';
 import '../../../shared/tokens/app_typography.dart';
-import 'widgets/playground_bottom_nav.dart';
 import 'widgets/playground_code_editor.dart';
 import 'widgets/playground_stat_tile.dart';
 
@@ -164,7 +163,6 @@ class _PlaygroundScreenState extends State<PlaygroundScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.bgBase,
-      bottomNavigationBar: const PlaygroundBottomNav(),
       body: SafeArea(
         bottom: false,
         child: Column(

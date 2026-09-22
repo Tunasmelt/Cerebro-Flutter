@@ -1,23 +1,26 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../shared/tokens/app_colors.dart';
 import '../../../shared/tokens/app_radius.dart';
 import '../../../shared/tokens/app_spacing.dart';
 import '../../../shared/tokens/app_typography.dart';
+import '../../auth/data/auth_notifier.dart';
 
 /// Settings screen — profile summary, grouped preference sections, sign
-/// out, and version footer. Presentation-layer only: all data below is
-/// static/mock (no auth/backend wired yet) and row taps are stubs.
+/// out, and version footer. Row taps besides sign-out are still stubs;
+/// profile data below is static/mock until a real profile endpoint
+/// exists.
 ///
 /// Amber is used ONLY on the "Encryption & sealed docs" row, per
 /// AppColors.accentLocked's exclusivity rule — every other icon/accent
 /// here is violet (avatar), teal (section labels, badge, mono values),
 /// or muted gray (default icons/chevrons).
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       backgroundColor: AppColors.bgBase,
       body: SafeArea(
@@ -120,7 +123,10 @@ class SettingsScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: AppSpacing.s6),
-            const _SignOutButton(),
+            _SignOutButton(
+              onPressed: () =>
+                  ref.read(authNotifierProvider.notifier).signOut(),
+            ),
             const SizedBox(height: AppSpacing.s4),
             Center(
               child: Text(
@@ -133,7 +139,6 @@ class SettingsScreen extends StatelessWidget {
           ],
         ),
       ),
-      bottomNavigationBar: const _BottomNavBar(),
     );
   }
 }
@@ -363,7 +368,9 @@ class _SettingsRow extends StatelessWidget {
 }
 
 class _SignOutButton extends StatelessWidget {
-  const _SignOutButton();
+  const _SignOutButton({required this.onPressed});
+
+  final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -371,7 +378,8 @@ class _SignOutButton extends StatelessWidget {
       width: double.infinity,
       height: AppSpacing.minTouchTarget + AppSpacing.s2,
       child: OutlinedButton.icon(
-        onPressed: () {},
+        key: const Key('settings_sign_out'),
+        onPressed: onPressed,
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.danger,
           side: const BorderSide(color: AppColors.danger),
@@ -386,85 +394,6 @@ class _SignOutButton extends StatelessWidget {
             fontWeight: AppTypography.weightSemibold,
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _BottomNavBar extends StatelessWidget {
-  const _BottomNavBar();
-
-  static const _items = [
-    (icon: Icons.description_outlined, label: 'Docs'),
-    (icon: Icons.chat_bubble_outline, label: 'Chat'),
-    (icon: Icons.hub_outlined, label: 'Graph'),
-    (icon: Icons.dashboard_outlined, label: 'Board'),
-    (icon: Icons.play_circle_outline, label: 'Play'),
-    (icon: Icons.settings_outlined, label: 'Settings'),
-  ];
-
-  static const _activeIndex = 5;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: AppColors.bgElevated,
-        border: Border(top: BorderSide(color: AppColors.borderDefault)),
-      ),
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: AppSpacing.s16,
-          child: Row(
-            children: [
-              for (var i = 0; i < _items.length; i++)
-                Expanded(
-                  child: _NavBarItem(
-                    icon: _items[i].icon,
-                    label: _items[i].label,
-                    active: i == _activeIndex,
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _NavBarItem extends StatelessWidget {
-  const _NavBarItem({
-    required this.icon,
-    required this.label,
-    required this.active,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool active;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = active ? AppColors.accentPrimary : AppColors.textSecondary;
-    return InkWell(
-      onTap: () {},
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: color, size: AppSpacing.s5),
-          const SizedBox(height: AppSpacing.s1),
-          Text(
-            label,
-            style: AppTypography.xs.copyWith(
-              color: color,
-              fontWeight:
-                  active ? AppTypography.weightSemibold : AppTypography.weightRegular,
-            ),
-          ),
-        ],
       ),
     );
   }
