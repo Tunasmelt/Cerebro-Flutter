@@ -6,6 +6,8 @@ import 'package:cerebro_mobile/features/auth/data/auth_repository.dart';
 /// Shared test double for widget tests that render [SignInScreen] /
 /// [SignUpScreen] — never touches a real Supabase client.
 class FakeAuthRepository implements AuthRepository {
+  FakeAuthRepository({String? initialUserId}) : _userId = initialUserId;
+
   final _controller = StreamController<String?>.broadcast();
   String? _userId;
 

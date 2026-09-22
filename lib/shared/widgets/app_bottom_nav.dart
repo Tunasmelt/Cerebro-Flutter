@@ -1,14 +1,22 @@
 import 'package:flutter/material.dart';
 
-import '../../../../shared/tokens/app_colors.dart';
-import '../../../../shared/tokens/app_spacing.dart';
-import '../../../../shared/tokens/app_typography.dart';
+import '../tokens/app_colors.dart';
+import '../tokens/app_spacing.dart';
+import '../tokens/app_typography.dart';
 
-/// Bottom navigation bar shared shape across the app's top-level
-/// destinations. Presentation-only here: this screen is not wired into
-/// real navigation yet, so taps are no-ops besides visual state.
-class PlaygroundBottomNav extends StatelessWidget {
-  const PlaygroundBottomNav({super.key});
+/// The app's single real bottom navigation bar — Docs/Chat/Graph/Board/
+/// Play/Settings, per the mockups. Promoted from the per-screen
+/// decorative bars built during the wireframe milestone (0.2) now that
+/// Milestone 1.2 gives it real taps via [onTap].
+class AppBottomNav extends StatelessWidget {
+  const AppBottomNav({
+    super.key,
+    required this.currentIndex,
+    required this.onTap,
+  });
+
+  final int currentIndex;
+  final ValueChanged<int> onTap;
 
   static const _items = <_NavItemData>[
     _NavItemData('Docs', Icons.description_outlined),
@@ -18,8 +26,6 @@ class PlaygroundBottomNav extends StatelessWidget {
     _NavItemData('Play', Icons.play_circle_fill),
     _NavItemData('Settings', Icons.settings_outlined),
   ];
-
-  static const _activeIndex = 4; // Play
 
   @override
   Widget build(BuildContext context) {
@@ -31,14 +37,16 @@ class PlaygroundBottomNav extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: SizedBox(
-          height: 64,
+          height: 68,
           child: Row(
             children: [
               for (var i = 0; i < _items.length; i++)
                 Expanded(
                   child: _NavItem(
+                    key: Key('app_nav_${_items[i].label.toLowerCase()}'),
                     data: _items[i],
-                    active: i == _activeIndex,
+                    active: i == currentIndex,
+                    onTap: () => onTap(i),
                   ),
                 ),
             ],
@@ -56,10 +64,16 @@ class _NavItemData {
 }
 
 class _NavItem extends StatelessWidget {
-  const _NavItem({required this.data, required this.active});
+  const _NavItem({
+    super.key,
+    required this.data,
+    required this.active,
+    required this.onTap,
+  });
 
   final _NavItemData data;
   final bool active;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -69,9 +83,11 @@ class _NavItem extends StatelessWidget {
       selected: active,
       label: data.label,
       child: InkWell(
-        onTap: () {},
+        onTap: onTap,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: AppSpacing.minTouchTarget),
+          constraints: const BoxConstraints(
+            minHeight: AppSpacing.minTouchTarget,
+          ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
@@ -83,14 +99,15 @@ class _NavItem extends StatelessWidget {
                         color: AppColors.accentPrimary,
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(data.icon, color: AppColors.textOnAccent, size: 18),
+                      child: Icon(
+                        data.icon,
+                        color: AppColors.textOnAccent,
+                        size: 18,
+                      ),
                     )
                   : Icon(data.icon, color: color, size: 22),
               const SizedBox(height: 4),
-              Text(
-                data.label,
-                style: AppTypography.xs.copyWith(color: color),
-              ),
+              Text(data.label, style: AppTypography.xs.copyWith(color: color)),
             ],
           ),
         ),

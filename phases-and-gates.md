@@ -216,6 +216,28 @@ the auth screens and cannot reach any authenticated route.
   reach the Documents screen by any navigation path, including deep
   link if deep linking exists yet.
 
+**Status: code complete, tests passing (14/14 new), partially
+live-verified.** Bottom nav chosen (per this file's own exit criteria
+wording) — `go_router`'s `StatefulShellRoute.indexedStack` with six
+branches behind a single persistent `AppBottomNav`. Auth guard is a
+pure `computeRedirect()` function, unit-tested directly; wired into
+`GoRouter.redirect` via a `refreshListenable` bridged to
+`authNotifierProvider`. `DocumentsScreen`/`ChatScreen` are
+placeholders (real Documents is Phase 2; Chat is unscoped) so every
+destination has a real screen. `DebugLauncherScreen` is deleted — no
+longer needed now that real navigation exists.
+
+Live-verified on the Android emulator: unauthenticated launch lands on
+Sign in with no path to the shell (the security-critical half of this
+milestone's exit criteria). The authenticated-shell half (all 6
+destinations render, sign-out redirects correctly) was not separately
+live-verified — no confirmed test account was available, same
+Supabase email-confirmation rate limit still blocking Milestone 1.1's
+remaining live checks (see that milestone's status note). Covered
+instead by 7 passing app-shell widget tests exercising every
+destination and the real sign-out flow. Will live-verify the
+authenticated side once a confirmed test account exists.
+
 ### Milestone 1.3 — Error handling framework
 **Exit criteria:** A shared error-display pattern (inline error widget,
 not raw exception text) used consistently across the app; offline

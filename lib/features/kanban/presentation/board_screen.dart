@@ -66,7 +66,6 @@ class _BoardScreenState extends State<BoardScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: const SafeArea(child: _BottomNavBar()),
     );
   }
 }
@@ -251,80 +250,3 @@ class _SegmentButton extends StatelessWidget {
   }
 }
 
-class _NavItem {
-  const _NavItem(this.icon, this.label);
-
-  final IconData icon;
-  final String label;
-}
-
-const _navItems = <_NavItem>[
-  _NavItem(Icons.description_outlined, 'Docs'),
-  _NavItem(Icons.chat_bubble_outline, 'Chat'),
-  _NavItem(Icons.hub_outlined, 'Graph'),
-  _NavItem(Icons.dashboard_outlined, 'Board'),
-  _NavItem(Icons.play_circle_outline, 'Play'),
-  _NavItem(Icons.settings_outlined, 'Settings'),
-];
-
-/// Static bottom navigation bar matching the mockups' Docs/Chat/Graph/
-/// Board/Play/Settings row, with "Board" shown active. Purely
-/// decorative — real app navigation/routing is a separate milestone,
-/// so these items are not wired to anything.
-class _BottomNavBar extends StatelessWidget {
-  const _BottomNavBar();
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: AppColors.borderSubtle)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: AppSpacing.s2),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            for (final item in _navItems)
-              _NavBarEntry(item: item, active: item.label == 'Board'),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _NavBarEntry extends StatelessWidget {
-  const _NavBarEntry({required this.item, required this.active});
-
-  final _NavItem item;
-  final bool active;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = active ? AppColors.accentPrimary : AppColors.textSecondary;
-    return ConstrainedBox(
-      constraints: const BoxConstraints(
-        minWidth: AppSpacing.minTouchTarget + AppSpacing.s2,
-        minHeight: AppSpacing.minTouchTarget,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(item.icon, size: 22, color: color),
-          const SizedBox(height: 2),
-          Text(
-            item.label,
-            style: AppTypography.xs.copyWith(
-              color: color,
-              fontWeight: active
-                  ? AppTypography.weightSemibold
-                  : AppTypography.weightRegular,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
