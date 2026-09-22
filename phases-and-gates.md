@@ -190,6 +190,17 @@ so it doesn't run unconditionally in CI and make the limit worse.
 Live verification (including the on-device restart-persistence check)
 pending the rate limit resetting.
 
+**Update (2026-09-22, later audit):** wrong-password sign-in verified
+live on the Android emulator — real device networking, real backend,
+correct inline error ("Incorrect email or password."). This also
+resolved an earlier dev-shell-only mystery (gotrue calls from
+`flutter test` on this Windows machine deterministically returned
+empty responses; isolated to a likely persistent-connection quirk in
+that specific environment, not a real bug — see `CHANGELOG.md`). What's
+left before this milestone exits: sign-up → check-email → tap
+confirmation link → session, and restart-persistence — both still
+blocked by the email rate limit, not by this finding.
+
 ### Milestone 1.2 — App shell & navigation
 **Exit criteria:** Primary navigation (bottom nav or drawer, per
 `flutter-rules.md`'s eventual decision) between Documents, Chat, Graph,

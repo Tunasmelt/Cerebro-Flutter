@@ -304,3 +304,43 @@ to the old one.
   behavior (supabase_flutter's own tested responsibility, restoring a
   persisted session before `Supabase.initialize()` completes) —
   verified live on the emulator, not by an automated test.
+
+### Milestone 1.1 audit — mystery resolved: live sign-in works
+- Re-ran `flutter analyze`/`flutter test` on merged `main`: still clean,
+  33 pass / 3 skip. Code review of `AuthNotifier`/
+  `SupabaseAuthRepository`/both screens found no logic bugs.
+- **Root-caused the "empty response" failure from the PR description as
+  dev-shell-specific, not a real bug.** Sign-in (unlike sign-up) never
+  sends an email, so it's free to test without the rate limit. Live
+  `signInWithPassword()` calls from `flutter test` on this Windows dev
+  machine deterministically failed 3/3 retries with
+  `AuthUnknownException: Received an empty response with status code 400`
+  — while raw `http.post` replicating gotrue's exact headers *and* exact
+  body (including the `gotrue_meta_security` field) succeeded every
+  time with a proper response. Checked gotrue-dart's own GitHub history
+  first (`supabase/supabase-flutter#1143`) — confirms the phenomenon is
+  known/acknowledged upstream (the maintainer hit it during their own
+  testing, in 2025, without ever isolating a root cause either), so this
+  wasn't a symptom to dismiss. Isolated it to something inside
+  `supabase_flutter`/`gotrue`'s internal `http.Client` usage — leading
+  hypothesis is a persistent-connection/keep-alive quirk specific to
+  this sandboxed dev machine's network path (raw calls each open a
+  fresh one-shot connection; gotrue reuses a persistent client) — not
+  confirmed further, since the next test settled the practical
+  question.
+- **Tested live on the Android emulator instead of the dev shell**
+  (real Android networking, not this machine's Dart-VM/test-runner
+  path): entered a deliberately wrong email/password on the real
+  `SignInScreen`, tapped Sign in. Got **"Incorrect email or password."**
+  — the correct, properly-mapped inline error, exactly as designed.
+  Confirms the live auth flow genuinely works; the empty-response
+  failure was specific to running gotrue from `flutter test` on this
+  dev machine, not a defect in the app, the Supabase project, or
+  gotrue-dart generally.
+- Real signup/confirm/session-persistence verification is still
+  pending — separately blocked by the email rate limit, unaffected by
+  this finding. This is the one piece of Milestone 1.1 that still
+  needs to happen before the milestone exits.
+- Emulator itself proved unstable during this session (crashed twice
+  before a run stuck; SystemUI ANR once mid-test) — unrelated to the
+  app, worth knowing if this dev machine keeps doing it.
