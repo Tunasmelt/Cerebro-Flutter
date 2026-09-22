@@ -11,6 +11,10 @@ to the old one.
   `flutter-rules.md`, `AGENTS.md`, `HANDOFF.md`, this file.
 
 ### Decided
+- Riverpod for state management, per Phase 1 audit (2026-09-22) —
+  `flutter-rules.md`'s proposed default, committed now because Phase 1
+  auth needs app-wide session state shared across nav guards, the
+  interceptor, and every screen; can no longer stay deferred.
 - Signed-URL-direct-to-storage upload flow, matching web's
   post-Vercel-limit redesign.
 - 2D brain graph via `flutter_force_directed_graph`, explicit choice
@@ -29,15 +33,12 @@ to the old one.
   incorrectly during initial mobile design research and corrected before
   any mobile crypto code was written.
 
-### Open, not yet decided
-- State management library (Riverpod proposed, not committed).
-- Which OpenAPI-to-Dart codegen tool (`openapi_generator` vs.
-  `swagger_dart_code_generator`) — pending a currency check at
-  implementation time.
-
 ### Corrected
 - ~~Stage-level phase plan for mobile — not written yet~~: superseded,
   `phases-and-gates.md` now exists.
+- ~~Which OpenAPI-to-Dart codegen tool — pending a currency check~~:
+  superseded, resolved at Milestone 0.4 (`swagger_dart_code_generator`
+  chosen, see the 2026-09-22 entry below).
 
 ## 2026-09-22
 
@@ -215,3 +216,33 @@ to the old one.
   `unused_import` warning, no compile error) each got
   `mergeStateStatus: "BLOCKED"` from GitHub's live API. Both closed
   without merging; proof branches deleted after.
+
+### Phase 1 audit (pre-work, before any Phase 1 code)
+- **Real finding, checked directly against the live Supabase project:
+  it requires email confirmation before a session exists.** A fresh
+  sign-up returns no session; sign-in fails with `email_not_confirmed`
+  until confirmed (hit this directly during Milestone 0.4's spec-access
+  detour). This breaks Milestone 1.1's functional test as originally
+  written ("sign up a real test user, confirm a session exists,
+  restart, confirm it persists") — a fresh sign-up alone can't satisfy
+  that.
+- The web app already solved this
+  (`apps/web/src/app/signup/page.tsx` + `auth/confirm/page.tsx`):
+  sign-up → "Check your email" screen → user taps the emailed link →
+  PKCE `exchangeCodeForSession` → session. **Mobile's version is
+  harder**: there's no web page to redirect to, so this needs a real
+  deep link / custom URL scheme (Android `AndroidManifest.xml`
+  intent-filter, iOS `Info.plist` URL scheme,
+  `supabase_flutter`'s deep-link listener) — not mentioned anywhere in
+  `architecture-and-spec.md` or `phases-and-gates.md` before now.
+- The reviewed sign-in mockup (`Mockups 2.0/src/components/SignIn.tsx`)
+  has no "check your email" state and no separate sign-up screen —
+  matches web's sign-in only. A mobile sign-up screen with this state
+  needs to be designed; none exists in `Mockups/` yet.
+- **Decided:** build the real email-confirmation deep-link flow as part
+  of Milestone 1.1, not a stopgap — matches actual product behavior and
+  the milestone's own test needs a real post-signup session.
+- `supabase_flutter` checked per `AGENTS.md` before adding: 2.17.2
+  stable (3.0.0-dev.4 prerelease also exists), officially
+  Supabase-maintained — healthy, matches `architecture-and-spec.md`'s
+  existing choice.

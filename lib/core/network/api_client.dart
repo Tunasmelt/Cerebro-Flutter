@@ -24,7 +24,12 @@ class ApiClient {
              BaseOptions(
                baseUrl: baseUrl,
                connectTimeout: const Duration(seconds: 15),
-               receiveTimeout: const Duration(seconds: 30),
+               // Render's free-tier instances cold-start on the first
+               // request after idling — a real production condition,
+               // not just test flakiness (found via a CI failure on
+               // Milestone 0.4's /health check). 30s was too tight and
+               // made a cold start look identical to no internet.
+               receiveTimeout: const Duration(seconds: 60),
              ),
            ) {
     _dio.interceptors.add(AuthInterceptor(tokenProvider));
