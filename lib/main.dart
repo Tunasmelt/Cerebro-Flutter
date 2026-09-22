@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'core/config/supabase_config.dart';
+import 'features/auth/presentation/sign_in_screen.dart';
+import 'features/auth/presentation/sign_up_screen.dart';
 import 'features/graph/presentation/graph_screen.dart';
 import 'features/kanban/presentation/board_screen.dart';
 import 'features/playground/presentation/playground_screen.dart';
@@ -10,7 +15,15 @@ import 'shared/tokens/app_colors.dart';
 import 'shared/tokens/app_radius.dart';
 import 'shared/tokens/app_spacing.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  // Awaiting this restores any persisted session before the app's first
+  // frame, which is what makes "session persists across restarts" work
+  // without extra code — supabase_flutter handles the persistence.
+  await Supabase.initialize(
+    url: SupabaseConfig.url,
+    publishableKey: SupabaseConfig.anonKey,
+  );
   runApp(const CerebroApp());
 }
 
@@ -19,10 +32,12 @@ class CerebroApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Cerebro',
-      theme: AppTheme.dark,
-      home: const DebugLauncherScreen(),
+    return ProviderScope(
+      child: MaterialApp(
+        title: 'Cerebro',
+        theme: AppTheme.dark,
+        home: const DebugLauncherScreen(),
+      ),
     );
   }
 }
@@ -37,6 +52,8 @@ class DebugLauncherScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final screens = <String, WidgetBuilder>{
       'Design tokens': (_) => const TokenShowcaseScreen(),
+      'Sign in': (_) => const SignInScreen(),
+      'Sign up': (_) => const SignUpScreen(),
       'Board (Todo + Kanban)': (_) => const BoardScreen(),
       'Token Playground': (_) => const PlaygroundScreen(),
       'Sealed document unlock': (_) => const SealedDocumentScreen(),

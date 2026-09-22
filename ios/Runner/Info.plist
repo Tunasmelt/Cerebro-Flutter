@@ -45,5 +45,18 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- Supabase auth deep link (email confirmation, magic links) —
+	     must match SupabaseConfig.emailRedirectTo. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>cerebro</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

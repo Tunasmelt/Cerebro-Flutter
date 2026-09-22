@@ -178,6 +178,18 @@ Supabase project as web.
   to exist in the same Supabase Auth table the web app uses (same
   project, not an accidentally separate one).
 
+**Status (2026-09-22): In progress, not exited.** Code complete —
+`AuthRepository`/`SupabaseAuthRepository`/`AuthNotifier`, sign-in/
+sign-up screens, deep-link config for email confirmation. Unit tests
+(4) and widget tests (5) pass. **Functional tests against the real
+backend are blocked**, not skipped by choice: this Supabase project's
+email-sending is rate-limited and testing exhausted it (real finding,
+not a code bug — see `CHANGELOG.md`). The real-signup functional test
+is gated behind `--dart-define=RUN_REAL_SIGNUP_TEST=true` specifically
+so it doesn't run unconditionally in CI and make the limit worse.
+Live verification (including the on-device restart-persistence check)
+pending the rate limit resetting.
+
 ### Milestone 1.2 — App shell & navigation
 **Exit criteria:** Primary navigation (bottom nav or drawer, per
 `flutter-rules.md`'s eventual decision) between Documents, Chat, Graph,
