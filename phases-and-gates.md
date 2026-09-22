@@ -249,6 +249,29 @@ detection distinct from server-error detection.
 - With the device's network disabled, attempting any authenticated
   action shows the offline state, not a spinner that never resolves.
 
+**Status: code complete, tests passing (17/17 new), partially
+live-verified.** `ErrorPresentation.of()` is the one exhaustive mapping
+from each Milestone 0.3 `AppException` to an icon/color, and `ErrorView`
+is the one shared inline error widget — both unit/widget tested against
+every exception type. No feature screen calls the real API yet
+(Documents/Chat are still Phase 2+ placeholders), so a minimal but real
+"Connection" section was added to Settings (calling the real `/health`
+endpoint) purely so this framework has an actual wired-in caller
+instead of untested-in-practice code; expect it to be superseded once
+Phase 2's Documents list makes real API calls.
+
+"Device network disabled" is approximated the same way
+`api_client_integration_test.dart` already did in Milestone 0.3: a real
+request to a deliberately unreachable host, since `flutter test`'s Dart
+VM has no actual airplane-mode toggle. That functional test passes
+against the real deployed backend both ways (real success, real
+unreachable-host failure → `NetworkUnreachableException`, not a hang).
+
+Live-verified: app still boots cleanly on the emulator after these
+changes. Not separately live-verified: the Settings screen's Connection
+section itself, interactively — same blocker as 1.1/1.2, no confirmed
+test account available this session to reach the authenticated shell.
+
 ### Phase 1 Gate
 All milestones 1.1–1.3 pass their tests, **and** the project owner
 confirms live:

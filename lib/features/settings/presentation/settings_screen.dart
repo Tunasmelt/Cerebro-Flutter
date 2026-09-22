@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/network/app_exception.dart';
+import '../../../core/network/connection_status_notifier.dart';
 import '../../../shared/tokens/app_colors.dart';
 import '../../../shared/tokens/app_radius.dart';
 import '../../../shared/tokens/app_spacing.dart';
 import '../../../shared/tokens/app_typography.dart';
+import '../../../shared/widgets/error_view.dart';
 import '../../auth/data/auth_notifier.dart';
 
 /// Settings screen — profile summary, grouped preference sections, sign
@@ -122,6 +125,10 @@ class SettingsScreen extends ConsumerWidget {
                 ),
               ],
             ),
+            const SizedBox(height: AppSpacing.s6),
+            const _SectionLabel('CONNECTION'),
+            const SizedBox(height: AppSpacing.s2),
+            const _ConnectionStatusSection(),
             const SizedBox(height: AppSpacing.s6),
             _SignOutButton(
               onPressed: () =>
@@ -394,6 +401,91 @@ class _SignOutButton extends StatelessWidget {
             fontWeight: AppTypography.weightSemibold,
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Milestone 1.3: a real call to the deployed backend's `/health`
+/// endpoint (via [connectionStatusProvider]), rendered through the
+/// shared [ErrorView] on failure — the app's one concrete, wired-in
+/// demonstration of "offline detection distinct from server-error
+/// detection" ahead of Phase 2's real feature screens.
+class _ConnectionStatusSection extends ConsumerWidget {
+  const _ConnectionStatusSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final status = ref.watch(connectionStatusProvider);
+    final notifier = ref.read(connectionStatusProvider.notifier);
+
+    return status.when(
+      data: (_) => _ConnectionRow(
+        key: const Key('connection_status_connected'),
+        icon: Icons.wifi_rounded,
+        iconColor: AppColors.accentSuccess,
+        label: 'Connected to Cerebro',
+        onCheckAgain: notifier.refresh,
+      ),
+      loading: () => const _ConnectionRow(
+        key: Key('connection_status_checking'),
+        icon: Icons.wifi_find_rounded,
+        iconColor: AppColors.textSecondary,
+        label: 'Checking connection…',
+      ),
+      error: (error, _) => ErrorView(
+        exception: error is AppException
+            ? error
+            : UnknownApiException(error.toString()),
+        onRetry: notifier.refresh,
+      ),
+    );
+  }
+}
+
+class _ConnectionRow extends StatelessWidget {
+  const _ConnectionRow({
+    super.key,
+    required this.icon,
+    required this.iconColor,
+    required this.label,
+    this.onCheckAgain,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final String label;
+  final VoidCallback? onCheckAgain;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.bgElevated,
+        border: Border.all(color: AppColors.borderDefault),
+        borderRadius: AppRadius.lgRadius,
+      ),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.s4,
+        vertical: AppSpacing.s3,
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: iconColor, size: AppSpacing.s5),
+          const SizedBox(width: AppSpacing.s4),
+          Expanded(
+            child: Text(
+              label,
+              style: AppTypography.base.copyWith(color: AppColors.textPrimary),
+            ),
+          ),
+          if (onCheckAgain != null)
+            IconButton(
+              key: const Key('connection_status_check_again'),
+              onPressed: onCheckAgain,
+              icon: const Icon(Icons.refresh, color: AppColors.textSecondary),
+            ),
+        ],
       ),
     );
   }
