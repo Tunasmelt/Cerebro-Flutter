@@ -393,3 +393,59 @@ to the old one.
   limit blocking Milestone 1.1's remaining live checks. Covered
   instead by the automated widget-test suite above, which is
   comprehensive for this milestone's exit criteria.
+
+### Milestone 1.3 — Error handling framework
+- Added `ErrorPresentation.of(AppException)` in
+  `lib/core/network/error_presentation.dart` — a pure, exhaustive
+  mapping from each of Milestone 0.3's five `AppException` subtypes to
+  an icon/color/`ErrorKind`, keeping "offline" and "server error"
+  visually distinct rather than collapsed into one generic look. The
+  exception's own plain-language `message` passes through unchanged;
+  this layer only adds the icon/kind.
+- Added `ErrorView`, the app's one shared inline error widget
+  (`lib/shared/widgets/error_view.dart`) — compact (inline, matches
+  `SignInScreen`'s existing error-banner footprint) or `expanded`
+  (full-section replacement), with an optional Retry action. Nothing
+  in the app should ever render a raw `Exception.toString()` again;
+  this is the one place that decision gets made.
+- Since no feature screen calls the real `ApiClient` yet (Documents/
+  Chat are still Phase 2+ placeholders — see Milestone 1.2), added a
+  minimal but real wiring point so the framework has an actual caller
+  instead of sitting untested-in-practice: a "Connection" section in
+  Settings (`ConnectionStatusNotifier` in
+  `lib/core/network/connection_status_notifier.dart`) that calls the
+  real deployed backend's `/health` endpoint via `apiClientProvider`,
+  rendered through `ErrorView` on failure. This will very likely get
+  superseded by a more meaningful real integration point once Phase 2
+  builds the Documents list against the real API — that's expected,
+  not a sign this was wasted work now.
+- `ConnectionStatusNotifier.checkConnection()` is deliberately not
+  private, so tests can fake just that one call (see
+  `test/core/network/fake_connection_status_notifier.dart`) without
+  reaching through the whole provider graph to a real, Supabase-backed
+  `ApiClient` — every other Settings widget test now overrides
+  `connectionStatusProvider` with an instant-success fake so they stay
+  fast and network-free, matching this project's established
+  fake-vs-real test split (mocked widget tests vs. dedicated
+  `*_integration_test.dart` files that hit the real backend
+  unconditionally).
+- Tests: unit tests for `ErrorPresentation.of` (one case per exception
+  type, plus a same-icon/same-color collision check), widget tests for
+  `ErrorView` (compact/expanded, Retry only when given), 5 new widget
+  tests for Settings' Connection section (checking/connected/offline/
+  server-error states, Retry re-triggers the check) — all using the
+  fake, and a real-backend functional test file
+  (`connection_status_notifier_test.dart`, mirroring
+  `api_client_integration_test.dart`'s established pattern) proving
+  both a real success against the deployed Render backend and a real
+  failure against a deliberately unreachable host resolves to
+  `NetworkUnreachableException` rather than hanging — the automatable
+  stand-in for "device network disabled" (the Dart VM `flutter test`
+  runs in has no airplane-mode toggle to actually disable). All pass.
+- Live-verified app still boots cleanly on the Android emulator after
+  these changes (no crash, no new errors in `flutter run`'s log). The
+  Settings screen itself — where the only concrete usage of this
+  milestone's framework currently lives — was **not** live-verified
+  interactively, same blocker as Milestones 1.1/1.2: no confirmed test
+  account's password was available this session to reach the
+  authenticated app shell.

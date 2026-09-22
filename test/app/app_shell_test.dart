@@ -1,3 +1,4 @@
+import 'package:cerebro_mobile/core/network/connection_status_notifier.dart';
 import 'package:cerebro_mobile/features/auth/data/auth_notifier.dart';
 import 'package:cerebro_mobile/features/graph/presentation/graph_screen.dart';
 import 'package:cerebro_mobile/main.dart';
@@ -5,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../core/network/fake_connection_status_notifier.dart';
 import '../features/auth/fake_auth_repository.dart';
 
 void main() {
@@ -12,7 +14,15 @@ void main() {
 
   Widget buildApp() {
     return ProviderScope(
-      overrides: [authRepositoryProvider.overrideWithValue(fakeRepository)],
+      overrides: [
+        authRepositoryProvider.overrideWithValue(fakeRepository),
+        // Settings' "Connection" section (Milestone 1.3) calls the real
+        // backend by default — faked here so nav tests unrelated to it
+        // stay fast and network-free.
+        connectionStatusProvider.overrideWith(
+          () => FakeConnectionStatusNotifier(() async {}),
+        ),
+      ],
       child: const CerebroApp(),
     );
   }
