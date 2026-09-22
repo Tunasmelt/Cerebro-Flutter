@@ -27,8 +27,10 @@ void main() {
         expect(response.statusCode, 200);
         expect(response.data?['status'], 'ok');
       },
-      // Render free-tier instances cold-start; give it room.
-      timeout: const Timeout(Duration(seconds: 30)),
+      // Render free-tier instances cold-start; give it room. Must stay
+      // above ApiClient's own receiveTimeout (60s) or the outer test
+      // timeout fires first and masks the real behavior being tested.
+      timeout: const Timeout(Duration(seconds: 75)),
     );
 
     test(
