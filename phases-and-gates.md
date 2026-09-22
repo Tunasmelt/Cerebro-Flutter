@@ -133,6 +133,16 @@ still compile.
 - A PR with a deliberate `flutter analyze` warning above the configured
   threshold is blocked the same way.
 
+**Status (2026-09-22):** Complete. `.github/workflows/ci.yml` — three
+required jobs (`Analyze & test`, `Build Android (debug)`,
+`Build iOS (no codesign)` on a macOS runner). Branch protection on
+`main` requires all three, `enforce_admins` on. Both functional tests
+proven on real PRs against `Tunasmelt/Cerebro-Flutter`: PR #1
+(deliberately failing test) and PR #2 (deliberate `unused_import`
+warning) both got `mergeStateStatus: BLOCKED` from GitHub's own API —
+not inferred from the workflow file. Both closed without merging, proof
+branches deleted. See `CHANGELOG.md` → 2026-09-22.
+
 ### Phase 0 Gate
 All milestones 0.1–0.5 pass their tests, **and** the project owner
 confirms live:

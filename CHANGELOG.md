@@ -191,6 +191,31 @@ to the old one.
   Harmless (unconfirmed→confirmed test account, no real data attached)
   but real — flagging rather than leaving it silent. Not deleted
   without being asked.
+- Project published to GitHub: `Tunasmelt/Cerebro-Flutter`, `main`
+  branch. `.claude/` and `dev-logs/` (scratch debugging output, not
+  deliverables) added to `.gitignore` before the initial commit; full
+  secret scan across all staged files came back clean.
+- Milestone 0.5 (CI pipeline) complete. `.github/workflows/ci.yml`:
+  three jobs — `Analyze & test` (ubuntu), `Build Android (debug)`
+  (ubuntu, debug APK), `Build iOS (no codesign)` (macOS runner, since
+  iOS builds need one — same constraint that blocked Milestone 0.1's
+  local iOS verification). `flutter analyze` defaults to
+  `--fatal-warnings` on, confirmed before relying on it — no CI config
+  change needed for the warning-level proof test.
+- Branch protection on `main`: all three checks required,
+  `enforce_admins` on (so admins can't bypass it either). Note: setting
+  this needed the GitHub token's "Administration" and "Pull requests"
+  permissions, neither present initially — the token was regenerated
+  mid-task with both added. The first protection rule attempt (set via
+  GitHub's web UI) saved with an **empty required-checks list**, i.e.
+  looked configured but enforced nothing; caught via the API once
+  permissions allowed reading it, fixed via a direct API call with the
+  three check names.
+- Both functional tests proven on real PRs, not inferred from the
+  workflow file: PR #1 (deliberately failing test) and PR #2 (a bare
+  `unused_import` warning, no compile error) each got
+  `mergeStateStatus: "BLOCKED"` from GitHub's live API. Both closed
+  without merging; proof branches deleted after.
 
 ### Phase 1 audit (pre-work, before any Phase 1 code)
 - **Real finding, checked directly against the live Supabase project:
