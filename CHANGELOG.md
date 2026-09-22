@@ -246,3 +246,61 @@ to the old one.
   stable (3.0.0-dev.4 prerelease also exists), officially
   Supabase-maintained — healthy, matches `architecture-and-spec.md`'s
   existing choice.
+
+### Milestone 1.1 — Supabase auth integration
+- `supabase_flutter` + `flutter_riverpod` added. Deep-link scheme
+  `cerebro://confirm-email` registered natively (Android
+  `AndroidManifest.xml` intent-filter, iOS `Info.plist`
+  `CFBundleURLTypes`) — `supabase_flutter` handles the callback
+  automatically once initialized (uses `app_links` internally, PKCE
+  flow by default for any deep-link auth), no manual URL-parsing code
+  needed. Supabase URL + anon/publishable key live in
+  `lib/core/config/supabase_config.dart` — the anon key is meant to be
+  public (RLS is the real boundary, not key secrecy), safe to commit;
+  the `service_role` key is never embedded anywhere in this app.
+- `lib/features/auth/data/`: `AuthRepository` interface (same
+  decoupling discipline as `SessionTokenProvider` — testable without a
+  real Supabase client), `SupabaseAuthRepository` (maps Supabase's
+  `AuthException` to plain-language messages, `code` preferred but
+  falls back to matching `message` text since `code` has been reported
+  null on some genuinely-coded errors even on current supabase_flutter),
+  `AuthNotifier` (Riverpod `Notifier`, states: `AuthLoading` /
+  `Authenticated` / `Unauthenticated` / `AwaitingEmailConfirmation`).
+  `SupabaseSessionTokenProvider` completes the seam
+  `core/network/session_token_provider.dart` was built for back in
+  Milestone 0.3 specifically so this could be wired in later without
+  touching that code. A Riverpod `apiClientProvider` now gives the app
+  one shared `ApiClient` instance using it.
+- Sign-in screen adapted from `Mockups 2.0/src/components/SignIn.tsx`.
+  No sign-up mockup exists — built mirroring web's real, working
+  pattern instead (`apps/web/src/app/signup/page.tsx`): email/password/
+  confirm, then a "Check your email" state, since
+  `AwaitingEmailConfirmation` is the expected outcome on this project,
+  not an edge case. Both wired into `DebugLauncherScreen` for manual
+  verification (real nav is Milestone 1.2).
+- **Real finding, not a code bug — confirmed by bypassing
+  `package:gotrue` entirely with a raw `http.post`, same result:** this
+  Supabase project's email-sending is rate-limited
+  (`429 over_email_send_rate_limit`), and testing across this session
+  (Milestone 0.4's spec-access detour + this milestone's own debugging)
+  exhausted it. The built-in Supabase test SMTP has a strict default
+  limit; a custom SMTP provider (Resend, SendGrid, etc.) would remove
+  it — a real decision for whoever owns the Supabase project, not made
+  here.
+- Because of the above, the real-signup integration test
+  (`test/features/auth/data/supabase_auth_integration_test.dart`) is
+  gated behind `--dart-define=RUN_REAL_SIGNUP_TEST=true`, **skipped by
+  default including in CI** — unlike the `/health` checks elsewhere,
+  every real signup call sends an actual email against a shared,
+  rate-limited resource, so running it on every CI trigger would make
+  CI flaky from quota exhaustion, not real bugs, and could starve real
+  users' signup emails. The "user exists in Supabase's Auth table"
+  cross-check and the wrong-password test additionally need
+  `--dart-define=SUPABASE_SERVICE_ROLE_KEY=...` (never hardcoded).
+  Unit tests (4) and widget tests (5) — all mocked, unaffected by the
+  rate limit — pass. Live verification against the real backend is
+  pending the rate limit resetting.
+- "Session persists across a real app restart" is inherently on-device
+  behavior (supabase_flutter's own tested responsibility, restoring a
+  persisted session before `Supabase.initialize()` completes) —
+  verified live on the emulator, not by an automated test.
