@@ -462,21 +462,31 @@ source, and one initial "pass" (finding 4) turned out to be a
 false positive of my own probe and was re-checked by dumping the
 visible widget text. Nothing below is inferred.
 
-**Verdict: Phase 1 is NOT ready to close.** Two defects sit directly
-on the sign-up → confirm → session path the gate requires a human to
-walk through live, and none of the three gate checks has been done.
+**Verdict: Phase 1 is NOT ready to close.** A dead-end on the
+sign-up → confirm path (finding 2) sits directly on the flow the gate
+requires a human to walk through live, and none of the three gate
+checks has been done.
+
+> **Correction (same day, before merge): finding 1 is retracted.** My
+> first probes waited only 400ms after each route change, which is
+> shorter than go_router's pop/replace transition on this setup (the
+> old route is still in the tree at 800ms and gone by ~1200ms). Re-run
+> against the untouched original code with fully settled animations,
+> the "stale Sign-up screen over the shell" does **not** occur — it was
+> a timing artifact of my test, and I reported it as HIGH. Findings 2,
+> 3 and 4 were re-verified the same settled way and **do** reproduce;
+> finding 5 was observed live on the emulator and never depended on
+> this. The lesson is now in the method line above: assert only after
+> `pumpAndSettle`, and check a claimed "stuck" state survives it.
 
 #### Defects (all reproduced; none fixed in this PR — audit only)
-1. **HIGH — stale Sign-up screen stays on top of the app after a
-   session arrives outside the form.** `SignInScreen` opens Sign up
-   with `Navigator.push(MaterialPageRoute)` (sign_in_screen.dart:149)
-   instead of the router's `/sign-up` route. go_router's redirect
-   swaps the page stack to the shell on auth, but the imperatively
-   pushed route survives on top. Reproduced: open Sign up, emit an
-   auth event (what the confirmation deep link does) → shell is built
-   but `SignUpScreen` is still visible above it. This is the exact
-   flow Milestone 1.1's remaining live check exercises: the user would
-   tap the email link and still be staring at "Check your email".
+1. ~~**HIGH — stale Sign-up screen stays on top of the app after a
+   session arrives outside the form.**~~ **RETRACTED — did not
+   reproduce once animations were settled (see Correction above).**
+   What remains true: `SignInScreen` opened Sign up with
+   `Navigator.push(MaterialPageRoute)` (sign_in_screen.dart:149)
+   instead of the router's existing `/sign-up` route — two ways to
+   reach one screen. That is a hygiene smell, not a demonstrated bug.
 2. **HIGH — "Check your email" is a dead end.** `_CheckEmailScreen`
    has no back, no resend, no "use a different email", and
    `AwaitingEmailConfirmation` lives in the *global* `AuthNotifier`,
@@ -520,12 +530,13 @@ walk through live, and none of the three gate checks has been done.
    untracked and not gitignored; `phases-and-gates.md` said Milestone
    1.2 added 14 tests — it's 15 (corrected there).
 
-#### Why my own tests missed findings 1–3
+#### Why my own tests missed findings 2–3
 Milestone 1.2's tests covered the shell, the redirect function, and a
 direct `router.go()` deep link — none drove Sign in → Sign up through
 the router, and Milestone 1.1's sign-up tests render `SignUpScreen` in
 isolation. Any fix should land with a router-level regression test for
-each of findings 1–4.
+each of findings 2–5 (and, this time, asserting only after animations
+have settled).
 
 #### Checked and fine
 - No secrets tracked: the only JWT in the tree decodes to
@@ -542,8 +553,9 @@ each of findings 1–4.
 
 #### Phase 1 Gate status (none of the three checks done)
 - [ ] Real sign-up → confirm → force-close → session persists. **Do
-  not attempt before findings 1–2 are fixed** or the walkthrough will
-  fail for reasons unrelated to persistence. The Supabase email rate
+  not attempt before finding 2 (and ideally 5) is fixed** or a typo'd
+  address or a bad link strands the walkthrough for reasons unrelated
+  to persistence. The Supabase email rate
   limit that blocked this on 2026-09-22 has had two days to reset
   (unverified); it will recur, so decide whether the Supabase project
   should get a custom SMTP sender.

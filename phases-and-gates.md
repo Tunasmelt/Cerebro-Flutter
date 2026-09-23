@@ -274,9 +274,11 @@ test account available this session to reach the authenticated shell.
 
 ### Phase 1 Gate
 **Audit note (2026-09-24, see CHANGELOG "Phase 1 audit"):** not ready to
-attempt. Two reproduced defects sit on the sign-up → confirm path this
-gate exercises (stale Sign-up screen left over the shell; "Check your
-email" dead end with global state that survives leaving the screen).
+attempt. Reproduced defects sit on the sign-up → confirm path this gate
+exercises: a "Check your email" dead end whose global state survives
+leaving the screen, auth errors leaking between screens, and failed
+confirmation links failing silently. (An initially reported "stale
+Sign-up screen over the shell" was retracted — a test-timing artifact.)
 Fix those first, then run the checks below.
 
 All milestones 1.1–1.3 pass their tests, **and** the project owner
