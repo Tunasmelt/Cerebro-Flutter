@@ -281,6 +281,11 @@ confirmation links failing silently. (An initially reported "stale
 Sign-up screen over the shell" was retracted — a test-timing artifact.)
 Fix those first, then run the checks below.
 
+**Update (2026-09-24):** the above are fixed (see CHANGELOG "Phase 1 audit
+fixes") with router-level regression tests, and the bad-confirmation-link
+fix was verified live on the emulator. The gate checks themselves are
+still not done.
+
 All milestones 1.1–1.3 pass their tests, **and** the project owner
 confirms live:
 - [ ] Signed up as a real new user on a real device, saw the session

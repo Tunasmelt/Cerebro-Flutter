@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../app/app_routes.dart';
 import '../../../shared/tokens/app_colors.dart';
 import '../../../shared/tokens/app_radius.dart';
 import '../../../shared/tokens/app_spacing.dart';
 import '../../../shared/tokens/app_typography.dart';
 import '../data/auth_notifier.dart';
 import '../data/auth_state.dart';
-import 'sign_up_screen.dart';
 
 /// Adapted from `Mockups 2.0/src/components/SignIn.tsx` — same layout
 /// (centered card, violet radial glow), real app tokens instead of the
@@ -23,6 +24,17 @@ class SignInScreen extends ConsumerStatefulWidget {
 class _SignInScreenState extends ConsumerState<SignInScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    // Auth state is app-wide; drop a stale error/"check your email" state
+    // left by another screen. Post-frame because provider state can't be
+    // modified while the widget tree is building.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.read(authNotifierProvider.notifier).clearStatus();
+    });
+  }
 
   @override
   void dispose() {
@@ -146,11 +158,12 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                     const SizedBox(height: AppSpacing.s4),
                     Center(
                       child: TextButton(
-                        onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const SignUpScreen(),
-                          ),
-                        ),
+                        key: const Key('sign_in_go_to_sign_up'),
+                        // Through the router, not Navigator.push: an
+                        // imperatively pushed route survives go_router's
+                        // redirect and would stay on top of the app after
+                        // sign-in completes.
+                        onPressed: () => context.push(AppRoutes.signUp),
                         child: Text.rich(
                           TextSpan(
                             text: "Don't have an account? ",
