@@ -216,7 +216,7 @@ the auth screens and cannot reach any authenticated route.
   reach the Documents screen by any navigation path, including deep
   link if deep linking exists yet.
 
-**Status: code complete, tests passing (14/14 new), partially
+**Status: code complete, tests passing (15/15 new), partially
 live-verified.** Bottom nav chosen (per this file's own exit criteria
 wording) — `go_router`'s `StatefulShellRoute.indexedStack` with six
 branches behind a single persistent `AppBottomNav`. Auth guard is a
@@ -273,6 +273,12 @@ section itself, interactively — same blocker as 1.1/1.2, no confirmed
 test account available this session to reach the authenticated shell.
 
 ### Phase 1 Gate
+**Audit note (2026-09-24, see CHANGELOG "Phase 1 audit"):** not ready to
+attempt. Two reproduced defects sit on the sign-up → confirm path this
+gate exercises (stale Sign-up screen left over the shell; "Check your
+email" dead end with global state that survives leaving the screen).
+Fix those first, then run the checks below.
+
 All milestones 1.1–1.3 pass their tests, **and** the project owner
 confirms live:
 - [ ] Signed up as a real new user on a real device, saw the session

@@ -449,3 +449,117 @@ to the old one.
   interactively, same blocker as Milestones 1.1/1.2: no confirmed test
   account's password was available this session to reach the
   authenticated app shell.
+
+### Phase 1 audit (post-Milestone 1.3, 2026-09-24)
+Scope: everything merged for Milestones 1.1–1.3, checked against
+`phases-and-gates.md`'s Phase 1 Gate. Method: re-ran `flutter analyze`
+and the full suite on `main` (clean; 65 pass / 3 skip; CI green on all
+four Phase 1 merges), read the auth/router/settings code, then
+**reproduced each suspected defect with a throwaway test through the
+real router or live on the emulator before recording it** — one
+suspect (sign-out offline) was downgraded after reading gotrue's
+source, and one initial "pass" (finding 4) turned out to be a
+false positive of my own probe and was re-checked by dumping the
+visible widget text. Nothing below is inferred.
+
+**Verdict: Phase 1 is NOT ready to close.** Two defects sit directly
+on the sign-up → confirm → session path the gate requires a human to
+walk through live, and none of the three gate checks has been done.
+
+#### Defects (all reproduced; none fixed in this PR — audit only)
+1. **HIGH — stale Sign-up screen stays on top of the app after a
+   session arrives outside the form.** `SignInScreen` opens Sign up
+   with `Navigator.push(MaterialPageRoute)` (sign_in_screen.dart:149)
+   instead of the router's `/sign-up` route. go_router's redirect
+   swaps the page stack to the shell on auth, but the imperatively
+   pushed route survives on top. Reproduced: open Sign up, emit an
+   auth event (what the confirmation deep link does) → shell is built
+   but `SignUpScreen` is still visible above it. This is the exact
+   flow Milestone 1.1's remaining live check exercises: the user would
+   tap the email link and still be staring at "Check your email".
+2. **HIGH — "Check your email" is a dead end.** `_CheckEmailScreen`
+   has no back, no resend, no "use a different email", and
+   `AwaitingEmailConfirmation` lives in the *global* `AuthNotifier`,
+   so leaving and re-opening Sign up shows the stale confirmation
+   screen again. Reproduced. A typo'd address strands the user until
+   the process restarts.
+3. **MEDIUM — auth errors leak across screens.** Same global-state
+   cause: a failed sign-in's "Incorrect email or password." renders
+   inside `SignUpScreen` when the user taps Sign up. Reproduced with a
+   descendant finder scoped to `SignUpScreen`.
+4. **MEDIUM — an authenticated user opening any unknown route sees
+   go_router's default "Page Not Found" page.** Verified: navigating
+   to `/confirm-email` while signed in leaves URI `/confirm-email`
+   with "Page Not Found"/"Home" visible over the shell. Reachable in
+   practice by re-tapping an old confirmation link. (Unauthenticated,
+   the guard sends unknown routes to Sign in — verified live via
+   `adb ... -d cerebro://confirm-email?...`: no error page.)
+5. **MEDIUM — a failed/expired confirmation link fails silently.**
+   Verified live: firing the deep link with an invalid code makes
+   supabase_flutter's own handler throw an *unhandled exception*
+   ("Code verifier could not be found in local storage") and the UI
+   shows nothing. PKCE's verifier is device-local, so a link opened
+   after app-data clear, on another device, or in a desktop mail
+   client will fail the same way. Needs a user-visible message and a
+   resend path (ties into finding 2).
+6. **LOW — sign-out swallows nothing.** `AuthNotifier.signOut()` has
+   no error handling. Read gotrue 2.27.2: it removes the local
+   session and emits `signedOut` *before* the server call, so an
+   offline sign-out still logs the user out locally — only a stray
+   unhandled exception and an un-revoked server-side refresh token
+   result. Relevant to the airplane-mode gate item; not a blocker.
+7. **LOW — error display is not yet "consistent across the app".**
+   `ErrorView` covers `AppException`; the auth screens still build
+   their own banner `Container`s for `AuthFailureException`. Same
+   look, two code paths.
+8. **LOW — hygiene.** Stale doc comment in `board_screen.dart:17-18`
+   ("not yet wired into app navigation"); `SealedDocumentScreen` is
+   now unreachable from real navigation and still carries its own
+   decorative bottom nav (expected until Phase 2/3 links it, but
+   nothing tracks it); `android/build/` (a Gradle `reports` dir) is
+   untracked and not gitignored; `phases-and-gates.md` said Milestone
+   1.2 added 14 tests — it's 15 (corrected there).
+
+#### Why my own tests missed findings 1–3
+Milestone 1.2's tests covered the shell, the redirect function, and a
+direct `router.go()` deep link — none drove Sign in → Sign up through
+the router, and Milestone 1.1's sign-up tests render `SignUpScreen` in
+isolation. Any fix should land with a router-level regression test for
+each of findings 1–4.
+
+#### Checked and fine
+- No secrets tracked: the only JWT in the tree decodes to
+  `role: anon` (project ref `vuwrefjsvtinnsvgeftq`), which is public by
+  design; `service_role` appears only in comments/`--dart-define`
+  gating.
+- Guard logic: every `AuthState` × route combination unit-tested;
+  unauthenticated launch verified live on the emulator (twice).
+- Deep-link plumbing (`cerebro://confirm-email`) reaches
+  supabase_flutter on Android and does not trip go_router when signed
+  out.
+- Dependencies are behind but not vulnerable-flagged: go_router 16.3
+  (18.x exists), flutter_riverpod 2.6.1 (3.x exists). No action.
+
+#### Phase 1 Gate status (none of the three checks done)
+- [ ] Real sign-up → confirm → force-close → session persists. **Do
+  not attempt before findings 1–2 are fixed** or the walkthrough will
+  fail for reasons unrelated to persistence. The Supabase email rate
+  limit that blocked this on 2026-09-22 has had two days to reset
+  (unverified); it will recur, so decide whether the Supabase project
+  should get a custom SMTP sender.
+- [ ] Same user visible in the Supabase Auth dashboard.
+- [ ] Airplane mode mid-session shows a real offline state (the only
+  concrete caller is Settings' Connection row; see finding 6 for
+  sign-out while offline).
+
+#### Process finding: Phase 0 Gate is also still open
+`phases-and-gates.md` says a phase cannot start until the previous
+phase's gate passes and that no agent marks a gate passed on its own
+authority. All three Phase 0 Gate boxes are unticked (Android device
+run and iOS simulator run need the owner's confirmation; iOS has only
+ever been compile-checked by CI's macOS runner with `--no-codesign`,
+never launched). Phase 1 was started on the owner's explicit direction,
+so this isn't a violation by the agent — but the gate is genuinely
+unsigned, and Phase 1's own Gate should not be read as sitting on a
+closed Phase 0. The third box (a real PR blocked by a failing test) was
+demonstrated in Milestone 0.5 (PRs #1/#2) and only needs ticking.
