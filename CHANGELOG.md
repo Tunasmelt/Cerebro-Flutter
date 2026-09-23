@@ -449,3 +449,188 @@ to the old one.
   interactively, same blocker as Milestones 1.1/1.2: no confirmed test
   account's password was available this session to reach the
   authenticated app shell.
+
+### Phase 1 audit (post-Milestone 1.3, 2026-09-24)
+Scope: everything merged for Milestones 1.1–1.3, checked against
+`phases-and-gates.md`'s Phase 1 Gate. Method: re-ran `flutter analyze`
+and the full suite on `main` (clean; 65 pass / 3 skip; CI green on all
+four Phase 1 merges), read the auth/router/settings code, then
+**reproduced each suspected defect with a throwaway test through the
+real router or live on the emulator before recording it** — one
+suspect (sign-out offline) was downgraded after reading gotrue's
+source, and one initial "pass" (finding 4) turned out to be a
+false positive of my own probe and was re-checked by dumping the
+visible widget text. Nothing below is inferred.
+
+**Verdict: Phase 1 is NOT ready to close.** A dead-end on the
+sign-up → confirm path (finding 2) sits directly on the flow the gate
+requires a human to walk through live, and none of the three gate
+checks has been done.
+
+> **Correction (same day, before merge): finding 1 is retracted.** My
+> first probes waited only 400ms after each route change, which is
+> shorter than go_router's pop/replace transition on this setup (the
+> old route is still in the tree at 800ms and gone by ~1200ms). Re-run
+> against the untouched original code with fully settled animations,
+> the "stale Sign-up screen over the shell" does **not** occur — it was
+> a timing artifact of my test, and I reported it as HIGH. Findings 2,
+> 3 and 4 were re-verified the same settled way and **do** reproduce;
+> finding 5 was observed live on the emulator and never depended on
+> this. The lesson is now in the method line above: assert only after
+> `pumpAndSettle`, and check a claimed "stuck" state survives it.
+
+#### Defects (all reproduced; none fixed in this PR — audit only)
+1. ~~**HIGH — stale Sign-up screen stays on top of the app after a
+   session arrives outside the form.**~~ **RETRACTED — did not
+   reproduce once animations were settled (see Correction above).**
+   What remains true: `SignInScreen` opened Sign up with
+   `Navigator.push(MaterialPageRoute)` (sign_in_screen.dart:149)
+   instead of the router's existing `/sign-up` route — two ways to
+   reach one screen. That is a hygiene smell, not a demonstrated bug.
+2. **HIGH — "Check your email" is a dead end.** `_CheckEmailScreen`
+   has no back, no resend, no "use a different email", and
+   `AwaitingEmailConfirmation` lives in the *global* `AuthNotifier`,
+   so leaving and re-opening Sign up shows the stale confirmation
+   screen again. Reproduced. A typo'd address strands the user until
+   the process restarts.
+3. **MEDIUM — auth errors leak across screens.** Same global-state
+   cause: a failed sign-in's "Incorrect email or password." renders
+   inside `SignUpScreen` when the user taps Sign up. Reproduced with a
+   descendant finder scoped to `SignUpScreen`.
+4. **MEDIUM — an authenticated user opening any unknown route sees
+   go_router's default "Page Not Found" page.** Verified: navigating
+   to `/confirm-email` while signed in leaves URI `/confirm-email`
+   with "Page Not Found"/"Home" visible over the shell. Reachable in
+   practice by re-tapping an old confirmation link. (Unauthenticated,
+   the guard sends unknown routes to Sign in — verified live via
+   `adb ... -d cerebro://confirm-email?...`: no error page.)
+5. **MEDIUM — a failed/expired confirmation link fails silently.**
+   Verified live: firing the deep link with an invalid code makes
+   supabase_flutter's own handler throw an *unhandled exception*
+   ("Code verifier could not be found in local storage") and the UI
+   shows nothing. PKCE's verifier is device-local, so a link opened
+   after app-data clear, on another device, or in a desktop mail
+   client will fail the same way. Needs a user-visible message and a
+   resend path (ties into finding 2).
+6. **LOW — sign-out swallows nothing.** `AuthNotifier.signOut()` has
+   no error handling. Read gotrue 2.27.2: it removes the local
+   session and emits `signedOut` *before* the server call, so an
+   offline sign-out still logs the user out locally — only a stray
+   unhandled exception and an un-revoked server-side refresh token
+   result. Relevant to the airplane-mode gate item; not a blocker.
+7. **LOW — error display is not yet "consistent across the app".**
+   `ErrorView` covers `AppException`; the auth screens still build
+   their own banner `Container`s for `AuthFailureException`. Same
+   look, two code paths.
+8. **LOW — hygiene.** Stale doc comment in `board_screen.dart:17-18`
+   ("not yet wired into app navigation"); `SealedDocumentScreen` is
+   now unreachable from real navigation and still carries its own
+   decorative bottom nav (expected until Phase 2/3 links it, but
+   nothing tracks it); `android/build/` (a Gradle `reports` dir) is
+   untracked and not gitignored; `phases-and-gates.md` said Milestone
+   1.2 added 14 tests — it's 15 (corrected there).
+
+#### Why my own tests missed findings 2–3
+Milestone 1.2's tests covered the shell, the redirect function, and a
+direct `router.go()` deep link — none drove Sign in → Sign up through
+the router, and Milestone 1.1's sign-up tests render `SignUpScreen` in
+isolation. Any fix should land with a router-level regression test for
+each of findings 2–5 (and, this time, asserting only after animations
+have settled).
+
+#### Checked and fine
+- No secrets tracked: the only JWT in the tree decodes to
+  `role: anon` (project ref `vuwrefjsvtinnsvgeftq`), which is public by
+  design; `service_role` appears only in comments/`--dart-define`
+  gating.
+- Guard logic: every `AuthState` × route combination unit-tested;
+  unauthenticated launch verified live on the emulator (twice).
+- Deep-link plumbing (`cerebro://confirm-email`) reaches
+  supabase_flutter on Android and does not trip go_router when signed
+  out.
+- Dependencies are behind but not vulnerable-flagged: go_router 16.3
+  (18.x exists), flutter_riverpod 2.6.1 (3.x exists). No action.
+
+#### Phase 1 Gate status (none of the three checks done)
+- [ ] Real sign-up → confirm → force-close → session persists. **Do
+  not attempt before finding 2 (and ideally 5) is fixed** or a typo'd
+  address or a bad link strands the walkthrough for reasons unrelated
+  to persistence. The Supabase email rate
+  limit that blocked this on 2026-09-22 has had two days to reset
+  (unverified); it will recur, so decide whether the Supabase project
+  should get a custom SMTP sender.
+- [ ] Same user visible in the Supabase Auth dashboard.
+- [ ] Airplane mode mid-session shows a real offline state (the only
+  concrete caller is Settings' Connection row; see finding 6 for
+  sign-out while offline).
+
+#### Process finding: Phase 0 Gate is also still open
+`phases-and-gates.md` says a phase cannot start until the previous
+phase's gate passes and that no agent marks a gate passed on its own
+authority. All three Phase 0 Gate boxes are unticked (Android device
+run and iOS simulator run need the owner's confirmation; iOS has only
+ever been compile-checked by CI's macOS runner with `--no-codesign`,
+never launched). Phase 1 was started on the owner's explicit direction,
+so this isn't a violation by the agent — but the gate is genuinely
+unsigned, and Phase 1's own Gate should not be read as sitting on a
+closed Phase 0. The third box (a real PR blocked by a failing test) was
+demonstrated in Milestone 0.5 (PRs #1/#2) and only needs ticking.
+
+### Phase 1 audit fixes (findings 2–5, 2026-09-24)
+Fixes for the audit's confirmed findings; finding 1 was retracted (see
+the audit's Correction note) and findings 6–8 are left for later.
+
+- **Finding 2 — Check your email is no longer a dead end.**
+  `AuthNotifier.clearStatus()` drops stale shared status; both auth
+  screens call it when they open, so re-opening Sign up shows a fresh
+  form. The Check-your-email screen now has an app-bar back button,
+  **Resend email** (new `AuthRepository.resendConfirmation`, wrapping
+  gotrue's `resend`), **Use a different email** (back to the form with
+  what was typed still in it) and **Back to sign in**. A resend is a
+  side action and deliberately does not touch the app-wide auth state.
+- **Finding 3 — errors no longer leak between auth screens**, by the
+  same `clearStatus()` on screen open.
+- **Finding 4 — unknown routes no longer show "Page Not Found".**
+  `GoRouter.onException` falls back to the app; the existing redirect
+  guard then sends a signed-out user on to Sign in.
+- **Finding 5 — a failed confirmation link is shown, not swallowed.**
+  Root cause found in supabase_flutter's source: it catches the failed
+  code exchange and re-emits it as an *error event* on
+  `onAuthStateChange`; our subscription had no `onError`, which is what
+  produced the unhandled exception. `AuthNotifier` now handles stream
+  errors (ignored while signed in or mid-request, so a background token
+  refresh failure can't knock anyone out), and the repository maps them
+  to plain language: bad/expired/other-device link vs. "can't reach
+  Cerebro" vs. generic. On the Check-your-email screen the message
+  appears with Resend still available.
+- **Also fixed while in there:** the auth error mapper checked "email"
+  before rate limiting, so Supabase's `email rate limit exceeded` was
+  shown to users as "Enter a valid email address." It now says "Too
+  many attempts. Wait a few minutes and try again." (mapper extracted to
+  `auth_error_mapper.dart` so it is unit-testable).
+- **Hygiene, not a bug:** Sign in → Sign up now goes through the
+  router's `/sign-up` route (`context.push`) instead of an imperative
+  `Navigator.push`, and `AppRoutes` moved to `app_routes.dart` so
+  screens can navigate by path without importing the router. The old
+  push did *not* leave a stale screen behind (that was the retracted
+  finding); this just removes the second way to reach one screen.
+- **Tests (+31, 96 pass / 3 skip):** `test/app/auth_navigation_test.dart`
+  drives the real router for findings 2–5 plus a guard group for the
+  retracted one; notifier tests for `clearStatus`, stream errors and
+  resend; mapper tests including the real rate-limit response. All
+  waits are `pumpAndSettle`. **Mutation-checked:** with `clearStatus`
+  disabled the finding 2/3 tests fail, with the stream `onError`
+  removed the finding 5 tests fail, with `onException` removed the
+  signed-in unknown-route test fails — each restored to green.
+  Consolidated the notifier test's private fake onto the shared
+  `FakeAuthRepository`.
+- **Live-verified on the Android emulator:** the same bogus
+  `cerebro://confirm-email?code=…` link that previously threw an
+  unhandled exception and showed nothing now shows "That confirmation
+  link is invalid or has expired. Request a new one." on Sign in, with
+  **0** unhandled exceptions in the log (was 1); Sign up opens through
+  the router with a back arrow and without the stale error
+  (`docs/screenshots/phase-1-audit-fix-bad-confirmation-link.png`).
+  **Not** live-verified: the actual resend and the real sign-up →
+  confirm → session flow — those still need a real inbox and are the
+  Phase 1 Gate's own checks.

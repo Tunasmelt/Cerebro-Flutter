@@ -31,5 +31,6 @@ abstract interface class AuthRepository {
     required String password,
   });
 
+  Future<void> resendConfirmation({required String email});
   Future<void> signOut();
 }
