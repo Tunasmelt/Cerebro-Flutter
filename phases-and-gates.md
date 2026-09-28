@@ -288,8 +288,9 @@ still not done.
 
 All milestones 1.1–1.3 pass their tests, **and** the project owner
 confirms live:
-- [ ] Signed up as a real new user on a real device, saw the session
-      persist after force-closing the app.
+- [x] Signed up as a real new user on a real device, saw the session
+      persist after force-closing the app. **Confirmed by the project
+      owner (2026-09-28)** against the merged Phase 1 audit fixes.
 - [ ] Confirmed the same user appears in the actual Supabase Auth
       dashboard.
 - [ ] Turned on airplane mode mid-session and saw a real offline state,
