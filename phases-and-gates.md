@@ -293,8 +293,17 @@ confirms live:
       owner (2026-09-28)** against the merged Phase 1 audit fixes.
 - [ ] Confirmed the same user appears in the actual Supabase Auth
       dashboard.
-- [ ] Turned on airplane mode mid-session and saw a real offline state,
-      not a hang or crash.
+- [x] Turned on airplane mode mid-session and saw a real offline state,
+      not a hang or crash. **Verified live on the Android emulator
+      (2026-09-28)**: signed in as a fresh confirmed user
+      (`forklift027+cerebro-gate3@gmail.com`), Settings' Connection row
+      showed "Connected to Cerebro"; disabled wifi+mobile data (a real
+      network cut, not just the `airplane_mode_on` setting, which the
+      emulator doesn't enforce by itself), tapped Retry, got "Can't
+      reach Cerebro. Check your connection." with 0 unhandled
+      exceptions in the log; re-enabled network, tapped Retry again,
+      recovered to "Connected to Cerebro." Screenshot:
+      `docs/screenshots/phase-1-gate-airplane-mode-offline-state.png`.
 
 ---
 
