@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:cerebro_mobile/features/auth/data/auth_exception.dart';
 import 'package:cerebro_mobile/features/auth/data/auth_notifier.dart';
 import 'package:cerebro_mobile/features/auth/data/auth_repository.dart';
@@ -7,59 +5,14 @@ import 'package:cerebro_mobile/features/auth/data/auth_state.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-class _FakeAuthRepository implements AuthRepository {
-  _FakeAuthRepository();
-
-  final _controller = StreamController<String?>.broadcast();
-  String? _userId;
-
-  /// Test hook: what the next signIn/signUp call should do.
-  Object? nextResult; // String userId, AuthFailureException, or SignUpOutcome
-
-  @override
-  String? get currentUserId => _userId;
-
-  @override
-  Stream<String?> get userIdChanges => _controller.stream;
-
-  @override
-  Future<void> signIn({required String email, required String password}) async {
-    final result = nextResult;
-    if (result is AuthFailureException) throw result;
-    if (result is String) {
-      _userId = result;
-      _controller.add(result);
-      return;
-    }
-    throw StateError('nextResult not configured for signIn');
-  }
-
-  @override
-  Future<SignUpOutcome> signUp({
-    required String email,
-    required String password,
-  }) async {
-    final result = nextResult;
-    if (result is AuthFailureException) throw result;
-    if (result is SignUpOutcome) return result;
-    throw StateError('nextResult not configured for signUp');
-  }
-
-  @override
-  Future<void> signOut() async {
-    _userId = null;
-    _controller.add(null);
-  }
-
-  void dispose() => _controller.close();
-}
+import '../fake_auth_repository.dart';
 
 void main() {
-  late _FakeAuthRepository fakeRepository;
+  late FakeAuthRepository fakeRepository;
   late ProviderContainer container;
 
   setUp(() {
-    fakeRepository = _FakeAuthRepository();
+    fakeRepository = FakeAuthRepository();
     container = ProviderContainer(
       overrides: [authRepositoryProvider.overrideWithValue(fakeRepository)],
     );
@@ -70,20 +23,22 @@ void main() {
     fakeRepository.dispose();
   });
 
+  AuthNotifier notifier() => container.read(authNotifierProvider.notifier);
+  AuthState state() => container.read(authNotifierProvider);
+
   group('AuthNotifier', () {
     test(
       'a mock sign-in success transitions state to Authenticated with a non-null user id',
       () async {
         fakeRepository.nextResult = 'user-123';
 
-        await container.read(authNotifierProvider.notifier).signIn(
+        await notifier().signIn(
           email: 'person@example.com',
           password: 'correct-password',
         );
 
-        final state = container.read(authNotifierProvider);
-        expect(state, isA<Authenticated>());
-        expect((state as Authenticated).userId, 'user-123');
+        expect(state(), isA<Authenticated>());
+        expect((state() as Authenticated).userId, 'user-123');
       },
     );
 
@@ -94,15 +49,14 @@ void main() {
           'Incorrect email or password.',
         );
 
-        await container.read(authNotifierProvider.notifier).signIn(
+        await notifier().signIn(
           email: 'person@example.com',
           password: 'wrong-password',
         );
 
-        final state = container.read(authNotifierProvider);
-        expect(state, isA<Unauthenticated>());
+        expect(state(), isA<Unauthenticated>());
         expect(
-          (state as Unauthenticated).errorMessage,
+          (state() as Unauthenticated).errorMessage,
           'Incorrect email or password.',
         );
       },
@@ -113,34 +67,139 @@ void main() {
       () async {
         fakeRepository.nextResult = SignUpOutcome.needsEmailConfirmation;
 
-        await container.read(authNotifierProvider.notifier).signUp(
+        await notifier().signUp(
           email: 'new-person@example.com',
           password: 'a-strong-password',
         );
 
-        final state = container.read(authNotifierProvider);
-        expect(state, isA<AwaitingEmailConfirmation>());
+        expect(state(), isA<AwaitingEmailConfirmation>());
         expect(
-          (state as AwaitingEmailConfirmation).email,
+          (state() as AwaitingEmailConfirmation).email,
           'new-person@example.com',
         );
       },
     );
 
     test('starts Authenticated when the repository already has a session', () {
-      final alreadySignedInRepository = _FakeAuthRepository();
-      alreadySignedInRepository._userId = 'existing-user';
-      final scopedContainer = ProviderContainer(
-        overrides: [
-          authRepositoryProvider.overrideWithValue(alreadySignedInRepository),
-        ],
+      final signedIn = FakeAuthRepository(initialUserId: 'existing-user');
+      final scoped = ProviderContainer(
+        overrides: [authRepositoryProvider.overrideWithValue(signedIn)],
       );
-      addTearDown(scopedContainer.dispose);
-      addTearDown(alreadySignedInRepository.dispose);
+      addTearDown(scoped.dispose);
+      addTearDown(signedIn.dispose);
 
-      final state = scopedContainer.read(authNotifierProvider);
-      expect(state, isA<Authenticated>());
-      expect((state as Authenticated).userId, 'existing-user');
+      final s = scoped.read(authNotifierProvider);
+      expect(s, isA<Authenticated>());
+      expect((s as Authenticated).userId, 'existing-user');
+    });
+  });
+
+  group('AuthNotifier.clearStatus', () {
+    test('drops a stale sign-in error', () async {
+      fakeRepository.nextResult = const AuthFailureException('nope');
+      await notifier().signIn(email: 'a@b.co', password: 'x');
+      expect((state() as Unauthenticated).errorMessage, 'nope');
+
+      notifier().clearStatus();
+
+      expect((state() as Unauthenticated).errorMessage, isNull);
+    });
+
+    test('drops a finished sign-up\'s "check your email" state', () async {
+      fakeRepository.nextResult = SignUpOutcome.needsEmailConfirmation;
+      await notifier().signUp(email: 'typo@b.co', password: 'secret1');
+      expect(state(), isA<AwaitingEmailConfirmation>());
+
+      notifier().clearStatus();
+
+      expect(state(), isA<Unauthenticated>());
+    });
+
+    test('never signs anyone out', () async {
+      fakeRepository.nextResult = 'user-1';
+      await notifier().signIn(email: 'a@b.co', password: 'x');
+
+      notifier().clearStatus();
+
+      expect(state(), isA<Authenticated>());
+    });
+  });
+
+  group('AuthNotifier auth-stream errors (failed confirmation link)', () {
+    test('while signed out, surfaces a plain-language error', () async {
+      // Keep the notifier alive so it is subscribed to the stream.
+      notifier();
+      fakeRepository.emitStreamError(
+        const AuthFailureException('That confirmation link has expired.'),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(state(), isA<Unauthenticated>());
+      expect(
+        (state() as Unauthenticated).errorMessage,
+        'That confirmation link has expired.',
+      );
+    });
+
+    test(
+      'while awaiting confirmation, keeps the user on that screen with the error',
+      () async {
+        fakeRepository.nextResult = SignUpOutcome.needsEmailConfirmation;
+        await notifier().signUp(email: 'p@b.co', password: 'secret1');
+
+        fakeRepository.emitStreamError(
+          const AuthFailureException('That confirmation link has expired.'),
+        );
+        await Future<void>.delayed(Duration.zero);
+
+        final s = state() as AwaitingEmailConfirmation;
+        expect(s.email, 'p@b.co');
+        expect(s.errorMessage, 'That confirmation link has expired.');
+      },
+    );
+
+    test('a background error never disturbs a signed-in user', () async {
+      fakeRepository.nextResult = 'user-1';
+      await notifier().signIn(email: 'a@b.co', password: 'x');
+
+      fakeRepository.emitStreamError(const AuthFailureException('flaky'));
+      await Future<void>.delayed(Duration.zero);
+
+      expect(state(), isA<Authenticated>());
+    });
+
+    test('an unexpected non-auth error still gets a plain-language message', () async {
+      notifier();
+      fakeRepository.emitStreamError(StateError('boom'));
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        (state() as Unauthenticated).errorMessage,
+        'Something went wrong. Try again.',
+      );
+    });
+  });
+
+  group('AuthNotifier.resendConfirmation', () {
+    test('returns null on success and does not change auth state', () async {
+      fakeRepository.nextResult = SignUpOutcome.needsEmailConfirmation;
+      await notifier().signUp(email: 'p@b.co', password: 'secret1');
+
+      final error = await notifier().resendConfirmation('p@b.co');
+
+      expect(error, isNull);
+      expect(fakeRepository.resendCalls, ['p@b.co']);
+      expect(state(), isA<AwaitingEmailConfirmation>());
+    });
+
+    test('returns the plain-language message on failure', () async {
+      fakeRepository.nextResendResult = const AuthFailureException(
+        'Too many attempts. Wait a few minutes and try again.',
+      );
+
+      final error = await notifier().resendConfirmation('p@b.co');
+
+      expect(error, 'Too many attempts. Wait a few minutes and try again.');
     });
   });
 }

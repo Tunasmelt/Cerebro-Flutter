@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../app/app_routes.dart';
 import '../../../shared/tokens/app_colors.dart';
 import '../../../shared/tokens/app_radius.dart';
 import '../../../shared/tokens/app_spacing.dart';
@@ -27,6 +29,14 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   String? _localError;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.read(authNotifierProvider.notifier).clearStatus();
+    });
+  }
 
   @override
   void dispose() {
@@ -57,7 +67,10 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     final authState = ref.watch(authNotifierProvider);
 
     if (authState is AwaitingEmailConfirmation) {
-      return _CheckEmailScreen(email: authState.email);
+      return _CheckEmailScreen(
+        email: authState.email,
+        errorMessage: authState.errorMessage,
+      );
     }
 
     final loading = authState is AuthLoading;
@@ -161,17 +174,45 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   }
 }
 
-class _CheckEmailScreen extends StatelessWidget {
-  const _CheckEmailScreen({required this.email});
+enum _ResendStatus { idle, sending, sent }
+
+class _CheckEmailScreen extends ConsumerStatefulWidget {
+  const _CheckEmailScreen({required this.email, this.errorMessage});
 
   final String email;
+  final String? errorMessage;
+
+  @override
+  ConsumerState<_CheckEmailScreen> createState() => _CheckEmailScreenState();
+}
+
+class _CheckEmailScreenState extends ConsumerState<_CheckEmailScreen> {
+  _ResendStatus _status = _ResendStatus.idle;
+  String? _resendError;
+
+  Future<void> _resend() async {
+    setState(() {
+      _status = _ResendStatus.sending;
+      _resendError = null;
+    });
+    final error = await ref
+        .read(authNotifierProvider.notifier)
+        .resendConfirmation(widget.email);
+    if (!mounted) return;
+    setState(() {
+      _status = error == null ? _ResendStatus.sent : _ResendStatus.idle;
+      _resendError = error;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    final error = _resendError ?? widget.errorMessage;
     return Scaffold(
       backgroundColor: AppColors.bgBase,
+      appBar: AppBar(backgroundColor: AppColors.bgBase, elevation: 0),
       body: Center(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(AppSpacing.s6),
           child: Column(
             key: const Key('check_email_state'),
@@ -193,11 +234,67 @@ class _CheckEmailScreen extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.s3),
               Text(
-                'We sent a confirmation link to $email. Tap it to finish creating your account.',
+                'We sent a confirmation link to ${widget.email}. Tap it to finish creating your account.',
                 textAlign: TextAlign.center,
                 style: AppTypography.sm.copyWith(
                   color: AppColors.textSecondary,
                 ),
+              ),
+              if (error != null) ...[
+                const SizedBox(height: AppSpacing.s4),
+                Container(
+                  key: const Key('check_email_error'),
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.s3,
+                    vertical: AppSpacing.s2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.dangerSubtle,
+                    borderRadius: AppRadius.mdRadius,
+                  ),
+                  child: Text(
+                    error,
+                    style: AppTypography.xs.copyWith(
+                      color: AppColors.dangerHover,
+                    ),
+                  ),
+                ),
+              ],
+              if (_status == _ResendStatus.sent) ...[
+                const SizedBox(height: AppSpacing.s4),
+                Text(
+                  'Sent. Check your inbox again.',
+                  key: const Key('check_email_resent'),
+                  style: AppTypography.xs.copyWith(
+                    color: AppColors.accentSuccess,
+                  ),
+                ),
+              ],
+              const SizedBox(height: AppSpacing.s6),
+              SizedBox(
+                width: double.infinity,
+                height: AppSpacing.minTouchTarget,
+                child: ElevatedButton(
+                  key: const Key('check_email_resend'),
+                  onPressed: _status == _ResendStatus.sending ? null : _resend,
+                  child: const Text('Resend email'),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.s2),
+              TextButton(
+                key: const Key('check_email_change'),
+                // Clearing the shared status swaps this screen back to the
+                // sign-up form, which still holds what was typed, so a
+                // typo'd address can be corrected.
+                onPressed: () =>
+                    ref.read(authNotifierProvider.notifier).clearStatus(),
+                child: const Text('Use a different email'),
+              ),
+              TextButton(
+                key: const Key('check_email_back_to_sign_in'),
+                onPressed: () => context.go(AppRoutes.signIn),
+                child: const Text('Back to sign in'),
               ),
             ],
           ),

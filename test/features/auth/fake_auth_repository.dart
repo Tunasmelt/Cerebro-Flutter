@@ -45,6 +45,21 @@ class FakeAuthRepository implements AuthRepository {
     throw StateError('nextResult not configured for signUp');
   }
 
+  /// Set to an [AuthFailureException] to make the next resend fail.
+  Object? nextResendResult;
+  final resendCalls = <String>[];
+
+  @override
+  Future<void> resendConfirmation({required String email}) async {
+    resendCalls.add(email);
+    final result = nextResendResult;
+    if (result is AuthFailureException) throw result;
+  }
+
+  /// Simulates an error arriving on the auth stream, e.g. a failed
+  /// confirmation deep link.
+  void emitStreamError(Object error) => _controller.addError(error);
+
   @override
   Future<void> signOut() async {
     _userId = null;

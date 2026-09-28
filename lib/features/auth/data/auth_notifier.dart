@@ -23,7 +23,10 @@ class AuthNotifier extends Notifier<AuthState> {
   @override
   AuthState build() {
     final repository = ref.watch(authRepositoryProvider);
-    final subscription = repository.userIdChanges.listen(_onUserIdChanged);
+    final subscription = repository.userIdChanges.listen(
+      _onUserIdChanged,
+      onError: _onAuthStreamError,
+    );
     ref.onDispose(subscription.cancel);
 
     final currentUserId = repository.currentUserId;
@@ -37,6 +40,49 @@ class AuthNotifier extends Notifier<AuthState> {
     // clobbered by a stray null-session event from the same call.
     if (state is AwaitingEmailConfirmation && userId == null) return;
     state = userId != null ? Authenticated(userId) : const Unauthenticated();
+  }
+
+  /// Errors that arrive on the auth stream instead of being thrown from a
+  /// call — chiefly a failed confirmation deep link. Without a handler
+  /// these surface as unhandled zone errors and the user sees nothing.
+  void _onAuthStreamError(Object error, StackTrace stackTrace) {
+    final message = error is AuthFailureException
+        ? error.message
+        : 'Something went wrong. Try again.';
+    switch (state) {
+      // A background failure (e.g. a token refresh) must not knock a
+      // signed-in user out or paint an error over the app.
+      case Authenticated():
+      case AuthLoading():
+        return;
+      case AwaitingEmailConfirmation(:final email):
+        state = AwaitingEmailConfirmation(email, errorMessage: message);
+      case Unauthenticated():
+        state = Unauthenticated(errorMessage: message);
+    }
+  }
+
+  /// Drops stale status — a previous screen's error, or a finished
+  /// sign-up's "check your email" state — when an auth screen opens.
+  /// Auth state is app-wide, so without this an error from Sign in shows
+  /// up on Sign up, and re-opening Sign up after a typo'd address lands
+  /// on "Check your email" again instead of a fresh form.
+  void clearStatus() {
+    if (state is Unauthenticated || state is AwaitingEmailConfirmation) {
+      state = const Unauthenticated();
+    }
+  }
+
+  /// Returns a plain-language error message, or null on success. Kept out
+  /// of [state] on purpose: a resend is a side action on the Check-your-
+  /// email screen, not a change in who is signed in.
+  Future<String?> resendConfirmation(String email) async {
+    try {
+      await ref.read(authRepositoryProvider).resendConfirmation(email: email);
+      return null;
+    } on AuthFailureException catch (e) {
+      return e.message;
+    }
   }
 
   Future<void> signIn({required String email, required String password}) async {

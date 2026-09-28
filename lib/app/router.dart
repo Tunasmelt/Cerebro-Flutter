@@ -12,18 +12,11 @@ import '../features/graph/presentation/graph_screen.dart';
 import '../features/kanban/presentation/board_screen.dart';
 import '../features/playground/presentation/playground_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
+import 'app_routes.dart';
 import 'app_shell.dart';
 
-abstract final class AppRoutes {
-  static const signIn = '/sign-in';
-  static const signUp = '/sign-up';
-  static const documents = '/documents';
-  static const chat = '/chat';
-  static const graph = '/graph';
-  static const board = '/board';
-  static const playground = '/playground';
-  static const settings = '/settings';
-}
+export 'app_routes.dart';
+
 
 const _authRoutes = {AppRoutes.signIn, AppRoutes.signUp};
 
@@ -56,6 +49,11 @@ final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: AppRoutes.documents,
     refreshListenable: refreshListenable,
+    // Any location no route matches (a stale or repeated
+    // `cerebro://confirm-email` link, a mistyped deep link) falls back to
+    // the app instead of go_router's default "Page Not Found" screen; the
+    // redirect guard then sends a signed-out user on to Sign in.
+    onException: (context, state, router) => router.go(AppRoutes.documents),
     redirect: (context, state) => computeRedirect(
       authState: ref.read(authNotifierProvider),
       matchedLocation: state.matchedLocation,

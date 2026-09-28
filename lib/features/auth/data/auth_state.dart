@@ -26,7 +26,12 @@ final class Unauthenticated extends AuthState {
 /// confirmation is required), not an edge case. See CHANGELOG.md's
 /// Phase 1 audit entry.
 final class AwaitingEmailConfirmation extends AuthState {
-  const AwaitingEmailConfirmation(this.email);
+  const AwaitingEmailConfirmation(this.email, {this.errorMessage});
 
   final String email;
+
+  /// Set when the confirmation link the user tapped failed (expired,
+  /// already used, opened on another device) — shown on the Check-your-
+  /// email screen so the user can resend instead of seeing nothing.
+  final String? errorMessage;
 }

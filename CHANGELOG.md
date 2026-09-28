@@ -575,3 +575,62 @@ so this isn't a violation by the agent — but the gate is genuinely
 unsigned, and Phase 1's own Gate should not be read as sitting on a
 closed Phase 0. The third box (a real PR blocked by a failing test) was
 demonstrated in Milestone 0.5 (PRs #1/#2) and only needs ticking.
+
+### Phase 1 audit fixes (findings 2–5, 2026-09-24)
+Fixes for the audit's confirmed findings; finding 1 was retracted (see
+the audit's Correction note) and findings 6–8 are left for later.
+
+- **Finding 2 — Check your email is no longer a dead end.**
+  `AuthNotifier.clearStatus()` drops stale shared status; both auth
+  screens call it when they open, so re-opening Sign up shows a fresh
+  form. The Check-your-email screen now has an app-bar back button,
+  **Resend email** (new `AuthRepository.resendConfirmation`, wrapping
+  gotrue's `resend`), **Use a different email** (back to the form with
+  what was typed still in it) and **Back to sign in**. A resend is a
+  side action and deliberately does not touch the app-wide auth state.
+- **Finding 3 — errors no longer leak between auth screens**, by the
+  same `clearStatus()` on screen open.
+- **Finding 4 — unknown routes no longer show "Page Not Found".**
+  `GoRouter.onException` falls back to the app; the existing redirect
+  guard then sends a signed-out user on to Sign in.
+- **Finding 5 — a failed confirmation link is shown, not swallowed.**
+  Root cause found in supabase_flutter's source: it catches the failed
+  code exchange and re-emits it as an *error event* on
+  `onAuthStateChange`; our subscription had no `onError`, which is what
+  produced the unhandled exception. `AuthNotifier` now handles stream
+  errors (ignored while signed in or mid-request, so a background token
+  refresh failure can't knock anyone out), and the repository maps them
+  to plain language: bad/expired/other-device link vs. "can't reach
+  Cerebro" vs. generic. On the Check-your-email screen the message
+  appears with Resend still available.
+- **Also fixed while in there:** the auth error mapper checked "email"
+  before rate limiting, so Supabase's `email rate limit exceeded` was
+  shown to users as "Enter a valid email address." It now says "Too
+  many attempts. Wait a few minutes and try again." (mapper extracted to
+  `auth_error_mapper.dart` so it is unit-testable).
+- **Hygiene, not a bug:** Sign in → Sign up now goes through the
+  router's `/sign-up` route (`context.push`) instead of an imperative
+  `Navigator.push`, and `AppRoutes` moved to `app_routes.dart` so
+  screens can navigate by path without importing the router. The old
+  push did *not* leave a stale screen behind (that was the retracted
+  finding); this just removes the second way to reach one screen.
+- **Tests (+31, 96 pass / 3 skip):** `test/app/auth_navigation_test.dart`
+  drives the real router for findings 2–5 plus a guard group for the
+  retracted one; notifier tests for `clearStatus`, stream errors and
+  resend; mapper tests including the real rate-limit response. All
+  waits are `pumpAndSettle`. **Mutation-checked:** with `clearStatus`
+  disabled the finding 2/3 tests fail, with the stream `onError`
+  removed the finding 5 tests fail, with `onException` removed the
+  signed-in unknown-route test fails — each restored to green.
+  Consolidated the notifier test's private fake onto the shared
+  `FakeAuthRepository`.
+- **Live-verified on the Android emulator:** the same bogus
+  `cerebro://confirm-email?code=…` link that previously threw an
+  unhandled exception and showed nothing now shows "That confirmation
+  link is invalid or has expired. Request a new one." on Sign in, with
+  **0** unhandled exceptions in the log (was 1); Sign up opens through
+  the router with a back arrow and without the stale error
+  (`docs/screenshots/phase-1-audit-fix-bad-confirmation-link.png`).
+  **Not** live-verified: the actual resend and the real sign-up →
+  confirm → session flow — those still need a real inbox and are the
+  Phase 1 Gate's own checks.
