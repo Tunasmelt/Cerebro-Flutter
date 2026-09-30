@@ -634,3 +634,88 @@ the audit's Correction note) and findings 6–8 are left for later.
   **Not** live-verified: the actual resend and the real sign-up →
   confirm → session flow — those still need a real inbox and are the
   Phase 1 Gate's own checks.
+
+## Phase 2 — Documents & upload
+
+### Milestone 2.1 — Document list & detail
+- **Real finding, corrects this milestone's own exit-criteria wording:**
+  the deployed backend's `GET /api/v1/documents` is **not**
+  cursor-paginated. Confirmed from the backend's actual source
+  (`services/api/app/core/documents_storage.py`'s `list_documents` —
+  a single flat, RLS-scoped Supabase REST query, `order:
+  created_at.desc`, no `limit`/cursor params anywhere), not from the
+  OpenAPI spec (still empty for this endpoint, per Milestone 0.4's
+  finding) or from `phases-and-gates.md`'s own speculative wording.
+  `api-documentation.md` already says this plainly: "not
+  cursor-paginated in practice; this project's realistic per-user
+  document count never needed it." Substituted the "pagination-cursor
+  logic" unit test with what the client actually does with the
+  response — parse every field correctly, preserve the server's
+  ordering — same substitution precedent as Milestone 0.4's missing
+  typed-schema finding.
+- Also confirmed from source, since the OpenAPI schema has none: the
+  list row shape (`id, title, mime, size_bytes,
+  original_size_bytes, status, created_at`) and the detail shape
+  (list's fields minus `original_size_bytes`, plus `ingest_state`/
+  `last_error` folded in from the document's `ingest_jobs` row — Stage
+  3.6's design, replacing a separate `GET /ingest-jobs/{id}`), and the
+  real `status` enum (`processing | ready | failed | sealed`, from
+  `apps/web/src/lib/graph/types.ts`).
+- Built on Milestone 0.4's generated (Chopper) client instead of the
+  hand-rolled `ApiClient` — this is that client's first real caller.
+  `GeneratedApiAuthInterceptor` attaches the session JWT (Chopper's
+  interceptor API, not Dio's); `DocumentsErrorMapper` maps Chopper
+  failures onto the *same* `AppException` hierarchy `ErrorMapper` uses
+  for `ApiClient` — one error framework across both HTTP stacks, per
+  Milestone 1.3's "shared error-display pattern," not a second one.
+- `DocumentsScreen` (real list, replacing Milestone 1.2's placeholder):
+  loading/empty/error/data states via `AsyncNotifier` +
+  `RefreshIndicator` (pull-to-refresh keeps the previous list visible
+  during a refresh, not a jarring flash to a spinner), each row
+  color-coded by mime type and status, tap pushes
+  `/documents/:id` (a nested route inside the Documents shell branch,
+  not a separate top-level route) to `DocumentDetailScreen`.
+- **Deliberately diverges from the web reference
+  (`Mockups 2.0/src/components/Documents.tsx`) on two colors**: that
+  mockup uses amber for both Markdown files and "processing" status.
+  `AppColors.accentLocked` (amber) is reserved exclusively for sealed/
+  encryption UI project-wide, enforced by
+  `test/shared/app_colors_test.dart` — kept that rule intact here
+  instead of quietly breaking it the first time a Markdown file or an
+  in-progress upload would have needed a color. Markdown got violet,
+  processing got teal; sealed status remains the one legitimate amber
+  use.
+- Tests (24 new; 65 → 96 → 118 passing total across the suite, 5
+  skipped): model parsing (`DocumentSummary`/`DocumentDetail.fromJson`,
+  including an unrecognized-status safety net and order preservation),
+  presentation mapping (the amber-exclusivity check above, every status
+  gets a distinct color), notifier tests (build/refresh/error, the
+  keep-previous-value-during-refresh behavior), widget tests for both
+  screens' states via a `FakeDocumentsRepository`, and a real-backend
+  integration test file for the empty-state and cross-user-isolation
+  checks — gated behind `RUN_REAL_SIGNUP_TEST` +
+  `SUPABASE_SERVICE_ROLE_KEY` exactly like Milestone 1.1's real-signup
+  test (creating a real confirmed user still sends a real, rate-limited
+  confirmation email even though the admin API confirms it without
+  anyone clicking the link), so it's skipped by default including in
+  CI; each test creates its own fresh throwaway user and tears it down
+  afterward via the admin API, unlike Milestone 1.1's own leftover test
+  users.
+- **Live-verified end to end against the real backend** on the Android
+  emulator, using the already-confirmed `forklift027+cerebro-gate3@gmail.com`
+  test account from the Phase 1 Gate walkthrough: launched straight into
+  the real empty-state list (a persisted session from that earlier
+  walkthrough, itself proof session persistence still works); seeded a
+  real document via a direct authenticated REST insert (same technique
+  the gated integration test above and the backend's own test suite
+  use); pull-to-refresh showed it correctly; opened its detail screen
+  and confirmed every field (title, type badge, size, status badge,
+  date) rendered correctly; deleted it directly via REST and confirmed
+  the list correctly returned to the empty state. Zero unhandled
+  exceptions in the log throughout. Screenshots:
+  `docs/screenshots/milestone-2.1-documents-list-live.png`,
+  `docs/screenshots/milestone-2.1-document-detail-live.png`. The
+  cross-user-isolation integration test itself was not run live this
+  session (needs the service-role secret), only its empty-state and
+  single-document paths were, live, by the manual seed/verify/cleanup
+  above.

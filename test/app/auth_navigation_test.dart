@@ -14,6 +14,7 @@ import 'package:cerebro_mobile/features/auth/data/auth_exception.dart';
 import 'package:cerebro_mobile/features/auth/data/auth_notifier.dart';
 import 'package:cerebro_mobile/features/auth/data/auth_repository.dart';
 import 'package:cerebro_mobile/features/auth/presentation/sign_up_screen.dart';
+import 'package:cerebro_mobile/features/documents/data/documents_repository_provider.dart';
 import 'package:cerebro_mobile/main.dart';
 import 'package:cerebro_mobile/shared/theme/app_theme.dart';
 import 'package:flutter/material.dart';
@@ -22,6 +23,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../core/network/fake_connection_status_notifier.dart';
 import '../features/auth/fake_auth_repository.dart';
+import '../features/documents/fake_documents_repository.dart';
 
 Future<void> settle(WidgetTester tester) => tester.pumpAndSettle();
 
@@ -33,6 +35,9 @@ void main() {
       authRepositoryProvider.overrideWithValue(repo),
       connectionStatusProvider.overrideWith(
         () => FakeConnectionStatusNotifier(() async {}),
+      ),
+      documentsRepositoryProvider.overrideWithValue(
+        FakeDocumentsRepository(),
       ),
     ],
     child: const CerebroApp(),
@@ -74,7 +79,7 @@ void main() {
         await repo.signIn(email: 'a@b.co', password: 'x');
         await settle(tester);
 
-        expect(find.byKey(const Key('documents_placeholder')), findsOneWidget);
+        expect(find.byKey(const Key('documents_empty')), findsOneWidget);
         expect(find.byKey(const Key('sign_up_email')), findsNothing);
         expect(find.byType(SignUpScreen), findsNothing);
       },
@@ -93,7 +98,7 @@ void main() {
         await repo.signIn(email: 'new@b.co', password: 'secret1');
         await settle(tester);
 
-        expect(find.byKey(const Key('documents_placeholder')), findsOneWidget);
+        expect(find.byKey(const Key('documents_empty')), findsOneWidget);
         expect(find.byKey(const Key('check_email_state')), findsNothing);
       },
     );
@@ -249,7 +254,15 @@ void main() {
         final signedIn = FakeAuthRepository(initialUserId: 'user-1');
         addTearDown(signedIn.dispose);
         final container = ProviderContainer(
-          overrides: [authRepositoryProvider.overrideWithValue(signedIn)],
+          overrides: [
+            authRepositoryProvider.overrideWithValue(signedIn),
+            connectionStatusProvider.overrideWith(
+              () => FakeConnectionStatusNotifier(() async {}),
+            ),
+            documentsRepositoryProvider.overrideWithValue(
+              FakeDocumentsRepository(),
+            ),
+          ],
         );
         addTearDown(container.dispose);
         await pumpWithRouter(tester, container);
@@ -258,7 +271,7 @@ void main() {
         await settle(tester);
 
         expect(find.text('Page Not Found'), findsNothing);
-        expect(find.byKey(const Key('documents_placeholder')), findsOneWidget);
+        expect(find.byKey(const Key('documents_empty')), findsOneWidget);
       },
     );
 

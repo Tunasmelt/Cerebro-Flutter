@@ -1,5 +1,6 @@
 import 'package:cerebro_mobile/core/network/connection_status_notifier.dart';
 import 'package:cerebro_mobile/features/auth/data/auth_notifier.dart';
+import 'package:cerebro_mobile/features/documents/data/documents_repository_provider.dart';
 import 'package:cerebro_mobile/features/graph/presentation/graph_screen.dart';
 import 'package:cerebro_mobile/main.dart';
 import 'package:flutter/material.dart';
@@ -8,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../core/network/fake_connection_status_notifier.dart';
 import '../features/auth/fake_auth_repository.dart';
+import '../features/documents/fake_documents_repository.dart';
 
 void main() {
   late FakeAuthRepository fakeRepository;
@@ -21,6 +23,11 @@ void main() {
         // stay fast and network-free.
         connectionStatusProvider.overrideWith(
           () => FakeConnectionStatusNotifier(() async {}),
+        ),
+        // Documents (Milestone 2.1) calls the real generated client by
+        // default — faked here for the same reason.
+        documentsRepositoryProvider.overrideWithValue(
+          FakeDocumentsRepository(),
         ),
       ],
       child: const CerebroApp(),
@@ -37,7 +44,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.byKey(const Key('documents_placeholder')), findsOneWidget);
+    expect(find.byKey(const Key('documents_empty')), findsOneWidget);
     expect(find.byKey(const Key('app_nav_docs')), findsOneWidget);
   });
 
