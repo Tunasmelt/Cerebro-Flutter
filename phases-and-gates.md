@@ -324,8 +324,12 @@ detail), cursor-paginated, matching `GET /documents` / `GET /documents/{id}`.
   cross-user isolation check the web project ran at the API/RLS layer,
   now confirmed reachable correctly through this client too.
 
-**Status: code complete, tests passing (24/24 new, 2 of them real-backend
-tests gated/skipped pending a secret), live-verified.**
+**Status: code complete, tests passing (34/34 new, 2 of them real-backend
+tests gated/skipped pending a secret), live-verified, audited (see
+CHANGELOG "Milestone 2.1 audit" — one real fix: a fragile
+error-sentinel design that could have mislabeled an unrelated error as
+a session problem; also closed a zero-coverage gap on the new error
+mapper with 10 tests).**
 **Real finding, corrects this milestone's own exit criteria:** the
 deployed backend's `GET /documents` is not cursor-paginated — confirmed
 from the backend's actual source (`services/api/app/core/documents_storage.py`),

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:chopper/chopper.dart';
 
 import 'api_client.dart' show kDefaultApiBaseUrl;
+import 'app_exception.dart';
 import 'generated/cerebro_api.swagger.dart';
 import 'session_token_provider.dart';
 
@@ -13,6 +14,16 @@ import 'session_token_provider.dart';
 /// Fail-fast: throwing here (rather than calling `chain.proceed`) aborts
 /// the request before it's sent when there's no session, exactly like
 /// `AuthInterceptor`'s no-session policy.
+///
+/// Throws the real [UnauthenticatedException] directly, not a generic
+/// `StateError` — a Milestone 2.1 audit finding: a generic sentinel type
+/// isn't exclusively ours, so a mapper matching on it (as
+/// `DocumentsErrorMapper.ofException` briefly did) would mislabel any
+/// unrelated `StateError` from deep inside Chopper/http as a session
+/// problem, masking the real one. `AuthInterceptor`/`ErrorMapper`
+/// (Milestone 0.3) already got this right by carrying the real typed
+/// exception through — this now matches that pattern instead of
+/// reinventing a weaker one.
 class GeneratedApiAuthInterceptor implements Interceptor {
   const GeneratedApiAuthInterceptor(this._tokenProvider);
 
@@ -22,7 +33,7 @@ class GeneratedApiAuthInterceptor implements Interceptor {
   FutureOr<Response<BodyType>> intercept<BodyType>(Chain<BodyType> chain) {
     final token = _tokenProvider.currentAccessToken;
     if (token == null) {
-      throw StateError('No active session — request not sent.');
+      throw const UnauthenticatedException();
     }
     return chain.proceed(
       applyHeader(chain.request, 'Authorization', 'Bearer $token'),

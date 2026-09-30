@@ -25,10 +25,14 @@ abstract final class DocumentsErrorMapper {
   }
 
   static AppException ofException(Object error) {
-    if (error is StateError) {
-      // GeneratedApiAuthInterceptor's fail-fast no-session signal.
-      return const UnauthenticatedException();
-    }
+    // GeneratedApiAuthInterceptor's fail-fast no-session signal carries
+    // the real exception, not a generic sentinel — pass it straight
+    // through, exactly like `ErrorMapper.map` does for `ApiClient`'s
+    // `AuthInterceptor`. Never match on a built-in type like
+    // `StateError` here: it isn't exclusively ours, so doing that once
+    // mislabeled any unrelated `StateError` as a session problem (a
+    // Milestone 2.1 audit finding — see `GeneratedApiAuthInterceptor`).
+    if (error is AppException) return error;
     if (error is SocketException ||
         error is TimeoutException ||
         error is HttpException) {

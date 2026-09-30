@@ -719,3 +719,63 @@ the audit's Correction note) and findings 6–8 are left for later.
   session (needs the service-role secret), only its empty-state and
   single-document paths were, live, by the manual seed/verify/cleanup
   above.
+
+### Milestone 2.1 audit (same day, before merge)
+Re-read the new code with fresh eyes and reproduced everything before
+reporting it (the Phase 1 audit's lesson: a plausible-looking risk
+isn't a finding until it's actually demonstrated).
+
+**Confirmed and fixed:**
+- **Fragile error-sentinel design.** `GeneratedApiAuthInterceptor`
+  threw a generic `StateError` as its "no session" signal, and
+  `DocumentsErrorMapper.ofException` matched on that generic type to
+  recognize it. `StateError` isn't exclusively ours — it's a common
+  built-in type Chopper/`package:http`/`dart:convert` could throw for
+  unrelated reasons (an empty-iterable access, a converter failure,
+  anything). Reproduced with a probe: a plain `StateError('Bad state:
+  No element')` unrelated to auth got mapped straight to
+  `UnauthenticatedException`, meaning a real, different failure would
+  have shown the user "Sign in to continue" instead of the actual
+  problem. `ApiClient`'s `AuthInterceptor`/`ErrorMapper` (Milestone
+  0.3) already got this right — the interceptor attaches the real
+  typed exception, and the mapper checks `is AppException` first. This
+  now matches that pattern: the interceptor throws the real
+  `UnauthenticatedException` directly, and the mapper checks `is
+  AppException` before anything else.
+- **Zero direct unit test coverage for `DocumentsErrorMapper`.**
+  Confirmed by grep — nothing imported it. The widget/repository tests
+  only exercised it indirectly through a fake that throws
+  `AppException`s directly, bypassing the mapper. Added 10 tests
+  covering every branch of `ofResponse`/`ofException`, including a
+  regression test for the finding above (mutation-checked: fails
+  against the pre-fix code, passes against the fix).
+
+**Checked and ruled out (reproduced, not just reasoned about):**
+- Whether the auth interceptor's fail-fast throw could escape
+  `ApiDocumentsRepository._run`'s try/catch unmapped, since `_run`
+  takes an already-constructed `Future` rather than a closure (so the
+  generated method call happens before the try block starts). Traced
+  through Chopper's `send()` (itself `async`) — Dart's `async`
+  semantics guarantee any exception, sync or async, becomes that
+  function's Future's error, never a raw synchronous throw to the
+  caller. Confirmed with a probe: the no-session case maps cleanly to
+  `UnauthenticatedException`. Not a bug.
+- Whether signing out while viewing a nested `/documents/:id` detail
+  screen leaves it stale over the Sign in screen — the exact shape of
+  the Phase 1 audit's retracted false-positive finding. Reproduced
+  properly this time (`pumpAndSettle`, not a fixed short wait): no
+  stale screen, redirects cleanly. Not a bug.
+
+**Noted, not fixed (low severity, out of scope for a fix-up):**
+- `original_size_bytes` is parsed onto `DocumentSummary` but never
+  displayed anywhere in the UI — dead weight, not a defect.
+- Neither error framework (`ErrorMapper` nor `DocumentsErrorMapper`)
+  has dedicated 429/rate-limit handling, despite
+  `architecture-and-security.md` stating every route is rate-limited
+  per user — a 429 falls into the generic "unexpected status code"
+  bucket. Pre-existing across the whole app since Milestone 0.3, not
+  introduced by or specific to this milestone.
+- No router-guard test specifically exercises the nested
+  `/documents/:id` path (only the top-level `/documents` redirect has
+  a dedicated test) — the guard logic is route-agnostic so this is a
+  coverage gap, not a demonstrated functional bug.
