@@ -7,6 +7,7 @@ import '../features/auth/data/auth_state.dart';
 import '../features/auth/presentation/sign_in_screen.dart';
 import '../features/auth/presentation/sign_up_screen.dart';
 import '../features/chat/presentation/chat_screen.dart';
+import '../features/documents/presentation/document_detail_screen.dart';
 import '../features/documents/presentation/documents_screen.dart';
 import '../features/graph/presentation/graph_screen.dart';
 import '../features/kanban/presentation/board_screen.dart';
@@ -76,6 +77,14 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: AppRoutes.documents,
                 builder: (context, state) => const DocumentsScreen(),
+                routes: [
+                  GoRoute(
+                    path: ':id',
+                    builder: (context, state) => DocumentDetailScreen(
+                      documentId: state.pathParameters['id']!,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

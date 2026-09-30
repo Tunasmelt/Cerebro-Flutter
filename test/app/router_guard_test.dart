@@ -42,7 +42,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.byKey(const Key('sign_in_submit')), findsOneWidget);
-      expect(find.byKey(const Key('documents_placeholder')), findsNothing);
+      expect(find.byKey(const Key('documents_empty')), findsNothing);
     },
   );
 }

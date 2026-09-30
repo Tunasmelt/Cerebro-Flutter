@@ -634,3 +634,148 @@ the audit's Correction note) and findings 6–8 are left for later.
   **Not** live-verified: the actual resend and the real sign-up →
   confirm → session flow — those still need a real inbox and are the
   Phase 1 Gate's own checks.
+
+## Phase 2 — Documents & upload
+
+### Milestone 2.1 — Document list & detail
+- **Real finding, corrects this milestone's own exit-criteria wording:**
+  the deployed backend's `GET /api/v1/documents` is **not**
+  cursor-paginated. Confirmed from the backend's actual source
+  (`services/api/app/core/documents_storage.py`'s `list_documents` —
+  a single flat, RLS-scoped Supabase REST query, `order:
+  created_at.desc`, no `limit`/cursor params anywhere), not from the
+  OpenAPI spec (still empty for this endpoint, per Milestone 0.4's
+  finding) or from `phases-and-gates.md`'s own speculative wording.
+  `api-documentation.md` already says this plainly: "not
+  cursor-paginated in practice; this project's realistic per-user
+  document count never needed it." Substituted the "pagination-cursor
+  logic" unit test with what the client actually does with the
+  response — parse every field correctly, preserve the server's
+  ordering — same substitution precedent as Milestone 0.4's missing
+  typed-schema finding.
+- Also confirmed from source, since the OpenAPI schema has none: the
+  list row shape (`id, title, mime, size_bytes,
+  original_size_bytes, status, created_at`) and the detail shape
+  (list's fields minus `original_size_bytes`, plus `ingest_state`/
+  `last_error` folded in from the document's `ingest_jobs` row — Stage
+  3.6's design, replacing a separate `GET /ingest-jobs/{id}`), and the
+  real `status` enum (`processing | ready | failed | sealed`, from
+  `apps/web/src/lib/graph/types.ts`).
+- Built on Milestone 0.4's generated (Chopper) client instead of the
+  hand-rolled `ApiClient` — this is that client's first real caller.
+  `GeneratedApiAuthInterceptor` attaches the session JWT (Chopper's
+  interceptor API, not Dio's); `DocumentsErrorMapper` maps Chopper
+  failures onto the *same* `AppException` hierarchy `ErrorMapper` uses
+  for `ApiClient` — one error framework across both HTTP stacks, per
+  Milestone 1.3's "shared error-display pattern," not a second one.
+- `DocumentsScreen` (real list, replacing Milestone 1.2's placeholder):
+  loading/empty/error/data states via `AsyncNotifier` +
+  `RefreshIndicator` (pull-to-refresh keeps the previous list visible
+  during a refresh, not a jarring flash to a spinner), each row
+  color-coded by mime type and status, tap pushes
+  `/documents/:id` (a nested route inside the Documents shell branch,
+  not a separate top-level route) to `DocumentDetailScreen`.
+- **Deliberately diverges from the web reference
+  (`Mockups 2.0/src/components/Documents.tsx`) on two colors**: that
+  mockup uses amber for both Markdown files and "processing" status.
+  `AppColors.accentLocked` (amber) is reserved exclusively for sealed/
+  encryption UI project-wide, enforced by
+  `test/shared/app_colors_test.dart` — kept that rule intact here
+  instead of quietly breaking it the first time a Markdown file or an
+  in-progress upload would have needed a color. Markdown got violet,
+  processing got teal; sealed status remains the one legitimate amber
+  use.
+- Tests (24 new; 65 → 96 → 118 passing total across the suite, 5
+  skipped): model parsing (`DocumentSummary`/`DocumentDetail.fromJson`,
+  including an unrecognized-status safety net and order preservation),
+  presentation mapping (the amber-exclusivity check above, every status
+  gets a distinct color), notifier tests (build/refresh/error, the
+  keep-previous-value-during-refresh behavior), widget tests for both
+  screens' states via a `FakeDocumentsRepository`, and a real-backend
+  integration test file for the empty-state and cross-user-isolation
+  checks — gated behind `RUN_REAL_SIGNUP_TEST` +
+  `SUPABASE_SERVICE_ROLE_KEY` exactly like Milestone 1.1's real-signup
+  test (creating a real confirmed user still sends a real, rate-limited
+  confirmation email even though the admin API confirms it without
+  anyone clicking the link), so it's skipped by default including in
+  CI; each test creates its own fresh throwaway user and tears it down
+  afterward via the admin API, unlike Milestone 1.1's own leftover test
+  users.
+- **Live-verified end to end against the real backend** on the Android
+  emulator, using the already-confirmed `forklift027+cerebro-gate3@gmail.com`
+  test account from the Phase 1 Gate walkthrough: launched straight into
+  the real empty-state list (a persisted session from that earlier
+  walkthrough, itself proof session persistence still works); seeded a
+  real document via a direct authenticated REST insert (same technique
+  the gated integration test above and the backend's own test suite
+  use); pull-to-refresh showed it correctly; opened its detail screen
+  and confirmed every field (title, type badge, size, status badge,
+  date) rendered correctly; deleted it directly via REST and confirmed
+  the list correctly returned to the empty state. Zero unhandled
+  exceptions in the log throughout. Screenshots:
+  `docs/screenshots/milestone-2.1-documents-list-live.png`,
+  `docs/screenshots/milestone-2.1-document-detail-live.png`. The
+  cross-user-isolation integration test itself was not run live this
+  session (needs the service-role secret), only its empty-state and
+  single-document paths were, live, by the manual seed/verify/cleanup
+  above.
+
+### Milestone 2.1 audit (same day, before merge)
+Re-read the new code with fresh eyes and reproduced everything before
+reporting it (the Phase 1 audit's lesson: a plausible-looking risk
+isn't a finding until it's actually demonstrated).
+
+**Confirmed and fixed:**
+- **Fragile error-sentinel design.** `GeneratedApiAuthInterceptor`
+  threw a generic `StateError` as its "no session" signal, and
+  `DocumentsErrorMapper.ofException` matched on that generic type to
+  recognize it. `StateError` isn't exclusively ours — it's a common
+  built-in type Chopper/`package:http`/`dart:convert` could throw for
+  unrelated reasons (an empty-iterable access, a converter failure,
+  anything). Reproduced with a probe: a plain `StateError('Bad state:
+  No element')` unrelated to auth got mapped straight to
+  `UnauthenticatedException`, meaning a real, different failure would
+  have shown the user "Sign in to continue" instead of the actual
+  problem. `ApiClient`'s `AuthInterceptor`/`ErrorMapper` (Milestone
+  0.3) already got this right — the interceptor attaches the real
+  typed exception, and the mapper checks `is AppException` first. This
+  now matches that pattern: the interceptor throws the real
+  `UnauthenticatedException` directly, and the mapper checks `is
+  AppException` before anything else.
+- **Zero direct unit test coverage for `DocumentsErrorMapper`.**
+  Confirmed by grep — nothing imported it. The widget/repository tests
+  only exercised it indirectly through a fake that throws
+  `AppException`s directly, bypassing the mapper. Added 10 tests
+  covering every branch of `ofResponse`/`ofException`, including a
+  regression test for the finding above (mutation-checked: fails
+  against the pre-fix code, passes against the fix).
+
+**Checked and ruled out (reproduced, not just reasoned about):**
+- Whether the auth interceptor's fail-fast throw could escape
+  `ApiDocumentsRepository._run`'s try/catch unmapped, since `_run`
+  takes an already-constructed `Future` rather than a closure (so the
+  generated method call happens before the try block starts). Traced
+  through Chopper's `send()` (itself `async`) — Dart's `async`
+  semantics guarantee any exception, sync or async, becomes that
+  function's Future's error, never a raw synchronous throw to the
+  caller. Confirmed with a probe: the no-session case maps cleanly to
+  `UnauthenticatedException`. Not a bug.
+- Whether signing out while viewing a nested `/documents/:id` detail
+  screen leaves it stale over the Sign in screen — the exact shape of
+  the Phase 1 audit's retracted false-positive finding. Reproduced
+  properly this time (`pumpAndSettle`, not a fixed short wait): no
+  stale screen, redirects cleanly. Not a bug.
+
+**Noted, not fixed (low severity, out of scope for a fix-up):**
+- `original_size_bytes` is parsed onto `DocumentSummary` but never
+  displayed anywhere in the UI — dead weight, not a defect.
+- Neither error framework (`ErrorMapper` nor `DocumentsErrorMapper`)
+  has dedicated 429/rate-limit handling, despite
+  `architecture-and-security.md` stating every route is rate-limited
+  per user — a 429 falls into the generic "unexpected status code"
+  bucket. Pre-existing across the whole app since Milestone 0.3, not
+  introduced by or specific to this milestone.
+- No router-guard test specifically exercises the nested
+  `/documents/:id` path (only the top-level `/documents` redirect has
+  a dedicated test) — the guard logic is route-agnostic so this is a
+  coverage gap, not a demonstrated functional bug.

@@ -324,6 +324,47 @@ detail), cursor-paginated, matching `GET /documents` / `GET /documents/{id}`.
   cross-user isolation check the web project ran at the API/RLS layer,
   now confirmed reachable correctly through this client too.
 
+**Status: code complete, tests passing (34/34 new, 2 of them real-backend
+tests gated/skipped pending a secret), live-verified, audited (see
+CHANGELOG "Milestone 2.1 audit" — one real fix: a fragile
+error-sentinel design that could have mislabeled an unrelated error as
+a session problem; also closed a zero-coverage gap on the new error
+mapper with 10 tests).**
+**Real finding, corrects this milestone's own exit criteria:** the
+deployed backend's `GET /documents` is not cursor-paginated — confirmed
+from the backend's actual source (`services/api/app/core/documents_storage.py`),
+which returns every one of the caller's documents in a single flat,
+RLS-scoped list, matching `api-documentation.md`'s own note that no list
+endpoint in this API ended up needing pagination in practice. The
+"pagination-cursor logic" unit test is substituted with what the client
+actually does with that response: parse it correctly and pass every
+field through unchanged, in the order the server already sorted it
+(same substitution precedent as Milestone 0.4's typed-schema finding).
+
+Built on the Milestone 0.4 generated (Chopper) client, wired with its
+own auth interceptor and its own error mapping onto the *same*
+`AppException` hierarchy `ApiClient`/`ErrorMapper` use — one error
+framework across both HTTP stacks, per Milestone 1.3.
+
+Live-verified against the real backend on the Android emulator: a real
+confirmed test account's empty Documents list rendered correctly
+("No documents yet."); a document seeded via a direct authenticated
+REST insert (same technique the backend's own test suite and this
+milestone's integration test use) appeared correctly after pull-to-
+refresh, opened to a correct detail screen (title/type/size/status/
+date), and disappeared correctly after deletion — 0 unhandled
+exceptions throughout. Screenshots:
+`docs/screenshots/milestone-2.1-documents-list-live.png`,
+`docs/screenshots/milestone-2.1-document-detail-live.png`.
+
+Cross-user isolation is covered by a real-backend integration test
+(creates two fresh admin-confirmed throwaway users, no manual email
+step) gated the same way as Milestone 1.1's real-signup test
+(`--dart-define=RUN_REAL_SIGNUP_TEST=true` +
+`--dart-define=SUPABASE_SERVICE_ROLE_KEY=...`, skipped by default
+including in CI) — not run in this session since exercising it needs
+that secret, but written and ready.
+
 ### Milestone 2.2 — Upload flow
 **Exit criteria:** Full `upload-init → PUT → upload-confirm` flow works
 from both a file picker and camera capture, per

@@ -9,4 +9,7 @@ abstract final class AppRoutes {
   static const board = '/board';
   static const playground = '/playground';
   static const settings = '/settings';
+
+  static String documentDetail(String documentId) =>
+      '$documents/$documentId';
 }
