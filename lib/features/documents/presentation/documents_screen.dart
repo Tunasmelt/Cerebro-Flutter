@@ -114,8 +114,13 @@ class DocumentsScreen extends ConsumerWidget {
                         )
                       : ListView.separated(
                           key: const Key('documents_list'),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.s4,
+                          // Bottom room so the last row can scroll clear
+                          // of the floating add button (56 + 16 margin).
+                          padding: const EdgeInsets.fromLTRB(
+                            AppSpacing.s4,
+                            0,
+                            AppSpacing.s4,
+                            88,
                           ),
                           itemCount: docs.length,
                           separatorBuilder: (_, _) =>

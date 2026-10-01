@@ -38,13 +38,25 @@ String? uploadMimeForFileName(String fileName) {
 
 /// Plain-language reason this file can't be uploaded, or null when it
 /// can. Fast feedback only — the backend re-checks both rules, and
-/// Storage enforces the size for real.
-String? validateUpload({required String? mime, required int sizeBytes}) {
+/// Storage enforces the size for real. [fileName], when given, lets the
+/// message name the offending extension (`.gif`) instead of "unknown".
+String? validateUpload({
+  required String? mime,
+  required int sizeBytes,
+  String? fileName,
+}) {
   if (mime == null || !kAllowedUploadMimeTypes.contains(mime)) {
-    return 'Unsupported file type: ${mime ?? 'unknown'}';
+    return 'Unsupported file type: ${mime ?? _extensionLabel(fileName)}';
   }
   if (sizeBytes > kMaxUploadBytes) {
     return 'File exceeds the 50MB upload limit';
   }
   return null;
+}
+
+String _extensionLabel(String? fileName) {
+  if (fileName == null) return 'unknown';
+  final dot = fileName.lastIndexOf('.');
+  if (dot < 0 || dot == fileName.length - 1) return 'unknown';
+  return '.${fileName.substring(dot + 1).toLowerCase()}';
 }

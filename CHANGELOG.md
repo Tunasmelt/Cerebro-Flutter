@@ -827,3 +827,42 @@ isn't a finding until it's actually demonstrated).
   `.md` file was uploaded twice by an automation slip, leaving two
   identical documents; there is no delete UI yet, so the six test
   documents remain on the `gate3` account.
+
+### Milestone 2.2 audit (after merge)
+Re-read the upload code with fresh eyes; every item below was reproduced
+(unit probe, widget test or the emulator) before being reported.
+
+**Confirmed and fixed:**
+- **"Unsupported file type: unknown" told the user nothing.** A `.gif`
+  or `.heic` from the photo library gets no mime, and the message fell
+  back to "unknown". It now names the extension ("Unsupported file
+  type: .gif"); a name with no extension still says unknown.
+  Mutation-checked at the controller level.
+- **The add button covered the last document.** The list had no bottom
+  padding, so on a list longer than the screen the last row's status
+  badge sat under the floating button and couldn't be scrolled clear
+  (seen in a live emulator screenshot with 7 documents). Added 88px of
+  bottom room; a widget test scrolls to the end and asserts the last
+  row doesn't overlap the button (fails without the fix).
+
+**Checked and ruled out:**
+- A file that fails to read mid-PUT surfaces as a generic
+  `UnknownApiException`, not a misleading "can't reach Cerebro".
+- Empty (0-byte) files: the client allows them and the real backend
+  accepts them and ingests them to Ready, so no client rule is needed.
+- Exactly 52,428,800 bytes passes client validation; one more is
+  rejected (already covered live in the milestone itself).
+
+**Noted, not fixed (needs a product decision or hardware):**
+- A failed `upload-confirm` (e.g. connection drops right after the PUT)
+  shows a failed row with Dismiss only. The object is already in
+  Storage and the document row stays unconfirmed; there is no "retry
+  confirm". Worth deciding alongside Milestone 2.3's status display.
+- Failed rows have no Retry for the earlier steps either.
+- iOS photo library may return HEIC, which the backend doesn't accept;
+  now at least named in the message. Unverified: no iOS device/simulator.
+- Android can destroy the app while the camera is open (low memory),
+  losing the photo; `image_picker`'s lost-data recovery isn't wired.
+  Unverified on real hardware.
+- No delete UI, so test documents on the `gate3` account can't be
+  removed from the app.

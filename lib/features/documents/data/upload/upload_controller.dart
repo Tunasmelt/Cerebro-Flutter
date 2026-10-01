@@ -89,7 +89,11 @@ class UploadController extends Notifier<List<UploadItem>> {
       ),
     );
 
-    final invalid = validateUpload(mime: file.mime, sizeBytes: file.sizeBytes);
+    final invalid = validateUpload(
+      mime: file.mime,
+      sizeBytes: file.sizeBytes,
+      fileName: file.name,
+    );
     if (invalid != null) {
       _step(id, (flow) => flow.fail(RequestRejectedException(invalid)));
       return;
