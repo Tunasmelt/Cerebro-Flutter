@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/config/supabase_config.dart';
 import '../../../../core/network/app_exception.dart';
 import '../../../../core/network/generated_api_client_provider.dart';
+import '../../../auth/data/current_user_provider.dart';
 import '../../../auth/data/supabase_session_token_provider.dart';
 import '../documents_list_notifier.dart';
 import 'picked_upload.dart';
@@ -63,10 +64,22 @@ final uploadsProvider = NotifierProvider<UploadController, List<UploadItem>>(
 class UploadController extends Notifier<List<UploadItem>> {
   int _nextId = 0;
 
+  /// Bumped every time the signed-in user changes (see `build`). An upload
+  /// started under one user must never carry on under the next: after any
+  /// `await` it compares against the generation it started with and stops.
+  int _generation = 0;
+
   @override
-  List<UploadItem> build() => const [];
+  List<UploadItem> build() {
+    // Watched so the previous user's upload rows (filenames, errors) are
+    // dropped when someone else signs in, and their flows are abandoned.
+    ref.watch(currentUserIdProvider);
+    _generation++;
+    return const [];
+  }
 
   Future<void> upload(PickedUpload file) async {
+    final generation = _generation;
     final id = _nextId++;
     _add(
       UploadItem(
@@ -103,6 +116,7 @@ class UploadController extends Notifier<List<UploadItem>> {
             onProgress: (sent, total) => _progress(id, sent, total),
           );
     });
+    if (generation != _generation) return;
     if (uploadError != null) {
       _step(id, (flow) => flow.fail(uploadError));
       return;
@@ -112,6 +126,7 @@ class UploadController extends Notifier<List<UploadItem>> {
     final confirmError = await _attempt(
       () => ref.read(uploadApiProvider).confirm(init!.documentId),
     );
+    if (generation != _generation) return;
     if (confirmError != null) {
       _step(id, (flow) => flow.fail(confirmError));
       return;

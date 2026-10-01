@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:cerebro_mobile/core/network/app_exception.dart';
+import 'package:cerebro_mobile/features/auth/data/current_user_provider.dart';
 import 'package:cerebro_mobile/features/documents/data/documents_repository_provider.dart';
 import 'package:cerebro_mobile/features/documents/data/upload/upload_controller.dart';
 import 'package:cerebro_mobile/features/documents/data/upload/upload_picker.dart';
@@ -30,6 +31,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          currentUserIdProvider.overrideWithValue('user-1'),
           documentsRepositoryProvider.overrideWithValue(
             FakeDocumentsRepository(),
           ),

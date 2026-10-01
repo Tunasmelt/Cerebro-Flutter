@@ -1,3 +1,4 @@
+import 'package:cerebro_mobile/features/auth/data/current_user_provider.dart';
 import 'package:cerebro_mobile/features/documents/data/document.dart';
 import 'package:cerebro_mobile/features/documents/data/documents_list_notifier.dart';
 import 'package:cerebro_mobile/features/documents/data/documents_repository_provider.dart';
@@ -16,6 +17,7 @@ void main() {
   ProviderContainer buildContainer() {
     container = ProviderContainer(
       overrides: [
+        currentUserIdProvider.overrideWithValue('user-1'),
         documentsRepositoryProvider.overrideWithValue(fakeRepository),
       ],
     );

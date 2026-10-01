@@ -5,6 +5,7 @@
 import 'dart:async';
 
 import 'package:cerebro_mobile/core/network/app_exception.dart';
+import 'package:cerebro_mobile/features/auth/data/current_user_provider.dart';
 import 'package:cerebro_mobile/features/documents/data/documents_list_notifier.dart';
 import 'package:cerebro_mobile/features/documents/data/documents_repository_provider.dart';
 import 'package:cerebro_mobile/features/documents/data/upload/upload_controller.dart';
@@ -29,6 +30,7 @@ void main() {
     documents = FakeDocumentsRepository();
     container = ProviderContainer(
       overrides: [
+        currentUserIdProvider.overrideWithValue('user-1'),
         uploadApiProvider.overrideWithValue(api),
         storageUploaderProvider.overrideWithValue(storage),
         documentsRepositoryProvider.overrideWithValue(documents),

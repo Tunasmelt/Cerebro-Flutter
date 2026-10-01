@@ -1,3 +1,4 @@
+import 'package:cerebro_mobile/features/auth/data/current_user_provider.dart';
 import 'package:cerebro_mobile/features/documents/data/document.dart';
 import 'package:cerebro_mobile/features/documents/data/documents_repository_provider.dart';
 import 'package:cerebro_mobile/features/documents/presentation/document_detail_screen.dart';
@@ -21,7 +22,10 @@ void main() {
 
   Widget buildApp(FakeDocumentsRepository repo, {String id = 'doc-1'}) {
     return ProviderScope(
-      overrides: [documentsRepositoryProvider.overrideWithValue(repo)],
+      overrides: [
+        currentUserIdProvider.overrideWithValue('user-1'),
+        documentsRepositoryProvider.overrideWithValue(repo),
+      ],
       child: MaterialApp(
         theme: AppTheme.dark,
         home: DocumentDetailScreen(documentId: id),
