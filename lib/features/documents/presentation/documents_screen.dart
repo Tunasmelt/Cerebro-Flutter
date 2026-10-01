@@ -11,13 +11,36 @@ import '../../../shared/tokens/app_typography.dart';
 import '../../../shared/widgets/error_view.dart';
 import '../data/document.dart';
 import '../data/documents_list_notifier.dart';
+import '../data/upload/upload_controller.dart';
+import '../data/upload/upload_picker.dart';
 import 'document_presentation.dart';
+import 'upload_list.dart';
+import 'upload_source_sheet.dart';
 
-/// Milestone 2.1 — real Documents list against `GET /api/v1/documents`.
-/// Upload (Milestone 2.2) doesn't exist yet, so this screen is
-/// read-only: no dropzone, no upload button.
+/// Real Documents list against `GET /api/v1/documents` (Milestone 2.1)
+/// with the upload entry point (Milestone 2.2): the Add button opens a
+/// source sheet (file / photo library / camera), and in-flight uploads
+/// appear above the list.
 class DocumentsScreen extends ConsumerWidget {
   const DocumentsScreen({super.key});
+
+  Future<void> _onAddPressed(BuildContext context, WidgetRef ref) async {
+    final source = await showUploadSourceSheet(context);
+    if (source == null || !context.mounted) return;
+
+    try {
+      final picked = await ref.read(uploadPickerProvider).pick(source);
+      if (picked == null) return;
+      // Not awaited on purpose: the flow reports through `uploadsProvider`,
+      // and the user shouldn't be held on this handler while it runs.
+      ref.read(uploadsProvider.notifier).upload(picked);
+    } on UploadPickException catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(key: const Key('upload_pick_error'), content: Text(e.message)),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -26,6 +49,14 @@ class DocumentsScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.bgBase,
+      floatingActionButton: FloatingActionButton(
+        key: const Key('documents_add_fab'),
+        backgroundColor: AppColors.accentPrimary,
+        foregroundColor: AppColors.textOnAccent,
+        tooltip: 'Add a document',
+        onPressed: () => _onAddPressed(context, ref),
+        child: const Icon(Icons.add),
+      ),
       body: SafeArea(
         bottom: false,
         child: Column(
@@ -47,6 +78,7 @@ class DocumentsScreen extends ConsumerWidget {
                 ),
               ),
             ),
+            const UploadList(),
             Expanded(
               child: documents.when(
                 loading: () => const Center(

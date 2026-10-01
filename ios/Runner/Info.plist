@@ -58,5 +58,9 @@
 			</array>
 		</dict>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Cerebro uses the camera only when you choose to photograph a document or note to add to your library.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Cerebro reads a photo from your library only when you choose one to add as a document.</string>
 </dict>
 </plist>

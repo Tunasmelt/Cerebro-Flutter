@@ -37,6 +37,14 @@ void main() {
       expect(presentation.message, 'Sign in to continue.');
     });
 
+    test('RequestRejectedException maps to rejected, showing the server message', () {
+      final presentation = ErrorPresentation.of(
+        const RequestRejectedException('File exceeds the 50MB upload limit'),
+      );
+      expect(presentation.kind, ErrorKind.rejected);
+      expect(presentation.message, 'File exceeds the 50MB upload limit');
+    });
+
     test('UnknownApiException maps to unknown and passes its detail through', () {
       final presentation = ErrorPresentation.of(
         const UnknownApiException('weird one'),
@@ -51,10 +59,11 @@ void main() {
         const ServerErrorException(500),
         const UnauthorizedException(),
         const UnauthenticatedException(),
+        const RequestRejectedException('nope'),
         const UnknownApiException(),
       ].map((e) => ErrorPresentation.of(e).icon).toSet();
 
-      expect(icons.length, 5);
+      expect(icons.length, 6);
     });
 
     test(

@@ -8,7 +8,14 @@ import 'app_exception.dart';
 /// decide "does this look like an error or like a neutral status",
 /// per Milestone 1.3's requirement that offline is never visually
 /// collapsed into a generic server-error look.
-enum ErrorKind { offline, serverError, unauthorized, unauthenticated, unknown }
+enum ErrorKind {
+  offline,
+  serverError,
+  unauthorized,
+  unauthenticated,
+  rejected,
+  unknown,
+}
 
 /// UI-ready presentation for an [AppException]: an icon, a tint, and
 /// the exception's own plain-language message passed through
@@ -55,6 +62,12 @@ class ErrorPresentation {
       UnauthenticatedException() => ErrorPresentation(
         kind: ErrorKind.unauthenticated,
         icon: Icons.login_rounded,
+        color: AppColors.danger,
+        message: exception.message,
+      ),
+      RequestRejectedException() => ErrorPresentation(
+        kind: ErrorKind.rejected,
+        icon: Icons.block_rounded,
         color: AppColors.danger,
         message: exception.message,
       ),
