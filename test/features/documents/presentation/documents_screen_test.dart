@@ -1,4 +1,5 @@
 import 'package:cerebro_mobile/core/network/app_exception.dart';
+import 'package:cerebro_mobile/features/auth/data/current_user_provider.dart';
 import 'package:cerebro_mobile/features/documents/data/document.dart';
 import 'package:cerebro_mobile/features/documents/data/documents_repository_provider.dart';
 import 'package:cerebro_mobile/features/documents/presentation/documents_screen.dart';
@@ -12,7 +13,10 @@ import '../fake_documents_repository.dart';
 void main() {
   Widget buildApp(FakeDocumentsRepository repo) {
     return ProviderScope(
-      overrides: [documentsRepositoryProvider.overrideWithValue(repo)],
+      overrides: [
+        currentUserIdProvider.overrideWithValue('user-1'),
+        documentsRepositoryProvider.overrideWithValue(repo),
+      ],
       child: MaterialApp(theme: AppTheme.dark, home: const DocumentsScreen()),
     );
   }

@@ -12,9 +12,13 @@ import 'package:chopper/chopper.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 
-Response _responseWithStatus(int statusCode) {
+Response _responseWithStatus(
+  int statusCode, [
+  String body = '',
+  Map<String, String> headers = const {},
+]) {
   return Response(
-    http.Response('', statusCode),
+    http.Response(body, statusCode, headers: headers),
     null,
   );
 }
@@ -38,6 +42,110 @@ void main() {
       final mapped = DocumentsErrorMapper.ofResponse(_responseWithStatus(404));
       expect(mapped, isA<UnknownApiException>());
       expect(mapped.message, 'Not found');
+    });
+
+    test(
+      "a 4xx carrying the backend's {error:{code,message}} body surfaces its "
+      'own plain-language message as a RequestRejectedException',
+      () {
+        final mapped = DocumentsErrorMapper.ofResponse(
+          _responseWithStatus(
+            413,
+            '{"error":{"code":"file_too_large","message":"File exceeds the 50MB upload limit"}}',
+          ),
+        );
+        expect(mapped, isA<RequestRejectedException>());
+        expect(mapped.message, 'File exceeds the 50MB upload limit');
+        expect((mapped as RequestRejectedException).code, 'file_too_large');
+      },
+    );
+
+    test('the same shape on a 422 and a 404 is surfaced too', () {
+      final upload = DocumentsErrorMapper.ofResponse(
+        _responseWithStatus(
+          422,
+          '{"error":{"code":"upload_not_found","message":"No uploaded object found for this document yet"}}',
+        ),
+      );
+      final missing = DocumentsErrorMapper.ofResponse(
+        _responseWithStatus(
+          404,
+          '{"error":{"code":"not_found","message":"Document not found"}}',
+        ),
+      );
+      expect(upload.message, 'No uploaded object found for this document yet');
+      expect(missing, isA<RequestRejectedException>());
+      expect(missing.message, 'Document not found');
+    });
+
+    test('a 4xx body that is not our error shape falls back, never throws', () {
+      // FastAPI's own validation errors use {"detail": [...]}, and a
+      // proxy might return HTML — neither may crash the mapper.
+      expect(
+        DocumentsErrorMapper.ofResponse(
+          _responseWithStatus(422, '{"detail":[{"msg":"field required"}]}'),
+        ),
+        isA<UnknownApiException>(),
+      );
+      expect(
+        DocumentsErrorMapper.ofResponse(_responseWithStatus(400, '<html>')),
+        isA<UnknownApiException>(),
+      );
+    });
+
+    group('429 rate limiting (the backend limits e.g. 10 upload-inits/hour)', () {
+      const body =
+          '{"error":{"code":"rate_limited","message":"Too many requests for upload"}}';
+
+      test('is a plain-language message built from Retry-After, not the '
+          "server's internal route-class wording", () {
+        final mapped = DocumentsErrorMapper.ofResponse(
+          _responseWithStatus(429, body, {'retry-after': '1500'}),
+        );
+        expect(mapped, isA<RequestRejectedException>());
+        expect((mapped as RequestRejectedException).code, 'rate_limited');
+        expect(mapped.message, "You're doing that too often. Try again in about 25 minutes.");
+        expect(mapped.message, isNot(contains('upload')));
+      });
+
+      test('rounds up to whole minutes', () {
+        expect(
+          DocumentsErrorMapper.ofResponse(_responseWithStatus(429, body, {'retry-after': '61'})).message,
+          contains('about 2 minutes'),
+        );
+      });
+
+      test('under a minute reads "a minute"', () {
+        expect(
+          DocumentsErrorMapper.ofResponse(_responseWithStatus(429, body, {'retry-after': '20'})).message,
+          "You're doing that too often. Try again in a minute.",
+        );
+      });
+
+      test('a long wait is expressed in hours', () {
+        expect(
+          DocumentsErrorMapper.ofResponse(_responseWithStatus(429, body, {'retry-after': '7200'})).message,
+          contains('about 2 hours'),
+        );
+      });
+
+      test('a missing or malformed Retry-After still gives a usable message', () {
+        for (final headers in [const <String, String>{}, {'retry-after': 'soon'}]) {
+          expect(
+            DocumentsErrorMapper.ofResponse(_responseWithStatus(429, '', headers)).message,
+            "You're doing that too often. Try again in a little while.",
+          );
+        }
+      });
+    });
+
+    test('a 401 is still Unauthorized even if the body has an error shape', () {
+      expect(
+        DocumentsErrorMapper.ofResponse(
+          _responseWithStatus(401, '{"error":{"code":"x","message":"nope"}}'),
+        ),
+        isA<UnauthorizedException>(),
+      );
     });
 
     test('an unexpected status code falls back to a generic UnknownApiException', () {

@@ -39,6 +39,19 @@ final class UnauthenticatedException extends AppException {
   const UnauthenticatedException() : super('Sign in to continue.');
 }
 
+/// The server understood the request and refused it for a specific,
+/// user-actionable reason — a 4xx carrying the backend's
+/// `{"error": {"code", "message"}}` body (unsupported file type, file too
+/// large, upload not found). Distinct from [UnknownApiException]: the
+/// message here is the server's own plain-language explanation, meant
+/// to be shown, not a generic fallback.
+final class RequestRejectedException extends AppException {
+  const RequestRejectedException(super.message, {this.code});
+
+  /// The backend's machine-readable `error.code`, when it sent one.
+  final String? code;
+}
+
 /// Anything else: unexpected status codes, malformed responses,
 /// cancellations. A safe fallback, never a crash.
 final class UnknownApiException extends AppException {

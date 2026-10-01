@@ -779,3 +779,33 @@ isn't a finding until it's actually demonstrated).
   `/documents/:id` path (only the top-level `/documents` redirect has
   a dedicated test) — the guard logic is route-agnostic so this is a
   coverage gap, not a demonstrated functional bug.
+
+### Milestone 2.2 — Upload flow
+- `upload-init` → direct PUT to Supabase Storage → `upload-confirm`,
+  from file picker, photo library and camera (`file_picker`,
+  `image_picker`). Bytes are streamed straight to Storage, never
+  through a proxy. Client-side checks mirror the backend (type list,
+  50 MiB = 52,428,800 bytes) so obvious rejections cost no network call.
+- Upload state machine (`selecting → uploading → confirming → done`,
+  `→ failed`) with illegal transitions throwing; `UploadController`
+  drives it, shows per-upload rows above the documents list, and
+  refreshes the list on success.
+- New `RequestRejectedException` carries the server's own message
+  (unsupported type, too large, rate limited) through the shared error
+  framework; 429 reads `Retry-After`.
+- **Findings:** Storage returns HTTP 400 + `EntityTooLarge` (not 413)
+  for oversize; `upload-init` is limited to 10/hour/user; signed URLs
+  live 60 s.
+- **Found by testing, fixed:** (1) cross-user state leak — the previous
+  user's document list and upload rows survived sign-out/sign-in;
+  reproduced, then fixed with `currentUserIdProvider` (user-scoped
+  providers rebuild on user change; an in-flight upload from the old
+  user is abandoned and never confirms under the new session).
+  (2) Release APKs had **no network permission** — Flutter only adds
+  `INTERNET` to debug/profile manifests; declared it in the main
+  manifest, guarded by `test/platform/platform_config_test.dart`, and
+  verified a release build loads Documents from the backend on the
+  emulator.
+- One-off: 3 tests failed once in a full run and did not reproduce in
+  4 clean reruns; noted, not explained.
+- Tests: 200 passing, 11 skipped. Camera verified on the emulator only.

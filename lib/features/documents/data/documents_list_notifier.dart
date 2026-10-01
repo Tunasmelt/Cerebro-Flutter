@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../auth/data/current_user_provider.dart';
 import 'document.dart';
 import 'documents_repository_provider.dart';
 
@@ -12,7 +13,13 @@ final documentsListProvider =
 
 class DocumentsListNotifier extends AsyncNotifier<List<DocumentSummary>> {
   @override
-  FutureOr<List<DocumentSummary>> build() => fetch();
+  FutureOr<List<DocumentSummary>> build() {
+    // Rebuilds (dropping the previous user's list) whenever the signed-in
+    // user changes; nothing to fetch while signed out.
+    final userId = ref.watch(currentUserIdProvider);
+    if (userId == null) return const [];
+    return fetch();
+  }
 
   /// Unlike `ConnectionStatusNotifier`, this repository is already
   /// overridable at the provider level with a plain fake (no real
