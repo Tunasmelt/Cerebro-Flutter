@@ -1,4 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Flutter only adds INTERNET to the debug and profile manifests, so a
+         release build without this line cannot reach the network at all —
+         no sign-in, no API calls, no uploads. It went unnoticed because CI
+         and every manual run used debug builds. Guarded by
+         test/platform/platform_config_test.dart. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <application
         android:label="cerebro_mobile"
         android:name="${applicationName}"
