@@ -395,8 +395,9 @@ from both a file picker and camera capture, per
   still holds.
 
 **Status: code complete, 200 tests passing (11 skipped: real-backend
-suites gated behind `--dart-define`s), analyze clean. Live emulator
-success runs and CI: see CHANGELOG "Milestone 2.2".**
+suites gated behind `--dart-define`s), analyze clean, CI green, live
+emulator uploads verified for file picker (.txt/.md/.pdf), photo
+library and camera (see CHANGELOG "Milestone 2.2").**
 **Real findings that correct or extend this milestone's own wording:**
 - *"Left in `uploading` state" test:* the client cannot force that
   state; it only abandons the flow (never calls `upload-confirm`). The
