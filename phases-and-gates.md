@@ -394,6 +394,25 @@ from both a file picker and camera capture, per
   MB/MiB unit finding from the web project without re-confirming it
   still holds.
 
+**Status: code complete, 200 tests passing (11 skipped: real-backend
+suites gated behind `--dart-define`s), analyze clean. Live emulator
+success runs and CI: see CHANGELOG "Milestone 2.2".**
+**Real findings that correct or extend this milestone's own wording:**
+- *"Left in `uploading` state" test:* the client cannot force that
+  state; it only abandons the flow (never calls `upload-confirm`). The
+  real-backend test asserts exactly that and checks the row stays
+  non-ready.
+- *Oversize rejection is HTTP 400, not 413:* Supabase Storage answers
+  an over-limit PUT with 400 and body code `EntityTooLarge`. The
+  50 MiB boundary (52,428,800 bytes) was confirmed live: success at the
+  limit, clean message above it.
+- *Rate limit:* `upload-init` is limited to 10/hour/user (429 +
+  `Retry-After`); surfaced as a plain-language message, and the
+  real-backend tests budget around it.
+- *Camera:* verified on the Android emulator only; no physical device
+  was available, so the "real device" manual test stays open for the
+  owner.
+
 ### Milestone 2.3 — Ingest status display
 **Exit criteria:** The UI reflects real `ingest_jobs.state` progression
 (uploading → normalizing → extracting → embedding → ready/failed),
