@@ -809,3 +809,21 @@ isn't a finding until it's actually demonstrated).
 - One-off: 3 tests failed once in a full run and did not reproduce in
   4 clean reruns; noted, not explained.
 - Tests: 200 passing, 11 skipped. Camera verified on the emulator only.
+
+- **Live-verified on the Android emulator against the real backend**
+  (confirmed `gate3` test account, debug build): file picker with a
+  `.txt`, a `.md` (not greyed out) and a `.pdf`; the Android photo
+  picker with a PNG; and the camera (emulator's virtual camera, no
+  permission prompt needed because capture goes through the system
+  camera intent). Each upload showed an Uploading row, then appeared in
+  the list as "Processing", and the earlier ones moved to "Ready" on
+  their own. No unhandled exceptions in the log. Screenshots:
+  `docs/screenshots/milestone-2.2-upload-txt-live.png`,
+  `milestone-2.2-upload-all-sources-live.png`,
+  `milestone-2.2-upload-camera-live.png`.
+- Observations (not defects): the photo picker hands back a content-URI
+  id as the file name (`46.png`) rather than the original name; the
+  camera shot gets a generated `photo-YYYYMMDD-HHMMSS.jpg` name. The
+  `.md` file was uploaded twice by an automation slip, leaving two
+  identical documents; there is no delete UI yet, so the six test
+  documents remain on the `gate3` account.
