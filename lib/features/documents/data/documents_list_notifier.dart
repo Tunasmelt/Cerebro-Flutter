@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../auth/data/current_user_provider.dart';
 import 'document.dart';
 import 'documents_repository_provider.dart';
+import 'ingest_polling.dart';
 
 final documentsListProvider =
     AsyncNotifierProvider<DocumentsListNotifier, List<DocumentSummary>>(
@@ -12,13 +13,29 @@ final documentsListProvider =
     );
 
 class DocumentsListNotifier extends AsyncNotifier<List<DocumentSummary>> {
+  Timer? _pollTimer;
+
+  /// False once this build is superseded or disposed, so an in-flight poll
+  /// can't write into a state that no longer belongs to it.
+  bool _alive = true;
+
+  int _polls = 0;
+
   @override
-  FutureOr<List<DocumentSummary>> build() {
+  Future<List<DocumentSummary>> build() async {
     // Rebuilds (dropping the previous user's list) whenever the signed-in
     // user changes; nothing to fetch while signed out.
     final userId = ref.watch(currentUserIdProvider);
+    _alive = true;
+    _polls = 0;
+    ref.onDispose(() {
+      _alive = false;
+      _pollTimer?.cancel();
+    });
     if (userId == null) return const [];
-    return fetch();
+    final documents = await fetch();
+    _pollIfProcessing(documents);
+    return documents;
   }
 
   /// Unlike `ConnectionStatusNotifier`, this repository is already
@@ -30,9 +47,36 @@ class DocumentsListNotifier extends AsyncNotifier<List<DocumentSummary>> {
       ref.read(documentsRepositoryProvider).listDocuments();
 
   Future<void> refresh() async {
-    state = const AsyncLoading<List<DocumentSummary>>().copyWithPrevious(
-      state,
-    );
+    _polls = 0;
+    state = const AsyncLoading<List<DocumentSummary>>().copyWithPrevious(state);
     state = await AsyncValue.guard(fetch);
+    _pollIfProcessing(state.valueOrNull);
+  }
+
+  /// While anything is still `processing`, quietly re-fetch so rows flip
+  /// to Ready/Failed on their own. Each poll replaces the list only on
+  /// success: a network blip mid-ingest must not swap the list for an
+  /// error. Stops when nothing is processing, or after the poll budget.
+  void _pollIfProcessing(List<DocumentSummary>? documents) {
+    _pollTimer?.cancel();
+    if (!_alive || documents == null) return;
+    if (!documents.any((d) => d.status == DocumentStatus.processing)) return;
+
+    final interval = ref.read(ingestPollIntervalProvider);
+    final budget = maxPolls(interval, ref.read(ingestPollLimitProvider));
+    if (_polls >= budget) return;
+
+    _pollTimer = Timer(interval, () async {
+      _polls++;
+      try {
+        final latest = await fetch();
+        if (!_alive) return;
+        state = AsyncData(latest);
+        _pollIfProcessing(latest);
+      } catch (_) {
+        if (!_alive) return;
+        _pollIfProcessing(state.valueOrNull);
+      }
+    });
   }
 }

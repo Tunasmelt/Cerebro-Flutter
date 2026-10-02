@@ -432,6 +432,20 @@ either via polling or SSE if the backend exposes it that way.
   whatever `last_error` message the backend provides, not a stuck
   spinner.
 
+**Status: code complete, 252 tests passing (13 skipped: gated
+real-backend suites), analyze clean, live-verified on the emulator (see
+CHANGELOG "Milestone 2.3").**
+- *Polling, not SSE:* the backend exposes ingest progress only via
+  `GET /documents/{id}`'s `ingest_state`/`last_error` (SSE was dropped
+  upstream), so the UI polls — capped at 10 minutes, after which it says
+  the job is taking longer than usual and offers "Check again".
+- *Real-backend integration tests are written but not yet run* (they
+  need `CEREBRO_TEST_EMAIL`/`CEREBRO_TEST_PASSWORD`); the corrupt-PDF
+  failure and small-file success were instead verified live through the
+  app. **Open for the owner: run the two ingest integration tests once.**
+- *No Retry button* for failed documents yet, though the backend has
+  `retry-ingest`.
+
 ### Phase 2 Gate
 All milestones 2.1–2.3 pass their tests, **and** the project owner
 confirms live:

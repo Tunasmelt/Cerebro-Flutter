@@ -866,3 +866,64 @@ Re-read the upload code with fresh eyes; every item below was reproduced
   Unverified on real hardware.
 - No delete UI, so test documents on the `gate3` account can't be
   removed from the app.
+
+### Milestone 2.3 — Ingest status display
+- **Source of truth, read from the backend repo, not guessed:**
+  `ingest_jobs.state` is `uploading → normalizing → extracting →
+  embedding → ready | failed` (captures start at `extracting`). The
+  backend exposes progress only by polling `GET /documents/{id}` — its
+  originally-planned SSE push was dropped (api-documentation.md, Stage
+  3.6) — so polling is the mechanism, not a fallback. `last_error` is a
+  machine code, not prose; the 11 codes the ingest pipeline writes were
+  collected from `ingest/*.py` and `documents_storage.py`.
+- `IngestStage` (new): maps every documented state to a label
+  ("Preparing file", "Reading text", "Indexing", …), with `unknown` →
+  "Processing" for anything the server adds later, plus a 0–1 progress
+  value that only moves forward. `ingestErrorMessage` turns each known
+  code into plain language ("This PDF looks damaged and couldn't be
+  read.") and, for an unfamiliar code, still shows it ("…couldn't be
+  processed (quota_exceeded).") rather than hiding the failure.
+- **Detail screen** now polls (autoDispose stream, every 3 s) until the
+  document is ready/failed, showing the real stage with a determinate
+  bar. A failure on the *first* fetch is the error; a failure on a later
+  poll is ignored so a dropped connection mid-ingest doesn't replace the
+  last known state. Stops the moment the screen closes.
+- **List** polls quietly while any row is `processing`, so rows flip to
+  Ready/Failed on their own (previously needed pull-to-refresh). Poll
+  errors keep the list on screen; polling stops when nothing is
+  processing.
+- **Poll window is capped at 10 minutes** (both screens) so a job the
+  server never finishes can't poll forever. Found necessary live: a
+  2.8 MB text file sat in the real "Indexing" stage for over 10 minutes
+  before reaching Ready. The detail screen now says "This is taking
+  longer than usual…", drops the bar (nothing is polling, so it
+  shouldn't imply live progress), and offers "Check again".
+- **Live-verified on the emulator against the real backend:** a corrupt
+  PDF showed Processing, then Failed in the list with no refresh, and
+  its detail screen showed "This PDF looks damaged and couldn't be
+  read." (backend code `corrupt_pdf`) — no spinner; small text/markdown
+  files flipped Processing → Ready unaided; the 2.8 MB file showed the
+  real "Indexing" stage with the bar. Screenshots:
+  `docs/screenshots/milestone-2.3-corrupt-pdf-failed-live.png`,
+  `milestone-2.3-indexing-live.png`.
+- **Not captured live:** the intermediate `normalizing`/`extracting`
+  transitions — small files pass through them in a couple of seconds,
+  faster than a screenshot loop over adb. They are covered by scripted
+  tests that replay each state in order.
+- **Real-backend integration tests written but NOT run:** two new tests
+  in `upload_integration_test.dart` (a real document observed advancing
+  through real states to `ready`; a corrupt PDF ending `failed` with a
+  `last_error` the app can explain — it fails if the backend ever
+  writes a code `ingestErrorMessage` doesn't know) are gated on
+  `CEREBRO_TEST_EMAIL`/`CEREBRO_TEST_PASSWORD`, which this session did
+  not have. They add 2 `upload-init` calls to that file's per-run
+  budget (now 7 of 10/hour). Owner should run them once.
+- **Not built (needs a decision):** the backend has
+  `POST /documents/{id}/retry-ingest` (resumes a failed job from its
+  checkpoint; 409 when not resumable). A failed document currently shows
+  its reason but has no Retry button.
+- Tests: 252 passing, 13 skipped (the gated real-backend suites). New:
+  mapper (26), polling for detail + list incl. blip/cap/dispose (17),
+  detail-screen ingest UI (6). Each mutation-checked (removing
+  stop-at-terminal, the poll caps, the give-up flag, or the error-code
+  mapping fails tests).
