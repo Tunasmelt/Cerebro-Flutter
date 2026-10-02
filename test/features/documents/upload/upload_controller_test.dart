@@ -162,7 +162,7 @@ void main() {
       expect(flow.failedAt, UploadStage.selecting);
       expect(
         (flow.error as RequestRejectedException).message,
-        'Unsupported file type: unknown',
+        'Unsupported file type: .zip',
       );
       expect(log.entries, isEmpty);
     });

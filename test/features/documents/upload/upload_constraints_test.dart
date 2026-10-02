@@ -2,6 +2,7 @@ import 'package:cerebro_mobile/features/documents/data/upload/upload_constraints
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  unsupportedTypeMessageTests();
   group('the 50MB ceiling is exactly 50 MiB, to the byte', () {
     test('kMaxUploadBytes is 52,428,800', () {
       expect(kMaxUploadBytes, 52428800);
@@ -66,6 +67,27 @@ void main() {
       expect(uploadMimeForFileName('archive.zip'), isNull);
       expect(uploadMimeForFileName('README'), isNull);
       expect(uploadMimeForFileName('trailing.'), isNull);
+    });
+  });
+}
+
+void unsupportedTypeMessageTests() {
+  group('unsupported type names the extension, not "unknown"', () {
+    test('a .gif', () {
+      expect(
+        validateUpload(
+          mime: uploadMimeForFileName('party.GIF'),
+          sizeBytes: 1,
+          fileName: 'party.GIF',
+        ),
+        'Unsupported file type: .gif',
+      );
+    });
+    test('no extension at all still says unknown', () {
+      expect(
+        validateUpload(mime: null, sizeBytes: 1, fileName: 'README'),
+        'Unsupported file type: unknown',
+      );
     });
   });
 }

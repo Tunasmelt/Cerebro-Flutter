@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:cerebro_mobile/core/network/app_exception.dart';
 import 'package:cerebro_mobile/features/auth/data/current_user_provider.dart';
+import 'package:cerebro_mobile/features/documents/data/document.dart';
 import 'package:cerebro_mobile/features/documents/data/documents_repository_provider.dart';
 import 'package:cerebro_mobile/features/documents/data/upload/upload_controller.dart';
 import 'package:cerebro_mobile/features/documents/data/upload/upload_picker.dart';
@@ -27,13 +28,16 @@ void main() {
     picker = FakeUploadPicker()..result = fakePickedUpload();
   });
 
-  Future<void> pumpScreen(WidgetTester tester) async {
+  Future<void> pumpScreen(
+    WidgetTester tester, {
+    FakeDocumentsRepository? documents,
+  }) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           currentUserIdProvider.overrideWithValue('user-1'),
           documentsRepositoryProvider.overrideWithValue(
-            FakeDocumentsRepository(),
+            documents ?? FakeDocumentsRepository(),
           ),
           uploadApiProvider.overrideWithValue(api),
           storageUploaderProvider.overrideWithValue(storage),
@@ -212,5 +216,37 @@ void main() {
 
     expect(find.text('File exceeds the 50MB upload limit'), findsOneWidget);
     expect(log.entries, isEmpty);
+  });
+
+  testWidgets('the last document can scroll clear of the add button', (
+    tester,
+  ) async {
+    final docs = [
+      for (var i = 0; i < 12; i++)
+        DocumentSummary(
+          id: 'id-$i',
+          title: 'doc-$i.txt',
+          mime: 'text/plain',
+          sizeBytes: 1,
+          originalSizeBytes: 1,
+          status: DocumentStatus.ready,
+          createdAt: DateTime.utc(2026),
+        ),
+    ];
+    await pumpScreen(tester, documents: FakeDocumentsRepository(documents: docs));
+
+    await tester.drag(find.byKey(const Key('documents_list')), const Offset(0, -3000));
+    await tester.pumpAndSettle();
+
+    final fab = tester.getRect(find.byKey(const Key('documents_add_fab')));
+    final last = tester.getRect(find.text('doc-11.txt'));
+    expect(
+      last.overlaps(fab),
+      isFalse,
+      reason: 'the final row is hidden under the floating add button',
+    );
+    // The status badge sits at the row's right edge, where the button is.
+    final row = tester.getRect(find.ancestor(of: find.text('doc-11.txt'), matching: find.byType(Container)).first);
+    expect(row.bottom, lessThanOrEqualTo(fab.top));
   });
 }
