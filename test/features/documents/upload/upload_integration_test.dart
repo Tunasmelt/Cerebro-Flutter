@@ -11,9 +11,9 @@
 //
 // RATE-LIMIT BUDGET: the backend allows only 10 `upload-init` calls per
 // user per hour (`services/api/app/core/rate_limit.py`, a sliding window;
-// rejected calls aren't counted). This file spends 5 of them per run
-// (e2e 1, abandoned 1, confirm-without-PUT 1, rejections 2) and the
-// opt-in large test 2 more — so don't run it more than once an hour
+// rejected calls aren't counted). This file spends 7 of them per run
+// (e2e 1, abandoned 1, confirm-without-PUT 1, rejections 2) plus 2 for
+// Milestone 2.3's ingest tests (7 in all), and the opt-in large test 2 more — so don't run it more than once an hour
 // against the same account, or the app (and the next run) will get a
 // 429 "Too many requests". Found the hard way during Milestone 2.2's live
 // camera test, which hit the limit this suite had just consumed.
@@ -31,6 +31,7 @@ import 'package:cerebro_mobile/core/network/generated_api_client.dart';
 import 'package:cerebro_mobile/core/network/session_token_provider.dart';
 import 'package:cerebro_mobile/features/documents/data/document.dart';
 import 'package:cerebro_mobile/features/documents/data/documents_repository.dart';
+import 'package:cerebro_mobile/features/documents/data/ingest_status.dart';
 import 'package:cerebro_mobile/features/documents/data/upload/picked_upload.dart';
 import 'package:cerebro_mobile/features/documents/data/upload/storage_uploader.dart';
 import 'package:cerebro_mobile/features/documents/data/upload/upload_api.dart';
@@ -86,6 +87,13 @@ PickedUpload _textFile(String name, String content) {
     openRead: () => Stream<List<int>>.value(bytes),
   );
 }
+
+PickedUpload _pdfFile(String name, List<int> bytes) => PickedUpload(
+  name: name,
+  mime: 'application/pdf',
+  sizeBytes: bytes.length,
+  openRead: () => Stream<List<int>>.value(bytes),
+);
 
 /// A file of exactly [size] bytes, streamed in 1 MiB chunks — never held
 /// in memory, since the boundary test is ~50 MiB.
@@ -388,6 +396,92 @@ void main() {
         );
       },
       timeout: const Timeout(Duration(minutes: 12)),
+    );
+  });
+
+  // Milestone 2.3: the ingest states the UI shows are the REAL ones the
+  // backend moves a document through, and a failure carries its reason.
+  group('ingest status — real backend', () {
+    /// Polls like the app does, recording each distinct state seen, until
+    /// the job settles (or the deadline passes).
+    Future<(List<String>, DocumentDetail)> watchIngest(String documentId) async {
+      final seen = <String>[];
+      late DocumentDetail last;
+      for (var i = 0; i < 90; i++) {
+        last = await documents.getDocument(documentId);
+        final state = last.ingestState ?? 'null';
+        if (seen.isEmpty || seen.last != state) seen.add(state);
+        if (IngestStage.fromApi(last.ingestState).isTerminal) break;
+        await Future<void>.delayed(const Duration(seconds: 1));
+      }
+      return (seen, last);
+    }
+
+    Future<String> uploadAndConfirm(PickedUpload file) async {
+      final init = await uploadApi.init(
+        filename: file.name,
+        mime: file.mime!,
+        sizeBytes: file.sizeBytes,
+      );
+      deleteAfter(init.documentId);
+      await storage.put(uploadUrl: init.uploadUrl, file: file, mime: file.mime!);
+      await uploadApi.confirm(init.documentId);
+      return init.documentId;
+    }
+
+    test(
+      'a real document is observed advancing through real states to ready, '
+      'with no error',
+      () async {
+        if (_gated) return skipUnlessConfigured();
+        final id = await uploadAndConfirm(
+          _textFile('m23-ready.txt', 'Cerebro Milestone 2.3 ingest test.\n'),
+        );
+
+        final (seen, last) = await watchIngest(id);
+
+        expect(seen.last, 'ready', reason: 'states seen: $seen');
+        expect(last.status, DocumentStatus.ready);
+        expect(last.lastError, isNull);
+        for (final state in seen) {
+          expect(
+            IngestStage.fromApi(state),
+            isNot(IngestStage.unknown),
+            reason: 'the app has no label for the real state "$state"',
+          );
+        }
+        // Only ever forward through the documented order.
+        const order = ['uploading', 'normalizing', 'extracting', 'embedding', 'ready'];
+        final indexes = [for (final s in seen) order.indexOf(s)];
+        expect(indexes, everyElement(isNonNegative), reason: '$seen');
+        expect(indexes, orderedEquals([...indexes]..sort()), reason: '$seen');
+      },
+      timeout: const Timeout(Duration(minutes: 3)),
+    );
+
+    test(
+      'a corrupt PDF ends `failed` with a last_error the app can explain',
+      () async {
+        if (_gated) return skipUnlessConfigured();
+        final id = await uploadAndConfirm(
+          _pdfFile('m23-corrupt.pdf', utf8.encode('this is not a pdf at all')),
+        );
+
+        final (seen, last) = await watchIngest(id);
+
+        expect(seen.last, 'failed', reason: 'states seen: $seen');
+        expect(last.status, DocumentStatus.failed);
+        expect(last.lastError, isNotNull);
+        final message = ingestErrorMessage(last.lastError);
+        expect(
+          message,
+          isNot(contains('(')),
+          reason:
+              'the app has no plain-language text for backend code '
+              '"${last.lastError}" — add it to ingestErrorMessage',
+        );
+      },
+      timeout: const Timeout(Duration(minutes: 3)),
     );
   });
 }
