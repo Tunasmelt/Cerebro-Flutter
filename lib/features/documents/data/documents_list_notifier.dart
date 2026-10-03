@@ -15,9 +15,11 @@ final documentsListProvider =
 class DocumentsListNotifier extends AsyncNotifier<List<DocumentSummary>> {
   Timer? _pollTimer;
 
-  /// False once this build is superseded or disposed, so an in-flight poll
-  /// can't write into a state that no longer belongs to it.
-  bool _alive = true;
+  /// Bumped on every rebuild (user change) and on dispose. Anything that
+  /// awaits — a poll, a refresh — remembers the generation it started in
+  /// and drops its result if it no longer matches, so a slow response for
+  /// one user can never land in the next user's list.
+  int _generation = 0;
 
   int _polls = 0;
 
@@ -26,15 +28,15 @@ class DocumentsListNotifier extends AsyncNotifier<List<DocumentSummary>> {
     // Rebuilds (dropping the previous user's list) whenever the signed-in
     // user changes; nothing to fetch while signed out.
     final userId = ref.watch(currentUserIdProvider);
-    _alive = true;
+    final generation = ++_generation;
     _polls = 0;
     ref.onDispose(() {
-      _alive = false;
+      _generation++;
       _pollTimer?.cancel();
     });
     if (userId == null) return const [];
     final documents = await fetch();
-    _pollIfProcessing(documents);
+    if (generation == _generation) _pollIfProcessing(documents);
     return documents;
   }
 
@@ -47,10 +49,13 @@ class DocumentsListNotifier extends AsyncNotifier<List<DocumentSummary>> {
       ref.read(documentsRepositoryProvider).listDocuments();
 
   Future<void> refresh() async {
+    final generation = _generation;
     _polls = 0;
     state = const AsyncLoading<List<DocumentSummary>>().copyWithPrevious(state);
-    state = await AsyncValue.guard(fetch);
-    _pollIfProcessing(state.valueOrNull);
+    final result = await AsyncValue.guard(fetch);
+    if (generation != _generation) return;
+    state = result;
+    _pollIfProcessing(result.valueOrNull);
   }
 
   /// While anything is still `processing`, quietly re-fetch so rows flip
@@ -59,22 +64,23 @@ class DocumentsListNotifier extends AsyncNotifier<List<DocumentSummary>> {
   /// error. Stops when nothing is processing, or after the poll budget.
   void _pollIfProcessing(List<DocumentSummary>? documents) {
     _pollTimer?.cancel();
-    if (!_alive || documents == null) return;
+    if (documents == null) return;
     if (!documents.any((d) => d.status == DocumentStatus.processing)) return;
 
     final interval = ref.read(ingestPollIntervalProvider);
     final budget = maxPolls(interval, ref.read(ingestPollLimitProvider));
     if (_polls >= budget) return;
 
+    final generation = _generation;
     _pollTimer = Timer(interval, () async {
       _polls++;
       try {
         final latest = await fetch();
-        if (!_alive) return;
+        if (generation != _generation) return;
         state = AsyncData(latest);
         _pollIfProcessing(latest);
       } catch (_) {
-        if (!_alive) return;
+        if (generation != _generation) return;
         _pollIfProcessing(state.valueOrNull);
       }
     });

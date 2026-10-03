@@ -927,3 +927,35 @@ Re-read the upload code with fresh eyes; every item below was reproduced
   detail-screen ingest UI (6). Each mutation-checked (removing
   stop-at-terminal, the poll caps, the give-up flag, or the error-code
   mapping fails tests).
+
+### Milestone 2.3 audit (after merge)
+Re-read the ingest polling code against the backend's actual write order
+and reproduced each suspect with a failing test before touching code.
+
+**Confirmed and fixed:**
+- **Detail polling stopped one beat too early.** The backend writes
+  `ingest_jobs.state` and `documents.status` in two separate requests
+  (`embed.py`/`normalize.py`), so for a moment the stage reads
+  ready/failed while the document's status is still processing. The
+  screen treated a terminal *stage* as "settled", stopped polling in that
+  gap, and could leave a stale "Processing" badge next to a "Ready"
+  stage. It now settles on the document's status.
+- **A slow list response could land in the next user's list.** An
+  in-flight poll that returned after a sign-out/sign-in wrote the
+  previous user's documents into the new user's list (a rebuild had
+  already flipped the "alive" flag back on). Same hole for an in-flight
+  `refresh()` — which predates 2.3 (Milestone 2.1's pull-to-refresh), so
+  this also closes an old cross-user leak the 2.2 audit's fix didn't
+  reach. Both now compare a generation counter after every await and drop
+  the result if the user changed. Reproduced by holding the response
+  back; the poll case self-healed on the next tick, the refresh case did
+  not.
+- Each of the three fixes was undone in turn and exactly its own test
+  failed (3 new tests; suite 255 passing, 13 skipped).
+
+**Noted, not fixed:**
+- The 10-minute poll window is counted in polls (interval × budget), not
+  wall-clock time, so a run of slow requests stretches it past 10
+  minutes. Harmless — it still stops — but not a precise limit.
+- Failed documents still have no Retry (backend `retry-ingest` exists).
+- Backgrounded app: timers keep polling for the rest of the window.
