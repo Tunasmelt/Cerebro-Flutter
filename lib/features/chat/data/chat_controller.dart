@@ -6,10 +6,12 @@ import '../../../core/network/api_client_provider.dart';
 import '../../../core/network/app_exception.dart';
 import '../../../core/network/generated_api_client_provider.dart';
 import '../../auth/data/current_user_provider.dart';
+import '../../documents/data/documents_list_notifier.dart';
 import 'chat_message.dart';
 import 'chat_sessions_api.dart';
 import 'chat_stream_client.dart';
 import 'chat_stream_event.dart';
+import 'document_titles_provider.dart';
 
 final chatStreamApiProvider = Provider<ChatStreamApi>((ref) {
   return DioChatStreamClient(ref.watch(apiClientProvider).dio);
@@ -191,6 +193,7 @@ class ChatController extends Notifier<ChatState> {
         );
       case ChatDone():
         _update(id, (m) => m.copyWith(status: ChatMessageStatus.complete));
+        _refreshDocumentsIfSourceUnknown(id);
         if (!turn.isCompleted) turn.complete();
       case ChatError():
         _update(
@@ -201,6 +204,25 @@ class ChatController extends Notifier<ChatState> {
           ),
         );
         if (!turn.isCompleted) turn.complete();
+    }
+  }
+
+  /// The answer cites a document the loaded document list has never heard
+  /// of. Usually that list is simply stale (a document uploaded from another
+  /// device since it loaded); declaring the source "no longer available" on
+  /// that evidence alone would mark a perfectly good citation dead. So look
+  /// again first — only a document still missing from a fresh list is gone.
+  void _refreshDocumentsIfSourceUnknown(int id) {
+    final titles = ref.read(documentTitlesProvider);
+    // List loading or unavailable: nothing to compare against.
+    if (titles == null) return;
+    final message = state.messages.where((m) => m.id == id).firstOrNull;
+    if (message == null) return;
+    final unknown = message.citedDocuments.values.any(
+      (documentId) => !titles.containsKey(documentId),
+    );
+    if (unknown && ref.exists(documentsListProvider)) {
+      ref.read(documentsListProvider.notifier).refresh();
     }
   }
 

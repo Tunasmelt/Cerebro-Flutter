@@ -9,6 +9,11 @@ import '../../documents/data/documents_list_notifier.dart';
 /// slow.
 final documentTitlesProvider = Provider<Map<String, String>?>((ref) {
   final documents = ref.watch(documentsListProvider);
+  // Mid-refresh the list still holds its previous value, but that value is
+  // exactly what is being checked: treat the answer as unknown meanwhile, so
+  // a source isn't shown as missing just because the refresh that would find
+  // it hasn't finished.
+  if (documents.isLoading) return null;
   return documents.whenOrNull(
     data: (list) => {for (final d in list) d.id: d.title},
   );

@@ -1337,3 +1337,39 @@ reproduced each suspect with a failing test before touching code.
   duplicate in the stored history. The test conversations created while
   verifying (and `zanzibar-live.txt`, which can't be deleted from the app
   because it is Ready) remain on the `gate3` account.
+
+### Milestone 3.2 audit (after merge)
+Re-read the chat code, checked both live runs' logs for runtime errors (none:
+no overflow, duplicate-key or exception output), and reproduced each suspect
+with a failing test before fixing it.
+
+**Confirmed and fixed:**
+- **A valid citation could be shown as "no longer available".** A chip is
+  muted and inert when its document isn't in the documents list the app holds.
+  That list can simply be *stale* — a document uploaded from another device
+  (the web app) after it loaded — and the chip for a perfectly good source
+  was then marked dead. Reproduced (the chip did nothing when tapped for a
+  document that exists). Now, when a turn finishes citing a document the list
+  has never heard of, the controller refreshes the list first; only a document
+  still missing from a *fresh* list is treated as gone. While that refresh is
+  in flight "is this document here?" is **unknown**, not "missing"
+  (`documentTitlesProvider` returns null mid-refresh), so the chip stays usable
+  instead of flashing muted. No refresh happens when every cited source is
+  already known.
+- Each part mutation-checked: no refresh for an unknown source, mid-refresh
+  read as missing, and refreshing on every turn each fail their own tests.
+  Suite: 478 passing, 24 skipped (gated real-backend).
+
+**Checked and held up (reproduced, not just reasoned about):**
+- The same source cited twice in one answer draws two chips with no
+  duplicate-key error (the chips share a number and a key).
+- While the document list is still loading, chips are usable.
+- Both live runs' logs: clean.
+
+**Noted, not fixed:**
+- "No matching documents" and a real server `error` event are still only
+  covered with faked events (the backend returns nearest chunks even for
+  nonsense, and a model failure can't be forced).
+- Chip numbering restarts in every answer (each answer has its own [1]).
+- Everything here is in-memory: a conversation is lost when the app restarts
+  (3.3 adds history).
