@@ -9,6 +9,7 @@ import '../../../shared/tokens/app_typography.dart';
 import '../../../shared/widgets/error_view.dart';
 import '../data/document.dart';
 import '../data/document_detail_provider.dart';
+import '../data/ingest_retry_controller.dart';
 import '../data/ingest_status.dart';
 import 'document_presentation.dart';
 
@@ -44,6 +45,7 @@ class DocumentDetailScreen extends ConsumerWidget {
             onRetry: () => ref.invalidate(documentDetailProvider(documentId)),
           ),
           data: (document) => _DocumentDetailBody(
+            documentId: documentId,
             document: document,
             gaveUp: ref.watch(ingestPollGaveUpProvider(documentId)),
             onCheckAgain: () =>
@@ -55,13 +57,15 @@ class DocumentDetailScreen extends ConsumerWidget {
   }
 }
 
-class _DocumentDetailBody extends StatelessWidget {
+class _DocumentDetailBody extends ConsumerWidget {
   const _DocumentDetailBody({
+    required this.documentId,
     required this.document,
     required this.gaveUp,
     required this.onCheckAgain,
   });
 
+  final String documentId;
   final DocumentDetail document;
 
   /// Polling stopped while the document was still processing.
@@ -69,9 +73,12 @@ class _DocumentDetailBody extends StatelessWidget {
   final VoidCallback onCheckAgain;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final typeColor = documentTypeColor(document.mime);
-    final statusColor = documentStatusColor(document.status);
+    // After a retry the backend still calls the document `failed` while
+    // its job runs again; show what is actually happening.
+    final status = effectiveDocumentStatus(document);
+    final statusColor = documentStatusColor(status);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(AppSpacing.s4),
@@ -113,7 +120,7 @@ class _DocumentDetailBody extends StatelessWidget {
           const SizedBox(height: AppSpacing.s5),
           _DetailRow(
             label: 'Status',
-            child: _StatusBadge(status: document.status, color: statusColor),
+            child: _StatusBadge(status: status, color: statusColor),
           ),
           _DetailRow(
             label: 'Size',
@@ -133,7 +140,7 @@ class _DocumentDetailBody extends StatelessWidget {
               ).copyWith(color: AppColors.textPrimary),
             ),
           ),
-          _IngestProgress(document: document, stalled: gaveUp),
+          _IngestProgress(document: document, status: status, stalled: gaveUp),
           if (gaveUp && !isIngestSettled(document)) ...[
             Container(
               key: const Key('document_detail_stalled'),
@@ -162,9 +169,7 @@ class _DocumentDetailBody extends StatelessWidget {
               ),
             ),
           ],
-          if (document.status == DocumentStatus.failed ||
-              IngestStage.fromApi(document.ingestState) ==
-                  IngestStage.failed) ...[
+          if (status == DocumentStatus.failed) ...[
             const SizedBox(height: AppSpacing.s4),
             Container(
               key: const Key('document_detail_last_error'),
@@ -182,9 +187,62 @@ class _DocumentDetailBody extends StatelessWidget {
                 style: AppTypography.xs.copyWith(color: AppColors.dangerHover),
               ),
             ),
+            const SizedBox(height: AppSpacing.s3),
+            if (ingestErrorRetryable(document.lastError))
+              _RetryButton(documentId: documentId)
+            else
+              Text(
+                'Upload the file again to try again.',
+                key: const Key('document_detail_reupload_hint'),
+                style: AppTypography.xs.copyWith(color: AppColors.textSecondary),
+              ),
           ],
         ],
       ),
+    );
+  }
+}
+
+/// "Retry" for a failed document: asks the server to resume the job, then
+/// the screen watches it run again. Disabled while the request is in
+/// flight; a refusal is shown in plain words underneath.
+class _RetryButton extends ConsumerWidget {
+  const _RetryButton({required this.documentId});
+
+  final String documentId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final retry = ref.watch(retryIngestProvider(documentId));
+    final error = retry.hasError ? retry.error : null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        OutlinedButton.icon(
+          key: const Key('document_detail_retry'),
+          onPressed: retry.isLoading
+              ? null
+              : () => ref.read(retryIngestProvider(documentId).notifier).retry(),
+          icon: retry.isLoading
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.refresh_rounded),
+          label: Text(retry.isLoading ? 'Retrying…' : 'Retry'),
+        ),
+        if (error != null)
+          Padding(
+            padding: const EdgeInsets.only(top: AppSpacing.s2),
+            child: Text(
+              error is AppException ? error.message : "Couldn't retry.",
+              key: const Key('document_detail_retry_error'),
+              style: AppTypography.xs.copyWith(color: AppColors.dangerHover),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -193,9 +251,17 @@ class _DocumentDetailBody extends StatelessWidget {
 /// document is still being processed. Nothing for a document that has no
 /// ingest job (null state) and is already settled.
 class _IngestProgress extends StatelessWidget {
-  const _IngestProgress({required this.document, required this.stalled});
+  const _IngestProgress({
+    required this.document,
+    required this.status,
+    required this.stalled,
+  });
 
   final DocumentDetail document;
+
+  /// The effective status (a retried document's raw status still says
+  /// failed while it runs).
+  final DocumentStatus status;
 
   /// Nothing is polling any more, so don't show a bar that implies live
   /// progress.
@@ -207,7 +273,7 @@ class _IngestProgress extends StatelessWidget {
     final stage = IngestStage.fromApi(document.ingestState);
     final inProgress =
         !stage.isTerminal &&
-        document.status == DocumentStatus.processing &&
+        status == DocumentStatus.processing &&
         !stalled;
 
     return Column(

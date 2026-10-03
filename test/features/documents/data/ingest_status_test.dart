@@ -1,5 +1,8 @@
+import 'package:cerebro_mobile/features/documents/data/document.dart';
 import 'package:cerebro_mobile/features/documents/data/ingest_status.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import '../scripted_documents_repository.dart';
 
 void main() {
   group('every documented ingest_jobs.state maps to a defined label', () {
@@ -84,5 +87,52 @@ void main() {
     test('no code at all still says it failed', () {
       expect(ingestErrorMessage(null), "This document couldn't be processed.");
     });
+  });
+
+  group('effectiveDocumentStatus — a retried document is not still "failed"', () {
+    // The backend leaves documents.status = failed while a retry runs; only
+    // the job's stage says what is really happening.
+    const cases = [
+      // (status, stage) -> effective
+      (DocumentStatus.failed, 'normalizing', DocumentStatus.processing),
+      (DocumentStatus.failed, 'extracting', DocumentStatus.processing),
+      (DocumentStatus.failed, 'embedding', DocumentStatus.processing),
+      (DocumentStatus.failed, 'ready', DocumentStatus.ready),
+      (DocumentStatus.failed, 'failed', DocumentStatus.failed),
+      (DocumentStatus.failed, null, DocumentStatus.failed),
+      (DocumentStatus.failed, 'archiving', DocumentStatus.failed),
+      (DocumentStatus.processing, 'embedding', DocumentStatus.processing),
+      (DocumentStatus.processing, 'ready', DocumentStatus.processing),
+      (DocumentStatus.ready, 'ready', DocumentStatus.ready),
+      (DocumentStatus.sealed, null, DocumentStatus.sealed),
+    ];
+    for (final (status, stage, expected) in cases) {
+      test('${status.name} + ${stage ?? 'no job'} -> ${expected.name}', () {
+        expect(
+          effectiveDocumentStatus(detailAt(stage, status: status)),
+          expected,
+        );
+      });
+    }
+  });
+
+  group('Retry is offered unless there is structurally nothing to resume', () {
+    for (final code in ['upload_expired', 'file_too_large', 'document_not_found']) {
+      test('not for $code', () => expect(ingestErrorRetryable(code), isFalse));
+    }
+    for (final code in [
+      'embed_call_failed',
+      'chunk_insert_failed',
+      'chunk_update_failed',
+      'original_download_failed',
+      'indexed_upload_failed',
+      'provider_not_configured',
+      'corrupt_pdf', // a truncated download can look corrupt
+      'corrupt_image',
+      'a_code_added_next_month',
+      null,
+    ]) {
+      test('for ${code ?? 'no code'}', () => expect(ingestErrorRetryable(code), isTrue));
+    }
   });
 }

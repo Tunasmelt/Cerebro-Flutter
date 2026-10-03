@@ -2,10 +2,15 @@
 // moves through the real states, a progress bar shows only while work is
 // in flight, and a failure is stated plainly with the backend's reason —
 // not a stuck spinner.
+import 'dart:async';
+
 import 'package:cerebro_mobile/features/auth/data/current_user_provider.dart';
 import 'package:cerebro_mobile/features/documents/data/document.dart';
 import 'package:cerebro_mobile/features/documents/data/documents_repository_provider.dart';
+import 'package:cerebro_mobile/core/network/app_exception.dart';
 import 'package:cerebro_mobile/features/documents/data/ingest_polling.dart';
+import 'package:cerebro_mobile/features/documents/data/ingest_retry_controller.dart';
+import 'package:cerebro_mobile/features/documents/data/retry_ingest_api.dart';
 import 'package:cerebro_mobile/features/documents/presentation/document_detail_screen.dart';
 import 'package:cerebro_mobile/shared/theme/app_theme.dart';
 import 'package:flutter/material.dart';
@@ -16,10 +21,25 @@ import '../scripted_documents_repository.dart';
 
 const _interval = Duration(milliseconds: 100);
 
+class _FakeRetryApi implements RetryIngestApi {
+  final List<String> retried = [];
+  Object? error;
+  Completer<void>? gate;
+
+  @override
+  Future<void> retry(String documentId) async {
+    retried.add(documentId);
+    await gate?.future;
+    final e = error;
+    if (e != null) throw e;
+  }
+}
+
 Future<void> _pumpScreen(
   WidgetTester tester,
   ScriptedDocumentsRepository repo, {
   Duration limit = const Duration(minutes: 10),
+  RetryIngestApi? retryApi,
 }) async {
   await tester.pumpWidget(
     ProviderScope(
@@ -28,6 +48,8 @@ Future<void> _pumpScreen(
         documentsRepositoryProvider.overrideWithValue(repo),
         ingestPollIntervalProvider.overrideWithValue(_interval),
         ingestPollLimitProvider.overrideWithValue(limit),
+        if (retryApi != null)
+          retryIngestApiProvider.overrideWithValue(retryApi),
       ],
       child: MaterialApp(
         theme: AppTheme.dark,
@@ -121,18 +143,21 @@ void main() {
     );
   });
 
-  testWidgets('an unknown stage reads as Processing with an indeterminate bar', (
-    tester,
-  ) async {
-    final repo = ScriptedDocumentsRepository(details: [detailAt('archiving')]);
-    await _pumpScreen(tester, repo);
+  testWidgets(
+    'an unknown stage reads as Processing with an indeterminate bar',
+    (tester) async {
+      final repo = ScriptedDocumentsRepository(
+        details: [detailAt('archiving')],
+      );
+      await _pumpScreen(tester, repo);
 
-    expect(_stage(tester), 'Processing');
-    final bar = tester.widget<LinearProgressIndicator>(
-      find.byKey(const Key('document_detail_progress')),
-    );
-    expect(bar.value, isNull);
-  });
+      expect(_stage(tester), 'Processing');
+      final bar = tester.widget<LinearProgressIndicator>(
+        find.byKey(const Key('document_detail_progress')),
+      );
+      expect(bar.value, isNull);
+    },
+  );
 
   testWidgets('the bar fills further as the stage advances', (tester) async {
     final repo = ScriptedDocumentsRepository(
@@ -156,7 +181,9 @@ void main() {
     'after the poll window it says it is taking long, drops the bar, and '
     '"Check again" polls afresh',
     (tester) async {
-      final repo = ScriptedDocumentsRepository(details: [detailAt('embedding')]);
+      final repo = ScriptedDocumentsRepository(
+        details: [detailAt('embedding')],
+      );
       // 300ms window at 100ms = 3 polls.
       await _pumpScreen(tester, repo, limit: const Duration(milliseconds: 300));
       expect(find.byKey(const Key('document_detail_stalled')), findsNothing);
@@ -184,4 +211,169 @@ void main() {
       expect(find.byKey(const Key('document_detail_progress')), findsOneWidget);
     },
   );
+
+  group('Retry', () {
+    DocumentDetail failedWith(String code) =>
+        detailAt('failed', status: DocumentStatus.failed, lastError: code);
+
+    testWidgets('is offered for a failure that might be transient', (
+      tester,
+    ) async {
+      final repo = ScriptedDocumentsRepository(
+        details: [failedWith('embed_call_failed')],
+      );
+      await _pumpScreen(tester, repo, retryApi: _FakeRetryApi());
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('document_detail_retry')), findsOneWidget);
+      expect(
+        find.byKey(const Key('document_detail_reupload_hint')),
+        findsNothing,
+      );
+    });
+
+    testWidgets('is replaced by "upload it again" where a retry cannot help', (
+      tester,
+    ) async {
+      final repo = ScriptedDocumentsRepository(
+        details: [failedWith('upload_expired')],
+      );
+      await _pumpScreen(tester, repo, retryApi: _FakeRetryApi());
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('document_detail_retry')), findsNothing);
+      expect(
+        find.byKey(const Key('document_detail_reupload_hint')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('is not shown for a document that is not failed', (
+      tester,
+    ) async {
+      final repo = ScriptedDocumentsRepository(
+        details: [detailAt('embedding')],
+      );
+      await _pumpScreen(tester, repo, retryApi: _FakeRetryApi());
+
+      expect(find.byKey(const Key('document_detail_retry')), findsNothing);
+    });
+
+    testWidgets(
+      'pressing it asks the server, then the screen shows the job running '
+      '- never "Failed" beside an "Indexing" stage',
+      (tester) async {
+        final repo = ScriptedDocumentsRepository(
+          details: [
+            failedWith('embed_call_failed'),
+            // After the retry the backend resets the job but leaves
+            // documents.status at failed until the job finishes.
+            detailAt('embedding', status: DocumentStatus.failed),
+            detailAt('ready', status: DocumentStatus.ready),
+          ],
+        );
+        final api = _FakeRetryApi();
+        await _pumpScreen(tester, repo, retryApi: api);
+        await tester.pumpAndSettle();
+        expect(find.text('Failed'), findsWidgets);
+
+        await tester.tap(find.byKey(const Key('document_detail_retry')));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 20));
+
+        expect(api.retried, ['doc-1']);
+        expect(_stage(tester), 'Indexing');
+        expect(
+          find.text('Failed'),
+          findsNothing,
+          reason: 'badge, stage and error box must agree while it runs',
+        );
+        expect(
+          find.byKey(const Key('document_detail_last_error')),
+          findsNothing,
+        );
+        expect(find.byKey(const Key('document_detail_retry')), findsNothing);
+        expect(
+          find.byKey(const Key('document_detail_progress')),
+          findsOneWidget,
+        );
+
+        await tester.pump(_interval);
+        await tester.pump(const Duration(milliseconds: 20));
+
+        expect(_stage(tester), 'Ready');
+      },
+    );
+
+    testWidgets('shows it is working, and cannot be pressed twice', (
+      tester,
+    ) async {
+      final repo = ScriptedDocumentsRepository(
+        details: [failedWith('embed_call_failed')],
+      );
+      final api = _FakeRetryApi()..gate = Completer<void>();
+      await _pumpScreen(tester, repo, retryApi: api);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('document_detail_retry')));
+      await tester.pump();
+
+      expect(find.text('Retrying…'), findsOneWidget);
+      final button = tester.widget<OutlinedButton>(
+        find.byKey(const Key('document_detail_retry')),
+      );
+      expect(button.onPressed, isNull);
+
+      api.gate!.complete();
+      await tester.pump();
+    });
+
+    testWidgets('a refusal is explained under the button', (tester) async {
+      final repo = ScriptedDocumentsRepository(
+        details: [failedWith('embed_call_failed')],
+      );
+      final api = _FakeRetryApi()
+        ..error = const RequestRejectedException(
+          'Job is not in a failed state (state=embedding)',
+          code: 'not_retryable',
+        );
+      await _pumpScreen(tester, repo, retryApi: api);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('document_detail_retry')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 20));
+
+      expect(
+        find.text("This document isn't in a failed state any more."),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets(
+      'a connection failure is explained, and Retry stays available',
+      (tester) async {
+        final repo = ScriptedDocumentsRepository(
+          details: [failedWith('embed_call_failed')],
+        );
+        final api = _FakeRetryApi()
+          ..error = const NetworkUnreachableException();
+        await _pumpScreen(tester, repo, retryApi: api);
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byKey(const Key('document_detail_retry')));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 20));
+
+        expect(
+          find.byKey(const Key('document_detail_retry_error')),
+          findsOneWidget,
+        );
+        final button = tester.widget<OutlinedButton>(
+          find.byKey(const Key('document_detail_retry')),
+        );
+        expect(button.onPressed, isNotNull, reason: 'the user can try again');
+      },
+    );
+  });
 }

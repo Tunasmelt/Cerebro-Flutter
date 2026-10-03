@@ -448,8 +448,9 @@ CHANGELOG "Milestone 2.3").**
   audit had found by reading the backend (the success test's first run
   stopped on the stage alone and saw status still `processing`); the
   test now settles on document status, like the app.
-- *No Retry button* for failed documents yet, though the backend has
-  `retry-ingest`.
+- *Retry for failed documents:* built (see CHANGELOG "Retry for failed
+  documents") on the backend's `retry-ingest`; live-verified on the
+  emulator and against the real backend.
 
 ### Phase 2 Gate
 All milestones 2.1–2.3 pass their tests, **and** the project owner

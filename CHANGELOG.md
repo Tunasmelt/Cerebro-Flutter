@@ -976,3 +976,53 @@ and reproduced each suspect with a failing test before touching code.
   are deleted by the tests' own teardown.
 - Phase 2 Gate: the integration-test item that was left to the owner is
   closed; the three real-device checks remain.
+
+### Retry for failed documents
+- A failed document's detail screen now has a **Retry** button, on the
+  backend's existing `POST /documents/{id}/retry-ingest` (resumes the
+  job from the stage it is safe to resume from; `202` once reset, `404
+  not_found`, `409 not_retryable`). Shows "Retrying…" and can't be
+  pressed twice; a refusal is explained in plain words ("This document
+  isn't in a failed state any more."), and a connection failure leaves
+  Retry available. After a refusal the document is re-read, since it
+  usually means the screen was stale.
+- **Backend quirk that shaped the design (read from `embed.py` /
+  `normalize.py` / `documents.py`):** a failure sets
+  `documents.status = failed`, but a retry resets only
+  `ingest_jobs.state`. So during a retry the document still reads
+  `failed` while its job is running again, and flips to `ready` only at
+  the very end. Taken at face value that would (a) make the 2.3-audit
+  rule "settle on document status" stop polling the instant a retry
+  starts, (b) show a red "Failed" badge and error box beside an
+  "Indexing" stage, and (c) leave the list stuck on "Failed" with
+  nothing polling. Handled by:
+  - `effectiveDocumentStatus`: a `failed` document whose job is running
+    is processing; with the job `ready` it is ready. The detail screen's
+    badge, error box, progress bar and polling all use it.
+  - The list notifier remembers which documents were retried
+    (`markRetrying`), shows them as processing, keeps polling, and looks
+    at each one's job: really failed again → back to Failed; running →
+    stays Processing; ready → done. Forgotten on user change.
+- **Retry is hidden only where it cannot help** — `upload_expired`,
+  `file_too_large`, `document_not_found` (replaced by "Upload the file
+  again to try again."). It is deliberately still offered for a
+  "corrupt" PDF/image, since a truncated download can look corrupt, and
+  for codes the app doesn't know.
+- **Verified:** 298 tests passing (16 skipped: gated real-backend). Each
+  piece mutation-checked (list ignoring `markRetrying`, effective status
+  = raw status, no double-tap guard, raw refusal text, controller
+  ignoring a user change, list never clearing a real failure, badge
+  using raw status, button never disabled). Three new real-backend tests
+  pass (corrupt PDF: retry accepted, job re-runs, fails again with the
+  same reason; retry of a ready document → 409; of an unknown id →
+  404; 2 `upload-init` calls). Live on the emulator against the real
+  backend: Failed → "Retrying…" → Processing / "Preparing file" with the
+  bar and no "Failed" badge → Failed again with the same reason and
+  Retry available; the list ended on Failed, not stuck on Processing.
+  Screenshots: `docs/screenshots/milestone-2.3-retry-button-live.png`,
+  `milestone-2.3-retry-running-live.png`.
+- **Not verified:** a retry that actually *succeeds* — it needs a
+  transient server failure (e.g. the embedding provider down) that can't
+  be produced on demand. That path (job → ready, status catching up) is
+  covered by scripted tests of the effective-status and list logic, not
+  by a live run.
