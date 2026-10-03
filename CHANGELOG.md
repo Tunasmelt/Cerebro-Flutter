@@ -1198,3 +1198,48 @@ was reproduced before it was fixed.
   the chat screen); no resume after a dropped turn (the server has no
   `Last-Event-ID` support — a cut-off answer must be re-asked); the sealed
   tier's `unlocked` credentials are not sent (Phase 5).
+
+### Milestone 3.1 audit (after merge)
+Re-read the SSE parser, typed events and stream client with fresh eyes and
+reproduced each suspect with a failing test before touching code.
+
+**Confirmed and fixed:**
+- **A stalled error body hid the real status for ~90 s.** When the server
+  answers with an error status (502 from a proxy, a 404) the client reads the
+  body to pick up the server's own wording. If that body never finished, the
+  status — already known — sat unreported until the idle timeout (90 s in
+  production), and then surfaced as the *wrong* error ("the connection
+  dropped"). The read is now capped at 5 s: the status is reported promptly
+  (`ServerError`, a clean 404) and the connection released.
+- **A 200 that wasn't an event stream read as "connection dropped".** A
+  captive portal's sign-in page or a proxy's HTML arrives as `200 text/html`;
+  the parser found no events, the body ended, and the user was told the
+  connection dropped. It now says "Received an unexpected response from the
+  server." and releases the unread body. A `text/event-stream; charset=utf-8`
+  header and a response with no content-type at all are still accepted.
+- Both mutation-checked (content-type guard removed; error-body cap removed:
+  each fails its own tests). Suite: 408 passing, 21 skipped (gated); the chat
+  and SSE tests ran 6× in a row without a flake despite their real-timer
+  idle-timeout cases.
+
+**Checked and held up:**
+- `receiveTimeout: Duration.zero` (used so a long answer isn't cut by the
+  app-wide 60 s limit) really disables the timeout: confirmed in Dio's
+  `io_adapter.dart` for both installed versions (`if (receiveTimeout >
+  Duration.zero)`), not assumed.
+- The backend's heartbeat interval is 1.5 s (`HEARTBEAT_INTERVAL_SECONDS`), so
+  the client's 90 s idle limit has a very wide margin.
+
+**Noted, not fixed:**
+- **The real run showed no heartbeat in the 7.3 s before `retrieval`.** Most
+  likely that time is spent *before the response headers arrive* (session
+  lookup and, on Render, cold start) with retrieval itself finishing inside the
+  1.5 s heartbeat interval — but one run can't prove it. Either way, 3.2's
+  "thinking…" state should begin when the question is *sent*, not when the
+  first heartbeat arrives.
+- A real turn longer than 60 s and a real server `error` event can't be
+  produced on demand, so those paths are covered by the fake-adapter tests
+  only, not by a live run.
+- The real-backend test asserts the answer arrived as more than one token
+  event; an unusually short model answer could in principle be one event.
+- Still no way to resume a cut-off answer (no `Last-Event-ID` on the server).

@@ -97,6 +97,21 @@ class DioChatStreamClient implements ChatStreamApi {
       }
       if (finished) return;
 
+      // A 200 that isn't an event stream — a captive portal's sign-in page,
+      // a proxy's HTML — is not "the connection dropped": say what it is, and
+      // let go of the unread body so the connection closes.
+      final contentType = response.headers.value('content-type');
+      if (contentType != null &&
+          !contentType.toLowerCase().contains('text/event-stream')) {
+        unawaited(response.data!.stream.listen((_) {}).cancel());
+        finish(
+          const UnknownApiException(
+            'Received an unexpected response from the server.',
+          ),
+        );
+        return;
+      }
+
       final bytes = response.data!.stream.map((chunk) {
         armIdleTimer(); // any bytes at all — even a comment — mean alive
         return chunk;
@@ -182,7 +197,24 @@ class DioChatStreamClient implements ChatStreamApi {
     return UnknownApiException('Unexpected status code $status');
   }
 
+  /// How long to wait for an error response's body. The status is already
+  /// known; the body only adds the server's own wording, so a body that
+  /// stalls must not hold the user up (or, worse, end up reported as a
+  /// dropped connection after the idle timeout).
+  static const _errorBodyLimit = Duration(seconds: 5);
+
   Future<(String?, String?)> _errorBody(Response<dynamic> response) async {
+    try {
+      return await _readErrorBody(response).timeout(
+        _errorBodyLimit,
+        onTimeout: () => (null, null),
+      );
+    } catch (_) {
+      return (null, null);
+    }
+  }
+
+  Future<(String?, String?)> _readErrorBody(Response<dynamic> response) async {
     try {
       final data = response.data;
       final List<int> bytes;
