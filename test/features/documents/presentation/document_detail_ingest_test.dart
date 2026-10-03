@@ -8,6 +8,8 @@ import 'package:cerebro_mobile/features/auth/data/current_user_provider.dart';
 import 'package:cerebro_mobile/features/documents/data/document.dart';
 import 'package:cerebro_mobile/features/documents/data/documents_repository_provider.dart';
 import 'package:cerebro_mobile/core/network/app_exception.dart';
+import 'package:cerebro_mobile/features/documents/data/delete_document_api.dart';
+import 'package:cerebro_mobile/features/documents/data/delete_document_controller.dart';
 import 'package:cerebro_mobile/features/documents/data/ingest_polling.dart';
 import 'package:cerebro_mobile/features/documents/data/ingest_retry_controller.dart';
 import 'package:cerebro_mobile/features/documents/data/retry_ingest_api.dart';
@@ -33,6 +35,59 @@ class _FakeRetryApi implements RetryIngestApi {
     final e = error;
     if (e != null) throw e;
   }
+}
+
+class _FakeDeleteApi implements DeleteDocumentApi {
+  final List<String> deleted = [];
+  Object? error;
+  Completer<void>? gate;
+
+  @override
+  Future<void> delete(String documentId) async {
+    deleted.add(documentId);
+    await gate?.future;
+    final e = error;
+    if (e != null) throw e;
+  }
+}
+
+/// The detail screen pushed on top of a home page, so "leaves the screen"
+/// is observable.
+Future<void> _pumpPushed(
+  WidgetTester tester,
+  ScriptedDocumentsRepository repo,
+  DeleteDocumentApi deleteApi,
+) async {
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        currentUserIdProvider.overrideWithValue('user-1'),
+        documentsRepositoryProvider.overrideWithValue(repo),
+        ingestPollIntervalProvider.overrideWithValue(_interval),
+        deleteDocumentApiProvider.overrideWithValue(deleteApi),
+      ],
+      child: MaterialApp(
+        theme: AppTheme.dark,
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: TextButton(
+                key: const Key('open_detail'),
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const DocumentDetailScreen(documentId: 'doc-1'),
+                  ),
+                ),
+                child: const Text('open'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+  await tester.tap(find.byKey(const Key('open_detail')));
+  await tester.pumpAndSettle();
 }
 
 Future<void> _pumpScreen(
@@ -411,6 +466,155 @@ void main() {
       expect(find.text('Incomplete'), findsNothing);
       expect(_stage(tester), 'Uploading');
       expect(find.byKey(const Key('document_detail_progress')), findsOneWidget);
+    });
+  });
+
+  group('Delete', () {
+    DocumentDetail failed() => detailAt(
+      'failed',
+      status: DocumentStatus.failed,
+      lastError: 'corrupt_pdf',
+    );
+
+    testWidgets('is offered for a failed document', (tester) async {
+      await _pumpPushed(
+        tester,
+        ScriptedDocumentsRepository(details: [failed()]),
+        _FakeDeleteApi(),
+      );
+
+      expect(find.byKey(const Key('document_detail_delete')), findsOneWidget);
+    });
+
+    testWidgets('is offered for an upload that never finished', (tester) async {
+      await _pumpPushed(
+        tester,
+        ScriptedDocumentsRepository(
+          details: [
+            detailAt(
+              'uploading',
+              createdAt: DateTime.now().subtract(const Duration(minutes: 30)),
+            ),
+          ],
+        ),
+        _FakeDeleteApi(),
+      );
+
+      expect(find.byKey(const Key('document_detail_delete')), findsOneWidget);
+    });
+
+    testWidgets('is not offered while a document is processing or once ready', (
+      tester,
+    ) async {
+      await _pumpPushed(
+        tester,
+        ScriptedDocumentsRepository(details: [detailAt('embedding')]),
+        _FakeDeleteApi(),
+      );
+      expect(find.byKey(const Key('document_detail_delete')), findsNothing);
+      // (A ready document is deliberately not deletable from here yet.)
+      await tester.pumpWidget(const SizedBox());
+      await _pumpPushed(
+        tester,
+        ScriptedDocumentsRepository(
+          details: [detailAt('ready', status: DocumentStatus.ready)],
+        ),
+        _FakeDeleteApi(),
+      );
+      expect(find.byKey(const Key('document_detail_delete')), findsNothing);
+    });
+
+    testWidgets('asks first, and Cancel deletes nothing', (tester) async {
+      final api = _FakeDeleteApi();
+      await _pumpPushed(
+        tester,
+        ScriptedDocumentsRepository(details: [failed()]),
+        api,
+      );
+
+      await tester.tap(find.byKey(const Key('document_detail_delete')));
+      await tester.pumpAndSettle();
+      expect(find.text('Delete this document?'), findsOneWidget);
+      expect(api.deleted, isEmpty, reason: 'nothing happens before confirming');
+
+      await tester.tap(find.byKey(const Key('document_detail_delete_cancel')));
+      await tester.pumpAndSettle();
+
+      expect(api.deleted, isEmpty);
+      expect(find.text('Delete this document?'), findsNothing);
+      expect(find.byKey(const Key('document_detail_body')), findsOneWidget);
+    });
+
+    testWidgets('confirming deletes it and leaves the screen', (tester) async {
+      final api = _FakeDeleteApi();
+      await _pumpPushed(
+        tester,
+        ScriptedDocumentsRepository(details: [failed()]),
+        api,
+      );
+
+      await tester.tap(find.byKey(const Key('document_detail_delete')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('document_detail_delete_confirm')));
+      await tester.pumpAndSettle();
+
+      expect(api.deleted, ['doc-1']);
+      expect(
+        find.byKey(const Key('document_detail_body')),
+        findsNothing,
+        reason: 'there is nothing left to show',
+      );
+      expect(find.byKey(const Key('open_detail')), findsOneWidget);
+    });
+
+    testWidgets('shows it is working and cannot be pressed twice', (
+      tester,
+    ) async {
+      final api = _FakeDeleteApi()..gate = Completer<void>();
+      await _pumpPushed(
+        tester,
+        ScriptedDocumentsRepository(details: [failed()]),
+        api,
+      );
+
+      await tester.tap(find.byKey(const Key('document_detail_delete')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('document_detail_delete_confirm')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(find.text('Deleting…'), findsOneWidget);
+      final button = tester.widget<TextButton>(
+        find.byKey(const Key('document_detail_delete')),
+      );
+      expect(button.onPressed, isNull);
+
+      api.gate!.complete();
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('a failure is explained and the screen stays', (tester) async {
+      final api = _FakeDeleteApi()..error = const NetworkUnreachableException();
+      await _pumpPushed(
+        tester,
+        ScriptedDocumentsRepository(details: [failed()]),
+        api,
+      );
+
+      await tester.tap(find.byKey(const Key('document_detail_delete')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('document_detail_delete_confirm')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('document_detail_delete_error')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('document_detail_body')), findsOneWidget);
+      final button = tester.widget<TextButton>(
+        find.byKey(const Key('document_detail_delete')),
+      );
+      expect(button.onPressed, isNotNull, reason: 'the user can try again');
     });
   });
 }

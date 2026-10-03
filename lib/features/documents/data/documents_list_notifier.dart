@@ -87,6 +87,20 @@ class DocumentsListNotifier extends AsyncNotifier<List<DocumentSummary>> {
     _pollIfProcessing(shown);
   }
 
+  /// The user deleted [documentId]: drop it from the list at once rather
+  /// than waiting for the next fetch.
+  void removeDocument(String documentId) {
+    _retrying.remove(documentId);
+    final current = state.valueOrNull;
+    if (current == null) return;
+    final remaining = [
+      for (final d in current)
+        if (d.id != documentId) d,
+    ];
+    state = AsyncData(remaining);
+    _pollIfProcessing(remaining);
+  }
+
   /// Applies [_retrying] to a freshly fetched list. For each retried
   /// document the server still calls `failed`, looks at the job itself:
   /// really failed again → stop treating it as retrying; still running (or

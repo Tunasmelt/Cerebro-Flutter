@@ -8,6 +8,7 @@ import '../../../shared/tokens/app_spacing.dart';
 import '../../../shared/tokens/app_typography.dart';
 import '../../../shared/widgets/error_view.dart';
 import '../data/document.dart';
+import '../data/delete_document_controller.dart';
 import '../data/document_detail_provider.dart';
 import '../data/ingest_retry_controller.dart';
 import '../data/ingest_status.dart';
@@ -167,6 +168,8 @@ class _DocumentDetailBody extends ConsumerWidget {
                 style: AppTypography.xs.copyWith(color: AppColors.dangerHover),
               ),
             ),
+            const SizedBox(height: AppSpacing.s3),
+            _DeleteButton(documentId: documentId),
           ] else if (gaveUp && !isIngestSettled(document)) ...[
             Container(
               key: const Key('document_detail_stalled'),
@@ -222,9 +225,88 @@ class _DocumentDetailBody extends ConsumerWidget {
                 key: const Key('document_detail_reupload_hint'),
                 style: AppTypography.xs.copyWith(color: AppColors.textSecondary),
               ),
+            const SizedBox(height: AppSpacing.s2),
+            _DeleteButton(documentId: documentId),
           ],
         ],
       ),
+    );
+  }
+}
+
+/// "Delete" for a document that can't be used (failed or never finished
+/// uploading): there is nothing else to do with it, and without this it
+/// would sit in the list indefinitely. Asks first; leaves the screen once
+/// the document is gone.
+class _DeleteButton extends ConsumerWidget {
+  const _DeleteButton({required this.documentId});
+
+  final String documentId;
+
+  Future<void> _onPressed(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.bgElevated,
+        title: const Text('Delete this document?'),
+        content: const Text(
+          "The file and everything made from it will be removed. This can't "
+          'be undone.',
+        ),
+        actions: [
+          TextButton(
+            key: const Key('document_detail_delete_cancel'),
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            key: const Key('document_detail_delete_confirm'),
+            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    final deleted = await ref
+        .read(deleteDocumentProvider(documentId).notifier)
+        .delete();
+    if (deleted && context.mounted) Navigator.of(context).maybePop();
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final delete = ref.watch(deleteDocumentProvider(documentId));
+    final error = delete.hasError ? delete.error : null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextButton.icon(
+          key: const Key('document_detail_delete'),
+          style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+          onPressed: delete.isLoading ? null : () => _onPressed(context, ref),
+          icon: delete.isLoading
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.delete_outline_rounded),
+          label: Text(delete.isLoading ? 'Deleting…' : 'Delete'),
+        ),
+        if (error != null)
+          Padding(
+            padding: const EdgeInsets.only(top: AppSpacing.s1),
+            child: Text(
+              error is AppException ? error.message : "Couldn't delete.",
+              key: const Key('document_detail_delete_error'),
+              style: AppTypography.xs.copyWith(color: AppColors.dangerHover),
+            ),
+          ),
+      ],
     );
   }
 }

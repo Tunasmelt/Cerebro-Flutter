@@ -1084,3 +1084,38 @@ was reproduced before it was fixed.
 - Still the owner's, on a real device: gallery/file upload to ready,
   camera photo to ready, force-kill mid-upload (emulator-verified only),
   plus Phase 1's Supabase-dashboard box.
+
+### Delete for failed and incomplete documents
+- Closes the gap the Phase 2 audit noted: a document that could never be
+  used (**Failed**, or an **Incomplete** upload from a killed app) sat in
+  the list with no way to remove it. Its detail screen now has a **Delete**
+  button, on the backend's `DELETE /documents/{id}` (removes the stored
+  file best-effort and the row, which cascades chunks, the ingest job and
+  graph edges).
+- Asks first ("Delete this document? The file and everything made from it
+  will be removed. This can't be undone."); shows "Deleting…" and can't be
+  pressed twice; on success the document leaves the list at once and the
+  screen closes; a failure is explained under the button and the button
+  stays available. A `404 not_found` counts as success - "already gone" is
+  what the user asked for (e.g. deleted from another device).
+- **Deliberately only for failed/incomplete documents.** Deleting a *ready*
+  document is a bigger, riskier action that deserves its own design (where
+  the button lives, bulk delete, what happens to graph/chat references);
+  it is not in this change.
+- An answer that lands after the screen closed or the user changed is
+  dropped (same generation guard as the other controllers), so one user's
+  delete can't edit the next user's list.
+- **Verified:** 329 tests passing (18 skipped: gated real-backend); each
+  piece mutation-checked (404-as-error, list not updated, user-change
+  guard, no confirmation, leaving the screen on failure). Two new
+  real-backend tests pass: an abandoned upload (init only, as a killed app
+  leaves) is deleted, is gone from `GET /documents/{id}` and the list
+  afterwards, and a second delete reads as "already gone"; deleting an id
+  that never existed likewise (1 `upload-init`). Live on the emulator
+  against the real backend: the Incomplete `p2-big.txt` from the audit's
+  force-kill test was deleted through the dialog and disappeared from the
+  list. Screenshots: `docs/screenshots/delete-confirmation-live.png`,
+  `delete-incomplete-after-live.png`.
+- Still open: no way to delete a *ready* document; the 10-minute
+  "Incomplete" rule depends on the device clock; the three real-device
+  Phase 2 Gate checks.
