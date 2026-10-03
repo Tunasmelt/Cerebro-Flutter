@@ -59,7 +59,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.byKey(const Key('chat_placeholder')), findsOneWidget);
+    expect(find.byKey(const Key('chat_empty')), findsOneWidget);
   });
 
   testWidgets('tapping the Graph destination renders the Graph screen', (

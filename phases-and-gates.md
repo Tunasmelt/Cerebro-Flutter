@@ -522,6 +522,20 @@ chips render and resolve to real source chunks.
   confirm the UI shows "no matching documents" distinctly from a normal
   cited answer, matching the web design's explicit empty-context state.
 
+**Status: code complete, tests passing, verified against the real backend and
+on the emulator (see CHANGELOG "Milestone 3.2").** The citation-chip unit test
+is covered and then some (a chip is drawn only if both the turn's retrieval
+set and the server's citation events back it; raw `[[chunk:…]]` syntax never
+reaches the screen at any token boundary). A real question about a real
+uploaded document streamed progressively and its chip opened the correct
+document.
+**Deviation:** the "query with no relevant stored content → no matching
+documents" functional test cannot be satisfied as written — the real backend
+returns its nearest chunks even for a nonsense query (5 chunks), so the
+empty-retrieval state only arises for an empty library. The UI state exists
+and is tested with a faked empty retrieval; not verified against a real empty
+library.
+
 ### Milestone 3.3 — Chat session management
 **Exit criteria:** List past conversations, reopen one, delete one,
 export one to Markdown with citation chips intact — matching web's

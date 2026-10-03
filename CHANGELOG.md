@@ -1243,3 +1243,97 @@ reproduced each suspect with a failing test before touching code.
 - The real-backend test asserts the answer arrived as more than one token
   event; an unusually short model answer could in principle be one event.
 - Still no way to resume a cut-off answer (no `Last-Event-ID` on the server).
+
+### Milestone 3.2 — Chat screen
+- **What it is:** the Chat tab is now real (the placeholder is gone). Ask a
+  question; the answer streams in; numbered citation chips and a "sources"
+  row open the documents it came from. Built on 3.1's stream client.
+- **How citations actually work (read from `chat/prompt.py` and the web
+  client, not guessed):** the model cites *inline in the answer text* with
+  `[[chunk:<id>]]` markers — and sometimes writes the malformed group
+  `[[chunk:id1], [chunk:id2]]`. Markers can be split across token events, so
+  the UI must hide a half-arrived marker, not flash `[[chu`. `answer_segments`
+  parses markers exactly as the backend and web do (same regex, same split of
+  the malformed group); while streaming it holds back any trailing fragment
+  that could still become a marker (`[`, `[[ch`, `[[chunk:3f9a…`), and drops
+  an unterminated `[[chunk:` tail even at the end.
+- **A chip never points nowhere (the milestone's unit-test requirement).**
+  `resolveAnswer` turns a marker into a chip only if its chunk id is in
+  **both** the turn's retrieval set (`retrieval` event) and the server's
+  `citation` events (chunk → document). Anything else — an id the model
+  invented, one outside the retrieval set — is dropped silently, with the text
+  either side joined back up and no raw marker shown. Chips are numbered by
+  first appearance (the same chunk cited twice keeps its number). Chips appear
+  when the turn finishes (the `citation` events arrive last); while streaming
+  the markers are simply hidden. A cited document that no longer exists in the
+  user's library renders muted and inert (never a working-looking dead link);
+  while the document list is still loading it is assumed to exist.
+- **State:** `ChatController` — opens the conversation lazily on the first
+  question (reused for follow-ups), shows the question and a pending answer
+  at once, applies events as they arrive, and handles **Stop** (keeps the
+  partial text, releases the connection), **Try again** (re-asks in place — no
+  duplicate question bubble), **New chat**, and a different user signing in
+  (conversation cleared; the previous user's late answer is dropped). One turn
+  at a time; blank input is ignored.
+- **Screen:** empty state; composer that grows to 5 lines, Send ↔ Stop;
+  "Searching your documents…" → "Writing the answer…" → text; a distinct
+  **"No matching documents"** notice when retrieval returns nothing (never
+  claimed while retrieval is still running); a failed answer keeps its partial
+  text, says so ("The answer above is incomplete."), shows the plain-language
+  reason (never the backend's raw exception text) and a Try again button;
+  "Stopped" label; auto-scroll that follows a streaming answer only while you
+  are at the bottom — it never drags you back down after you scroll up to
+  re-read. Tapping a chip pushes the document within the Chat tab; Back
+  returns to the conversation intact.
+- **Found by testing, fixed:**
+  1. **The inline chip rendered as a full-width bar** (found only on the
+     emulator: all the widget tests passed). A `Container` with `alignment:`
+     expands to the width it is offered, and inside a line of text that is the
+     whole line — the `[1]` stretched across the bubble and pushed the full
+     stop onto its own line. Fixed (`Center(widthFactor: 1)`); a new test
+     asserts the chip's real size (it was 702 px) and fails if `alignment` is
+     put back. Lesson: geometry needs a geometry assertion.
+  2. **Stop while the conversation was still being created** would have
+     started the stream anyway once creation finished. `stop()` now
+     invalidates pending work.
+- **Real backend (`chat_flow_integration_test.dart`, gated, 3 tests pass):**
+  a real question about a *real, freshly uploaded* document (distinctive
+  facts; uploaded, ingested to `ready`, deleted afterwards) streamed in 5
+  progressive states, the answer named the right person, and the resulting
+  chips (2, both citing the one document) resolved to the uploaded document's
+  id, with no raw marker syntax left; a follow-up in the same conversation
+  reused the session. *First run of that test failed, informatively:* the
+  account's existing documents are gibberish test files and the model said so
+  honestly without citing anything — so the test now uploads its own document
+  instead of relying on whatever the account holds.
+- **Spec deviation worth knowing — "no matching documents" can't be provoked
+  by a nonsense query.** The milestone asks for a real test that a query with
+  no relevant content shows "no matching documents". Against the real backend
+  a gibberish query (`zxqv wlmn 8472 …`) still returned **5 retrieved
+  chunks**: retrieval returns nearest neighbours rather than applying a
+  relevance cutoff, so the empty-retrieval state only occurs when the user has
+  no ready documents at all (or the backend later adds a cutoff). The UI state
+  is covered by widget and controller tests (with a faked empty retrieval);
+  the real-backend test only asserts the app is consistent with whatever
+  retrieval reports and prints what happened. Not verified live against an
+  empty library (needs a fresh account).
+- **Live on the emulator (real backend):** uploaded a distinctive text file
+  through the app, opened Chat, asked about it — "Searching…", "Writing…", then
+  the streamed answer with small inline chips and a "[1] zanzibar-live.txt"
+  source chip; tapping it opened that document; Back returned to the
+  conversation. Screenshots:
+  `docs/screenshots/milestone-3.2-chat-answer-live.png`,
+  `milestone-3.2-citation-opens-document-live.png`.
+- **Tests:** 472 passing, 24 skipped (gated real-backend). New: markers /
+  resolution 29 (incl. every token boundary of a realistic answer: raw syntax
+  never shown, visible text only ever grows), controller 17, screen 18, plus 3
+  gated real-backend. Each behaviour mutation-checked (raw text drawn,
+  retrieval set not checked, "found nothing" never flagged, always dragging
+  to the bottom, partial markers not held back, Stop not releasing the stream,
+  retry duplicating the question).
+- **Not done (3.3):** no list of past conversations, no reopening, deleting or
+  exporting one — a conversation lives only on screen until New chat. A failed
+  turn's question may already be saved server-side, so "Try again" can leave a
+  duplicate in the stored history. The test conversations created while
+  verifying (and `zanzibar-live.txt`, which can't be deleted from the app
+  because it is Ready) remain on the `gate3` account.
