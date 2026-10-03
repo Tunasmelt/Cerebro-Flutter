@@ -439,10 +439,15 @@ CHANGELOG "Milestone 2.3").**
   `GET /documents/{id}`'s `ingest_state`/`last_error` (SSE was dropped
   upstream), so the UI polls — capped at 10 minutes, after which it says
   the job is taking longer than usual and offers "Check again".
-- *Real-backend integration tests are written but not yet run* (they
-  need `CEREBRO_TEST_EMAIL`/`CEREBRO_TEST_PASSWORD`); the corrupt-PDF
-  failure and small-file success were instead verified live through the
-  app. **Open for the owner: run the two ingest integration tests once.**
+- *Real-backend ingest integration tests: run and passing* (2026-10-03,
+  against the real deployed backend with the `gate3` test account): a
+  real uploaded document is observed advancing through the documented
+  states to `ready` with no error, and a corrupt PDF ends `failed` with a
+  `last_error` the app has plain-language text for. Running them also
+  surfaced the job-state/document-status write gap the Milestone 2.3
+  audit had found by reading the backend (the success test's first run
+  stopped on the stage alone and saw status still `processing`); the
+  test now settles on document status, like the app.
 - *No Retry button* for failed documents yet, though the backend has
   `retry-ingest`.
 

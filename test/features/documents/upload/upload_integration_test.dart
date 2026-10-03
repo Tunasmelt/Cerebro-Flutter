@@ -411,7 +411,12 @@ void main() {
         last = await documents.getDocument(documentId);
         final state = last.ingestState ?? 'null';
         if (seen.isEmpty || seen.last != state) seen.add(state);
-        if (IngestStage.fromApi(last.ingestState).isTerminal) break;
+        // Settle on the DOCUMENT's status, as the app does: the backend
+        // writes the job's state and the document's status in two
+        // separate requests, so the stage can read ready/failed for a
+        // moment while the status still says processing (this very test
+        // caught that against the real backend).
+        if (last.status != DocumentStatus.processing) break;
         await Future<void>.delayed(const Duration(seconds: 1));
       }
       return (seen, last);
