@@ -1119,3 +1119,82 @@ was reproduced before it was fixed.
 - Still open: no way to delete a *ready* document; the 10-minute
   "Incomplete" rule depends on the device clock; the three real-device
   Phase 2 Gate checks.
+
+## Phase 3 — Chat & retrieval
+
+### Milestone 3.1 — SSE client module
+- **Source of truth, read from the backend repo (`chat/stream.py`,
+  `routes/chat.py`, api-documentation.md), not guessed:** `POST
+  /api/v1/chat/sessions/{id}/stream` with body `{query, unlocked?}`
+  answers `text/event-stream` as `event: <name>\ndata: <json>\n\n`. In
+  order: zero or more `heartbeat` (only before `retrieval`), `retrieval`
+  `{chunk_ids, document_ids}`, repeated `token` `{text}`, repeated
+  `citation` `{chunk_id, document_id}`, then `done` — or `error {code,
+  message}` in its place (no `done` after an error). A stream that simply
+  ends with neither is the "failed vs. still working?" ambiguity the
+  backend's own docs describe.
+- **Two layers, both reusable:**
+  - `lib/core/sse/` — `parseSse(Stream<List<int>>) → Stream<SseEvent>`, a
+    spec-compliant (WHATWG §9.2) line state machine. Handles a chunk
+    boundary *anywhere*: mid-event, mid-line, between the `\r` and `\n` of
+    a CRLF, inside a multi-byte UTF-8 character (chunked decoder). LF / CR /
+    CRLF, comments (`:` keep-alives), multi-line `data`, one leading space
+    dropped, `id` that persists, `retry`, BOM, unknown fields ignored, an
+    event left incomplete at end-of-stream **discarded** (never delivered
+    half-formed).
+  - `lib/features/chat/data/` — `ChatStreamEvent` (sealed: `ChatHeartbeat`,
+    `ChatRetrieval`, `ChatToken`, `ChatCitation`, `ChatDone`, `ChatError`),
+    and `DioChatStreamClient` / `ChatStreamApi` over the app's existing
+    authenticated Dio.
+- **Found by testing, fixed:**
+  1. **A `Stream<Uint8List>` crashed the parser.** Dio's streamed body is
+     `Stream<Uint8List>`; `.transform(Utf8Decoder)` on it fails Dart's
+     runtime generic check ("`Utf8Decoder` is not a subtype of
+     `StreamTransformer<Uint8List, String>`"). The parser's own unit tests
+     only ever fed it `Stream<List<int>>`, so they passed; the very first
+     client test against a real-shaped body hung. Fixed with a `cast`, and a
+     regression test feeding a typed `Uint8List` stream.
+  2. **Cancelling an `async*` stream parked on the network doesn't take
+     effect until the next event arrives.** First version of the parser (and
+     the planned client) were `async*` generators; a Stop tapped while the
+     server was silent would have left the HTTP connection open. Both are now
+     built on stream transformers / a `StreamController` whose `onCancel`
+     cancels the request and the body immediately — including a cancel
+     *before the response headers have even arrived*.
+- **The backend's `error.message` is raw exception text** (`str(exc)` or just
+  the exception's type name, e.g. `ReadTimeout` — it can be empty). It is
+  kept on `ChatError` for diagnostics but the UI gets a separate plain
+  `userMessage`; a test asserts the raw text never appears in it.
+- **Client behaviour:** a failure the server *reports* (`error` event) is a
+  `ChatError` event, part of the protocol; a failure to *open* the stream
+  (offline, signed out, 401, 404 → "That conversation no longer exists.",
+  429 → "try again in about N minutes", 5xx) and a stream that dies without
+  `done`/`error` (body ends, connection reset, or 90 s of total silence —
+  any bytes, even a `:` comment, count as life) are stream errors carrying
+  an `AppException`. Unknown event names are skipped (forward compatible); a
+  *known* event with a broken payload ends the turn as an error. After
+  `done`/`error` the connection is released at once. The client-wide 60 s
+  receive timeout is overridden for this call so a long answer isn't cut.
+- **Tests:** 403 passing, 21 skipped (gated) overall. New: parser 28 (the
+  same wire text cut at **every** byte position, one byte per chunk, 400
+  seeded random multi-way cuts, mid-emoji / mid-CRLF cuts, a 1 MiB event,
+  syntax cases, truncation, cancel), typed events 24, client 22 (typed order,
+  request shape, cut at every byte through the whole client, error event,
+  no-terminal-event cases, idle timeout vs keep-alive, three cancel timings,
+  seven open-failure cases). Each key behaviour mutation-checked (no CRLF-split
+  handling, per-chunk UTF-8 decode, flushing a half event, ending without
+  `done` read as success, idle timer disabled, cancel not releasing the
+  connection, raw server error shown, the `cast` removed).
+- **Against the real backend (`chat_stream_integration_test.dart`, gated):**
+  all 3 pass. A real query produced 15 events (8 tokens, 5 citations, no
+  heartbeat on that run) in contract order: retrieval at 7.3 s, first token
+  at 8.4 s, done at 9.4 s — **retrieval strictly before the first token**,
+  heartbeats (none here) only before retrieval, citations only after the last
+  token, every citation naming a chunk retrieval returned, tokens arriving
+  progressively rather than in one lump. Cancelling mid-answer ends cleanly
+  in under 5 s; streaming into a non-existent conversation is a clean error.
+  The first run took 52 s (Render cold start + the model).
+- **Not done (later milestones):** nothing in the UI uses this yet (3.2 is
+  the chat screen); no resume after a dropped turn (the server has no
+  `Last-Event-ID` support — a cut-off answer must be re-asked); the sealed
+  tier's `unlocked` credentials are not sent (Phase 5).
