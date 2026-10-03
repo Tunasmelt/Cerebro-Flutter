@@ -11,6 +11,7 @@ import '../../../shared/tokens/app_typography.dart';
 import '../../../shared/widgets/error_view.dart';
 import '../data/document.dart';
 import '../data/documents_list_notifier.dart';
+import '../data/ingest_status.dart';
 import '../data/upload/upload_controller.dart';
 import '../data/upload/upload_picker.dart';
 import 'document_presentation.dart';
@@ -30,7 +31,11 @@ class DocumentsScreen extends ConsumerWidget {
 
     try {
       final picked = await ref.read(uploadPickerProvider).pick(source);
-      if (picked == null) return;
+      // The picker (the camera especially) can stay open a long time. If
+      // this screen is gone by then — the session ended and the router moved
+      // on — drop the result: touching `ref` now would throw, and starting
+      // the upload anyway could send it under whoever signs in next.
+      if (picked == null || !context.mounted) return;
       // Not awaited on purpose: the flow reports through `uploadsProvider`,
       // and the user shouldn't be held on this handler while it runs.
       ref.read(uploadsProvider.notifier).upload(picked);
@@ -146,7 +151,10 @@ class _DocumentRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final typeColor = documentTypeColor(document.mime);
-    final statusColor = documentStatusColor(document.status);
+    final abandoned = summaryIsAbandonedUpload(document, DateTime.now());
+    final statusColor = abandoned
+        ? AppColors.danger
+        : documentStatusColor(document.status);
 
     return Material(
       color: AppColors.bgElevated,
@@ -217,7 +225,9 @@ class _DocumentRow extends StatelessWidget {
                   borderRadius: AppRadius.pillRadius,
                 ),
                 child: Text(
-                  documentStatusLabel(document.status),
+                  abandoned
+                      ? 'Incomplete'
+                      : documentStatusLabel(document.status),
                   style: AppTypography.xs.copyWith(color: statusColor),
                 ),
               ),

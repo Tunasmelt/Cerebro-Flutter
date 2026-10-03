@@ -16,7 +16,8 @@ import 'ingest_status.dart';
 /// status stays `failed` while the job runs again. Stopping on either
 /// signal alone would freeze the screen in those gaps.
 bool isIngestSettled(DocumentDetail d) =>
-    effectiveDocumentStatus(d) != DocumentStatus.processing;
+    effectiveDocumentStatus(d) != DocumentStatus.processing ||
+    detailIsAbandonedUpload(d, DateTime.now());
 
 /// True once the poll window ran out while the document was still being
 /// processed — the screen then says so instead of silently freezing on the

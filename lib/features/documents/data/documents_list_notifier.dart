@@ -134,7 +134,13 @@ class DocumentsListNotifier extends AsyncNotifier<List<DocumentSummary>> {
   void _pollIfProcessing(List<DocumentSummary>? documents) {
     _pollTimer?.cancel();
     if (documents == null) return;
-    if (!documents.any((d) => d.status == DocumentStatus.processing)) return;
+    final now = DateTime.now();
+    final waiting = documents.any(
+      (d) =>
+          d.status == DocumentStatus.processing &&
+          !summaryIsAbandonedUpload(d, now),
+    );
+    if (!waiting) return;
 
     final interval = ref.read(ingestPollIntervalProvider);
     final budget = maxPolls(interval, ref.read(ingestPollLimitProvider));
