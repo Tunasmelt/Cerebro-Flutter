@@ -959,3 +959,20 @@ and reproduced each suspect with a failing test before touching code.
   minutes. Harmless — it still stops — but not a precise limit.
 - Failed documents still have no Retry (backend `retry-ingest` exists).
 - Backgrounded app: timers keep polling for the rest of the window.
+
+### Milestone 2.3 — real-backend ingest tests run
+- Ran the two ingest integration tests added in 2.3 against the real
+  deployed backend (`gate3` test account; 2 of the 10 `upload-init`
+  calls/hour): **both pass** — a real document advances through real
+  states to `ready` with no error, and a corrupt PDF ends `failed` with a
+  `last_error` that `ingestErrorMessage` has plain-language text for (so
+  the "app has no text for this backend code" guard held).
+- **The first run of the success test failed, usefully:** it stopped
+  polling when the job stage read `ready` and found the document status
+  still `processing` — the same two-request write gap the 2.3 audit had
+  found by reading the backend source, now seen live. The failure was in
+  the *test's* stopping rule (the app already settles on document
+  status after the audit); the test now does the same. Test documents
+  are deleted by the tests' own teardown.
+- Phase 2 Gate: the integration-test item that was left to the owner is
+  closed; the three real-device checks remain.
