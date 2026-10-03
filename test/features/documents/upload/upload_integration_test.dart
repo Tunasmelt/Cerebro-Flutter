@@ -14,7 +14,7 @@
 // rejected calls aren't counted). This file spends 7 of them per run
 // (e2e 1, abandoned 1, confirm-without-PUT 1, rejections 2) plus 2 for
 // Milestone 2.3's ingest tests (7 in all) plus 2 for the retry-ingest tests
-// (9), and the opt-in large test 2 more — so don't run it more than once an hour
+// (9) plus 1 for the delete test (10), and the opt-in large test 2 more — so don't run it more than once an hour
 // against the same account, or the app (and the next run) will get a
 // 429 "Too many requests". Found the hard way during Milestone 2.2's live
 // camera test, which hit the limit this suite had just consumed.
@@ -32,6 +32,7 @@ import 'package:cerebro_mobile/core/network/generated_api_client.dart';
 import 'package:cerebro_mobile/core/network/session_token_provider.dart';
 import 'package:cerebro_mobile/features/documents/data/document.dart';
 import 'package:cerebro_mobile/features/documents/data/documents_repository.dart';
+import 'package:cerebro_mobile/features/documents/data/delete_document_api.dart';
 import 'package:cerebro_mobile/features/documents/data/ingest_status.dart';
 import 'package:cerebro_mobile/features/documents/data/retry_ingest_api.dart';
 import 'package:cerebro_mobile/features/documents/data/upload/picked_upload.dart';
@@ -142,6 +143,7 @@ void main() {
   late DocumentsRepository documents;
   late StorageUploader storage;
   late RetryIngestApi retryApi;
+  late DeleteDocumentApi deleteApi;
 
   setUpAll(() async {
     if (_gated) return;
@@ -151,6 +153,7 @@ void main() {
     );
     uploadApi = ApiUploadApi(api);
     retryApi = ApiRetryIngestApi(api);
+    deleteApi = ApiDeleteDocumentApi(api);
     documents = ApiDocumentsRepository(api);
     storage = DioStorageUploader(
       tokenProvider: _FixedTokenProvider(session.accessToken),
@@ -558,5 +561,63 @@ void main() {
       );
     });
   });
-}
 
+  // Delete (the button on a failed / never-finished document) against the
+  // real backend. An upload that was initialised but never PUT is exactly
+  // what a force-killed app leaves behind.
+  group('delete — real backend', () {
+    test(
+      'an abandoned upload can be deleted, is gone afterwards, and deleting '
+      'it again reads as "already gone"',
+      () async {
+        if (_gated) return skipUnlessConfigured();
+        final init = await uploadApi.init(
+          filename: 'm-delete-abandoned.txt',
+          mime: 'text/plain',
+          sizeBytes: 10,
+        );
+        // No deleteAfter(): the test deletes it itself.
+
+        final before = await documents.getDocument(init.documentId);
+        expect(before.ingestState, 'uploading');
+
+        await deleteApi.delete(init.documentId); // 200: no exception
+
+        await expectLater(
+          documents.getDocument(init.documentId),
+          throwsA(isA<AppException>()),
+          reason: 'the document no longer exists',
+        );
+        final listed = await documents.listDocuments();
+        expect(listed.any((d) => d.id == init.documentId), isFalse);
+
+        await expectLater(
+          deleteApi.delete(init.documentId),
+          throwsA(
+            isA<RequestRejectedException>().having(
+              (e) => isAlreadyDeleted(e),
+              'isAlreadyDeleted',
+              isTrue,
+            ),
+          ),
+        );
+      },
+      timeout: const Timeout(Duration(minutes: 2)),
+    );
+
+    test('deleting a document that never existed reads as "already gone"', () async {
+      if (_gated) return skipUnlessConfigured();
+
+      await expectLater(
+        deleteApi.delete('00000000-0000-4000-8000-000000000000'),
+        throwsA(
+          isA<RequestRejectedException>().having(
+            (e) => isAlreadyDeleted(e),
+            'isAlreadyDeleted',
+            isTrue,
+          ),
+        ),
+      );
+    });
+  });
+}
