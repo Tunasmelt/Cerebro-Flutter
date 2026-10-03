@@ -494,6 +494,17 @@ from a chunked HTTP response — no dependency on a browser-only
   project enforced at Stage 1.6, now verified reachable from this
   client independently.
 
+**Status: code complete, tests passing, verified against the real backend
+(see CHANGELOG "Milestone 3.1").** Both unit-test requirements are covered
+and then some: events reassemble across *every* possible chunk boundary
+(including mid-event, mid-CRLF and mid-emoji), and `retrieval` / `token` /
+`citation` / `done` (plus `heartbeat` and `error`) dispatch to typed events.
+The real-backend test confirmed `retrieval` arrives before the first `token`
+(7.3 s vs 8.4 s on the recorded run).
+Two real defects were found by the tests and fixed: a `Stream<Uint8List>`
+(what Dio produces) crashed the parser, and cancelling a stream parked on the
+network did not release the connection until the next event.
+
 ### Milestone 3.2 — Chat screen
 **Exit criteria:** Send a query, see tokens stream in, see citation
 chips render and resolve to real source chunks.
