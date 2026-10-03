@@ -6,14 +6,17 @@ import '../../auth/data/current_user_provider.dart';
 import 'document.dart';
 import 'documents_repository_provider.dart';
 import 'ingest_polling.dart';
+import 'ingest_status.dart';
 
 /// Nothing more will change without the user doing something. Judged by
-/// the *document's* status, not the job's stage: the backend writes
-/// `ingest_jobs.state` and `documents.status` in two separate requests, so
-/// for a moment the stage can read ready/failed while the status still
-/// says processing. Stopping on the stage alone would freeze the screen in
-/// that gap.
-bool isIngestSettled(DocumentDetail d) => d.status != DocumentStatus.processing;
+/// the document's *effective* status (see [effectiveDocumentStatus]), not
+/// the job's stage alone: the backend writes `ingest_jobs.state` and
+/// `documents.status` in separate requests, so the stage can read
+/// ready/failed for a moment while the status lags — and after a retry the
+/// status stays `failed` while the job runs again. Stopping on either
+/// signal alone would freeze the screen in those gaps.
+bool isIngestSettled(DocumentDetail d) =>
+    effectiveDocumentStatus(d) != DocumentStatus.processing;
 
 /// True once the poll window ran out while the document was still being
 /// processed — the screen then says so instead of silently freezing on the

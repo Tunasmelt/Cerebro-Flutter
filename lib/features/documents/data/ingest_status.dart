@@ -1,3 +1,5 @@
+import 'document.dart';
+
 /// `ingest_jobs.state` — the real values, read from the deployed
 /// backend's source (`documents_storage.py`, `ingest/*.py`), not the
 /// empty OpenAPI schema. Captures start at `extracting` (they have no
@@ -105,5 +107,43 @@ String ingestErrorMessage(String? code) {
       return "Indexing isn't set up on the server yet.";
     default:
       return "This document couldn't be processed ($code).";
+  }
+}
+
+/// The document's real status, correcting for how the backend records a
+/// retry: on failure it sets `documents.status = failed`, but a retry only
+/// resets `ingest_jobs.state` — the document keeps reading `failed` while
+/// the job runs again, and flips to `ready` only at the very end. So a
+/// `failed` document whose job is running (or has just finished) is not
+/// really failed. Everything else is taken at face value.
+DocumentStatus effectiveDocumentStatus(DocumentDetail d) {
+  if (d.status != DocumentStatus.failed) return d.status;
+  switch (IngestStage.fromApi(d.ingestState)) {
+    case IngestStage.uploading:
+    case IngestStage.normalizing:
+    case IngestStage.extracting:
+    case IngestStage.embedding:
+      return DocumentStatus.processing;
+    case IngestStage.ready:
+      return DocumentStatus.ready;
+    case IngestStage.failed:
+    case IngestStage.unknown:
+      return DocumentStatus.failed;
+  }
+}
+
+/// Whether offering "Retry" for this `last_error` can possibly help. False
+/// only where there is structurally nothing to resume: the upload never
+/// completed, the file was refused for size, or the document is gone.
+/// Anything else — including a corrupt-looking file, which a truncated
+/// download can cause, and codes the app doesn't know — may succeed.
+bool ingestErrorRetryable(String? code) {
+  switch (code) {
+    case 'upload_expired':
+    case 'file_too_large':
+    case 'document_not_found':
+      return false;
+    default:
+      return true;
   }
 }

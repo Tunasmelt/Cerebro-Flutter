@@ -13,7 +13,8 @@
 // user per hour (`services/api/app/core/rate_limit.py`, a sliding window;
 // rejected calls aren't counted). This file spends 7 of them per run
 // (e2e 1, abandoned 1, confirm-without-PUT 1, rejections 2) plus 2 for
-// Milestone 2.3's ingest tests (7 in all), and the opt-in large test 2 more — so don't run it more than once an hour
+// Milestone 2.3's ingest tests (7 in all) plus 2 for the retry-ingest tests
+// (9), and the opt-in large test 2 more — so don't run it more than once an hour
 // against the same account, or the app (and the next run) will get a
 // 429 "Too many requests". Found the hard way during Milestone 2.2's live
 // camera test, which hit the limit this suite had just consumed.
@@ -32,6 +33,7 @@ import 'package:cerebro_mobile/core/network/session_token_provider.dart';
 import 'package:cerebro_mobile/features/documents/data/document.dart';
 import 'package:cerebro_mobile/features/documents/data/documents_repository.dart';
 import 'package:cerebro_mobile/features/documents/data/ingest_status.dart';
+import 'package:cerebro_mobile/features/documents/data/retry_ingest_api.dart';
 import 'package:cerebro_mobile/features/documents/data/upload/picked_upload.dart';
 import 'package:cerebro_mobile/features/documents/data/upload/storage_uploader.dart';
 import 'package:cerebro_mobile/features/documents/data/upload/upload_api.dart';
@@ -139,6 +141,7 @@ void main() {
   late UploadApi uploadApi;
   late DocumentsRepository documents;
   late StorageUploader storage;
+  late RetryIngestApi retryApi;
 
   setUpAll(() async {
     if (_gated) return;
@@ -147,6 +150,7 @@ void main() {
       tokenProvider: _FixedTokenProvider(session.accessToken),
     );
     uploadApi = ApiUploadApi(api);
+    retryApi = ApiRetryIngestApi(api);
     documents = ApiDocumentsRepository(api);
     storage = DioStorageUploader(
       tokenProvider: _FixedTokenProvider(session.accessToken),
@@ -488,5 +492,71 @@ void main() {
       },
       timeout: const Timeout(Duration(minutes: 3)),
     );
+
+    // Retry (the Retry button's endpoint) against the real backend. A
+    // corrupt PDF is deterministic, so retrying it must run the pipeline
+    // again and fail the same way - which exercises the real 202 path
+    // without needing a flaky provider.
+    test(
+      'retrying a failed document is accepted, re-runs the job, and (for a '
+      'corrupt PDF) fails again with the same reason',
+      () async {
+        if (_gated) return skipUnlessConfigured();
+        final id = await uploadAndConfirm(
+          _pdfFile('m23-retry.pdf', utf8.encode('still not a pdf')),
+        );
+        final (_, first) = await watchIngest(id);
+        expect(first.status, DocumentStatus.failed);
+        final firstError = first.lastError;
+        expect(ingestErrorRetryable(firstError), isTrue);
+
+        await retryApi.retry(id); // 202: no exception
+
+        final (seen, second) = await watchIngest(id);
+        expect(second.status, DocumentStatus.failed, reason: 'seen: $seen');
+        expect(second.lastError, firstError);
+      },
+      timeout: const Timeout(Duration(minutes: 3)),
+    );
+
+    test(
+      'retrying a document that is not failed is refused (409)',
+      () async {
+        if (_gated) return skipUnlessConfigured();
+        final id = await uploadAndConfirm(
+          _textFile('m23-retry-ready.txt', 'Nothing to retry here.\n'),
+        );
+        final (_, done) = await watchIngest(id);
+        expect(done.status, DocumentStatus.ready);
+
+        await expectLater(
+          retryApi.retry(id),
+          throwsA(
+            isA<RequestRejectedException>().having(
+              (e) => e.code,
+              'code',
+              'not_retryable',
+            ),
+          ),
+        );
+      },
+      timeout: const Timeout(Duration(minutes: 3)),
+    );
+
+    test('retrying a document that does not exist is refused (404)', () async {
+      if (_gated) return skipUnlessConfigured();
+
+      await expectLater(
+        retryApi.retry('00000000-0000-4000-8000-000000000000'),
+        throwsA(
+          isA<RequestRejectedException>().having(
+            (e) => e.code,
+            'code',
+            'not_found',
+          ),
+        ),
+      );
+    });
   });
 }
+
