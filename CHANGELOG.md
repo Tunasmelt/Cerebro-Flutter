@@ -1026,3 +1026,61 @@ and reproduced each suspect with a failing test before touching code.
   be produced on demand. That path (job → ready, status catching up) is
   covered by scripted tests of the effective-status and list logic, not
   by a live run.
+
+### Phase 2 audit (Milestones 2.1–2.3 and the Gate)
+Looked at Phase 2 as a whole rather than per milestone, and ran the
+Phase 2 Gate's force-kill case for real on the emulator. Everything below
+was reproduced before it was fixed.
+
+**Confirmed and fixed:**
+- **A killed upload sat in the list as "Processing" for up to an hour.**
+  Force-stopping the app mid-upload (`adb shell am force-stop`) and
+  reopening it left a document at job state `uploading`: not falsely
+  Ready (the gate's main worry), but listed as "Processing", size "0b",
+  with a live-looking "Uploading" bar — for something that will never
+  advance. The backend only expires it after 1 hour, lazily, the next time
+  the list is fetched. The app can tell much sooner: it uploads straight
+  after `upload-init` and the signed URL lives 60 s, so a document still
+  uploading 10 minutes after it was created isn't progressing. It now
+  reads **Incomplete** (list badge and detail), the detail says "This
+  upload didn't finish — the app was closed before it completed. Upload
+  the file again.", the bar is gone, no Retry is offered (there is no job
+  to resume), and neither screen polls for it. Detected by age + job stage
+  on the detail, and by age + processing + a never-recorded size (0) in
+  the list. Verified live: the real killed upload flipped from
+  "Processing" to "Incomplete" once it passed 10 minutes. Screenshots:
+  `docs/screenshots/phase-2-audit-killed-upload-before.png` / `-after.png`.
+- **A picker that returned after its screen was gone threw.** The camera
+  can stay open a long time; if the session ends meanwhile and the router
+  leaves the Documents screen, `ref.read` on the disposed widget threw
+  "Cannot use ref after the widget was disposed" as an unhandled error and
+  the photo vanished. The result is now dropped. (Capturing the notifier
+  early and uploading anyway would have been worse: after a sign-out and
+  sign-in it would upload under the next user's session.) Reproduced with
+  a widget test; fails without the one-line guard.
+- Each fix mutation-checked (list predicate, detail predicate, detail
+  polling, list polling, mounted guard). Suite: 313 passing, 16 skipped;
+  stable across 3 consecutive full runs.
+
+**Checked and held up:**
+- The rate-limit message ("You're doing that too often. Try again in
+  about N minutes.") appeared on a real upload row twice during the audit
+  — the 429/Retry-After path works end to end, not just in tests.
+- A tightened `effectiveDocumentStatus`: an `uploading` stage beside a
+  `failed` status is no longer read as a retry in progress (a retry only
+  ever resumes at normalizing/extracting/embedding).
+
+**Noted, not fixed:**
+- **The upload rate limit bites developers, not just users.** 10
+  `upload-init`/hour: one full run of the gated real-backend suite spends
+  9, and the audit's own live checks were locked out twice. Run that suite
+  at most once an hour per account.
+- An "Incomplete" document stays in the list until the backend's own
+  sweep removes it (≥ 1 hour, on a later list fetch), and the app has no
+  delete action yet, so the user can't dismiss it themselves.
+- The 10-minute rule compares the server's `created_at` with the device
+  clock; a device clock wrong by more than ~10 minutes could mislabel a
+  genuinely in-flight upload or delay the label.
+- Still the owner's, on a real device: gallery/file upload to ready,
+  camera photo to ready, force-kill mid-upload (emulator-verified only),
+  plus Phase 1's Supabase-dashboard box.

@@ -376,4 +376,41 @@ void main() {
       },
     );
   });
+
+  group('an abandoned upload', () {
+    testWidgets(
+      'is called incomplete, with no bar pretending it is progressing',
+      (tester) async {
+        final repo = ScriptedDocumentsRepository(
+          details: [
+            detailAt(
+              'uploading',
+              createdAt: DateTime.now().subtract(const Duration(minutes: 30)),
+            ),
+          ],
+        );
+        await _pumpScreen(tester, repo);
+        await tester.pumpAndSettle();
+
+        expect(find.text('Incomplete'), findsOneWidget);
+        expect(find.text('Processing'), findsNothing);
+        expect(_stage(tester), 'Upload not finished');
+        expect(find.byKey(const Key('document_detail_abandoned')), findsOneWidget);
+        expect(find.byKey(const Key('document_detail_progress')), findsNothing);
+        expect(find.byKey(const Key('document_detail_retry')), findsNothing,
+            reason: 'there is no job to retry; the file must be uploaded again');
+      },
+    );
+
+    testWidgets('a fresh upload still reads as uploading', (tester) async {
+      final repo = ScriptedDocumentsRepository(
+        details: [detailAt('uploading', createdAt: DateTime.now())],
+      );
+      await _pumpScreen(tester, repo);
+
+      expect(find.text('Incomplete'), findsNothing);
+      expect(_stage(tester), 'Uploading');
+      expect(find.byKey(const Key('document_detail_progress')), findsOneWidget);
+    });
+  });
 }

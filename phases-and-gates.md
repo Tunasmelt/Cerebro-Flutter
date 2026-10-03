@@ -461,6 +461,15 @@ confirms live:
 - [ ] Force-killed the app mid-upload once and confirmed nothing was
       left in a broken or falsely-successful state on reopening.
 
+**Phase 2 audit status (2026-10-03):** all three items are still the
+owner's to confirm on a real device, but the force-kill case was run on
+the emulator (`adb shell am force-stop` mid-upload) and exposed a real
+defect, now fixed: the abandoned upload was never falsely *Ready*, but it
+sat in the list as "Processing" with a live-looking progress bar for up to
+an hour (the backend only expires it then). It now reads **Incomplete** —
+"This upload didn't finish… Upload the file again." (CHANGELOG "Phase 2
+audit"; screenshots `docs/screenshots/phase-2-audit-killed-upload-*.png`).
+
 ---
 
 ## Phase 3 — Chat & retrieval

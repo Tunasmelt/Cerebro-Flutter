@@ -78,7 +78,10 @@ class _DocumentDetailBody extends ConsumerWidget {
     // After a retry the backend still calls the document `failed` while
     // its job runs again; show what is actually happening.
     final status = effectiveDocumentStatus(document);
-    final statusColor = documentStatusColor(status);
+    final abandoned = detailIsAbandonedUpload(document, DateTime.now());
+    final statusColor = abandoned
+        ? AppColors.danger
+        : documentStatusColor(status);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(AppSpacing.s4),
@@ -120,7 +123,10 @@ class _DocumentDetailBody extends ConsumerWidget {
           const SizedBox(height: AppSpacing.s5),
           _DetailRow(
             label: 'Status',
-            child: _StatusBadge(status: status, color: statusColor),
+            child: _StatusBadge(
+              label: abandoned ? 'Incomplete' : documentStatusLabel(status),
+              color: statusColor,
+            ),
           ),
           _DetailRow(
             label: 'Size',
@@ -140,8 +146,28 @@ class _DocumentDetailBody extends ConsumerWidget {
               ).copyWith(color: AppColors.textPrimary),
             ),
           ),
-          _IngestProgress(document: document, status: status, stalled: gaveUp),
-          if (gaveUp && !isIngestSettled(document)) ...[
+          _IngestProgress(
+            document: document,
+            status: status,
+            stalled: gaveUp || abandoned,
+            abandoned: abandoned,
+          ),
+          if (abandoned) ...[
+            Container(
+              key: const Key('document_detail_abandoned'),
+              width: double.infinity,
+              padding: const EdgeInsets.all(AppSpacing.s3),
+              decoration: BoxDecoration(
+                color: AppColors.dangerSubtle,
+                borderRadius: AppRadius.mdRadius,
+              ),
+              child: Text(
+                "This upload didn't finish — the app was closed before it "
+                'completed. Upload the file again.',
+                style: AppTypography.xs.copyWith(color: AppColors.dangerHover),
+              ),
+            ),
+          ] else if (gaveUp && !isIngestSettled(document)) ...[
             Container(
               key: const Key('document_detail_stalled'),
               width: double.infinity,
@@ -255,7 +281,11 @@ class _IngestProgress extends StatelessWidget {
     required this.document,
     required this.status,
     required this.stalled,
+    this.abandoned = false,
   });
+
+  /// The upload never finished; say so instead of "Uploading".
+  final bool abandoned;
 
   final DocumentDetail document;
 
@@ -283,7 +313,7 @@ class _IngestProgress extends StatelessWidget {
         _DetailRow(
           label: 'Stage',
           child: Text(
-            stage.label,
+            abandoned ? 'Upload not finished' : stage.label,
             key: const Key('document_detail_stage'),
             style: AppTypography.sm.copyWith(color: AppColors.textPrimary),
           ),
@@ -334,9 +364,9 @@ class _DetailRow extends StatelessWidget {
 }
 
 class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({required this.status, required this.color});
+  const _StatusBadge({required this.label, required this.color});
 
-  final DocumentStatus status;
+  final String label;
   final Color color;
 
   @override
@@ -351,7 +381,7 @@ class _StatusBadge extends StatelessWidget {
         borderRadius: AppRadius.pillRadius,
       ),
       child: Text(
-        documentStatusLabel(status),
+        label,
         style: AppTypography.xs.copyWith(color: color),
       ),
     );

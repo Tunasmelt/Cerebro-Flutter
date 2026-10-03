@@ -135,4 +135,83 @@ void main() {
       test('for ${code ?? 'no code'}', () => expect(ingestErrorRetryable(code), isTrue));
     }
   });
+
+  group('an abandoned upload (app killed mid-upload) is recognised', () {
+    final now = DateTime.utc(2026, 10, 3, 12);
+    DateTime ago(Duration d) => now.subtract(d);
+
+    test('detail: still uploading well past when it could be in flight', () {
+      expect(
+        detailIsAbandonedUpload(
+          detailAt('uploading', createdAt: ago(const Duration(minutes: 11))),
+          now,
+        ),
+        isTrue,
+      );
+    });
+    test('detail: a fresh upload is not', () {
+      expect(
+        detailIsAbandonedUpload(
+          detailAt('uploading', createdAt: ago(const Duration(minutes: 2))),
+          now,
+        ),
+        isFalse,
+      );
+    });
+    test('detail: only the uploading stage counts (a slow indexing is not)', () {
+      for (final stage in ['normalizing', 'extracting', 'embedding', 'ready', 'failed', null]) {
+        expect(
+          detailIsAbandonedUpload(
+            detailAt(stage, createdAt: ago(const Duration(hours: 5))),
+            now,
+          ),
+          isFalse,
+          reason: 'stage $stage',
+        );
+      }
+    });
+    test('detail: a document already ready or failed is not', () {
+      for (final status in [DocumentStatus.ready, DocumentStatus.failed]) {
+        expect(
+          detailIsAbandonedUpload(
+            detailAt('uploading', status: status, createdAt: ago(const Duration(hours: 2))),
+            now,
+          ),
+          isFalse,
+        );
+      }
+    });
+    test('list: processing, size never recorded, and old', () {
+      expect(
+        summaryIsAbandonedUpload(
+          summaryWith(DocumentStatus.processing, sizeBytes: 0, createdAt: ago(const Duration(minutes: 30))),
+          now,
+        ),
+        isTrue,
+      );
+    });
+    test('list: not when it has a size, is recent, or is not processing', () {
+      expect(
+        summaryIsAbandonedUpload(
+          summaryWith(DocumentStatus.processing, sizeBytes: 5, createdAt: ago(const Duration(hours: 1))),
+          now,
+        ),
+        isFalse,
+      );
+      expect(
+        summaryIsAbandonedUpload(
+          summaryWith(DocumentStatus.processing, sizeBytes: 0, createdAt: ago(const Duration(minutes: 1))),
+          now,
+        ),
+        isFalse,
+      );
+      expect(
+        summaryIsAbandonedUpload(
+          summaryWith(DocumentStatus.ready, sizeBytes: 0, createdAt: ago(const Duration(hours: 1))),
+          now,
+        ),
+        isFalse,
+      );
+    });
+  });
 }

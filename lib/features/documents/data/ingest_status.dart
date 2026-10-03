@@ -119,13 +119,16 @@ String ingestErrorMessage(String? code) {
 DocumentStatus effectiveDocumentStatus(DocumentDetail d) {
   if (d.status != DocumentStatus.failed) return d.status;
   switch (IngestStage.fromApi(d.ingestState)) {
-    case IngestStage.uploading:
+    // A retry only ever resumes at normalizing/extracting/embedding, never
+    // at uploading, so an `uploading` stage beside a failed status is not a
+    // retry in progress.
     case IngestStage.normalizing:
     case IngestStage.extracting:
     case IngestStage.embedding:
       return DocumentStatus.processing;
     case IngestStage.ready:
       return DocumentStatus.ready;
+    case IngestStage.uploading:
     case IngestStage.failed:
     case IngestStage.unknown:
       return DocumentStatus.failed;
@@ -147,3 +150,30 @@ bool ingestErrorRetryable(String? code) {
       return true;
   }
 }
+
+/// An upload that was started but never finished — the app was closed or
+/// killed mid-upload, so `upload-confirm` was never called. The backend
+/// leaves such a document at job state `uploading` and only expires it an
+/// hour later, lazily, the next time the list is fetched. Meanwhile it reads
+/// "Processing" with a live-looking progress bar for something that will
+/// never advance.
+///
+/// The app can tell sooner: it uploads straight after `upload-init`, and the
+/// signed upload URL lives only 60 seconds, so a document still uploading
+/// this long after it was created is not progressing.
+const kUploadAbandonedAfter = Duration(minutes: 10);
+
+/// Detail form: processing, job still at `uploading`, and old.
+bool detailIsAbandonedUpload(DocumentDetail d, DateTime now) =>
+    d.status == DocumentStatus.processing &&
+    IngestStage.fromApi(d.ingestState) == IngestStage.uploading &&
+    now.difference(d.createdAt) > kUploadAbandonedAfter;
+
+/// List form. The list has no job stage, but a document that is still
+/// "processing" with a recorded size of 0 and is this old never got as far
+/// as `upload-confirm` (which is what records the size); a real document
+/// has long since moved on.
+bool summaryIsAbandonedUpload(DocumentSummary d, DateTime now) =>
+    d.status == DocumentStatus.processing &&
+    d.sizeBytes == 0 &&
+    now.difference(d.createdAt) > kUploadAbandonedAfter;

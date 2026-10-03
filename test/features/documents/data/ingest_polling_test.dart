@@ -345,4 +345,73 @@ void main() {
       expect(repo.listCalls, calls);
     });
   });
+
+  group('an abandoned upload', () {
+    final old = DateTime.now().subtract(const Duration(minutes: 30));
+
+    test('detail is fetched once and never polled', () async {
+      final repo = ScriptedDocumentsRepository(
+        details: [detailAt('uploading', createdAt: old)],
+      );
+      final container = _container(repo);
+      container.listen(documentDetailProvider('doc-1'), (_, _) {});
+
+      await _settle();
+
+      expect(repo.detailCalls, 1);
+    });
+
+    test('a fresh upload is still polled', () async {
+      final repo = ScriptedDocumentsRepository(
+        details: [
+          detailAt('uploading', createdAt: DateTime.now()),
+          detailAt('uploading', createdAt: DateTime.now()),
+          detailAt('normalizing', createdAt: DateTime.now()),
+          detailAt('ready', status: DocumentStatus.ready, createdAt: DateTime.now()),
+        ],
+      );
+      final container = _container(repo);
+      container.listen(documentDetailProvider('doc-1'), (_, _) {});
+
+      await _settle();
+
+      expect(repo.detailCalls, 4);
+    });
+
+    test('the list does not poll for it', () async {
+      final repo = ScriptedDocumentsRepository(
+        lists: [
+          [summaryWith(DocumentStatus.processing, sizeBytes: 0, createdAt: old)],
+        ],
+      );
+      final container = _container(repo);
+      container.listen(documentsListProvider, (_, _) {});
+
+      await _settle();
+
+      expect(repo.listCalls, 1);
+    });
+
+    test('the list still polls while a real document is processing beside it',
+        () async {
+      final repo = ScriptedDocumentsRepository(
+        lists: [
+          [
+            summaryWith(DocumentStatus.processing, sizeBytes: 0, createdAt: old, id: 'dead'),
+            summaryWith(DocumentStatus.processing, id: 'live'),
+          ],
+          [
+            summaryWith(DocumentStatus.processing, sizeBytes: 0, createdAt: old, id: 'dead'),
+            summaryWith(DocumentStatus.ready, id: 'live'),
+          ],
+        ],
+      );
+      final container = _container(repo);
+      container.listen(documentsListProvider, (_, _) {});
+
+      await _settle();
+
+      expect(repo.listCalls, 2);
+    });
+  });
 }
