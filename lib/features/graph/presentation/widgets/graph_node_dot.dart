@@ -32,6 +32,10 @@ class GraphNodeDot extends StatelessWidget {
     final radius = type.baseRadius;
     final opacity = dimmed ? 0.2 : 1.0;
     final emphasised = matched || selected;
+    // A selected node is an expanded one, and its title is in the panel; the
+    // label would sit on top of its own satellites. Only a search match gets
+    // one.
+    final labelled = matched && !dimmed;
     final glow = radius * (matched ? 6 : (selected ? 5 : 4));
     const target = AppSpacing.minTouchTarget;
 
@@ -85,7 +89,7 @@ class GraphNodeDot extends StatelessWidget {
                 ),
               ),
             ),
-            if (emphasised && !dimmed)
+            if (labelled)
               Positioned(
                 top: target / 2 + radius + 4,
                 left: -80,

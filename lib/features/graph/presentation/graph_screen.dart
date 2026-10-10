@@ -10,13 +10,18 @@ import '../../../shared/tokens/app_spacing.dart';
 import '../../../shared/tokens/app_typography.dart';
 import '../../../shared/widgets/error_view.dart';
 import '../data/graph_api.dart';
+import '../data/graph_expansion.dart';
 import '../data/graph_layout.dart';
 import '../data/graph_models.dart';
 import 'widgets/graph_ask_bar.dart';
 import 'widgets/graph_legend.dart';
 import 'widgets/graph_node_dot.dart';
 import 'widgets/graph_search_bar.dart';
-import 'widgets/node_detail_sheet.dart';
+import 'widgets/node_info_panel.dart';
+
+/// What share of the screen's height the node panel may cover; an expanded
+/// node is brought into the part above it.
+const double _panelShare = 0.5;
 
 /// The brain graph — Cerebro's 2D, deliberately-not-3D visual index of a
 /// user's vault (architecture-and-spec.md §5, CLAUDE.md "2D graph is a
@@ -24,7 +29,9 @@ import 'widgets/node_detail_sheet.dart';
 ///
 /// Draws the real `/graph/nodes` and `/graph/edges` with
 /// `flutter_force_directed_graph`. The layout is the server's (see
-/// [buildForceGraph]); this screen only renders it.
+/// [buildForceGraph]); this screen only renders it. Tapping a node expands it
+/// and opens its chunks in a panel (see [GraphExpansion]); pan and pinch-zoom
+/// are the package's own gestures.
 class GraphScreen extends ConsumerStatefulWidget {
   const GraphScreen({super.key, this.openDocument});
 
@@ -41,7 +48,6 @@ class _GraphScreenState extends ConsumerState<GraphScreen> {
   final _askController = TextEditingController();
 
   String _query = '';
-  String? _selectedId;
   bool _showLegend = true;
 
   /// The package's graph for [_builtFrom]; rebuilt only when a new snapshot
@@ -74,7 +80,10 @@ class _GraphScreenState extends ConsumerState<GraphScreen> {
       _controller = controller;
       _builtFrom = snapshot;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && identical(_controller, controller)) controller.center();
+        if (!mounted || !identical(_controller, controller)) return;
+        controller.center();
+        // A fresh graph has nothing expanded.
+        ref.read(graphExpansionProvider.notifier).collapse();
       });
     }
     return _controller!;
@@ -94,33 +103,30 @@ class _GraphScreenState extends ConsumerState<GraphScreen> {
     }
   }
 
+  Node<String>? _nodeFor(ForceDirectedGraphController<String> c, String id) {
+    for (final n in c.graph.nodes) {
+      if (n.data == id) return n;
+    }
+    return null;
+  }
+
+  /// Brings [id] into the part of the view the panel will not cover, so a
+  /// node tapped low on the screen is not hidden by its own panel.
+  void _bringIntoView(String id) {
+    final controller = _controller;
+    if (controller == null) return;
+    final node = _nodeFor(controller, id);
+    if (node == null) return;
+    final height = MediaQuery.sizeOf(context).height;
+    // The graph's origin is the middle of the view; y points up.
+    final visibleMiddle = height * (1 - _panelShare) / 2;
+    final targetY = height / 2 - visibleMiddle;
+    controller.locateToPosition(node.position.x, node.position.y - targetY);
+  }
+
   bool _matches(GraphNodeData node) =>
       _query.isNotEmpty &&
       node.title.toLowerCase().contains(_query.toLowerCase());
-
-  void _select(GraphNodeData node) {
-    setState(() => _selectedId = node.id);
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (sheetContext) => NodeDetailSheet(
-        node: node,
-        onChatAboutThis: () => Navigator.of(sheetContext).maybePop(),
-        onOpenInDocuments: () {
-          Navigator.of(sheetContext).maybePop();
-          _openDocument(node.id);
-        },
-        onZoomOut: () {
-          Navigator.of(sheetContext).maybePop();
-          setState(() => _selectedId = null);
-        },
-      ),
-    ).whenComplete(() {
-      // Deselect once the sheet is dismissed (swipe, scrim tap or button).
-      if (mounted) setState(() => _selectedId = null);
-    });
-  }
 
   void _openDocument(String id) {
     final open = widget.openDocument;
@@ -141,12 +147,28 @@ class _GraphScreenState extends ConsumerState<GraphScreen> {
     final graph = ref.watch(graphProvider);
     // Keep the last graph on screen while a refresh is in flight.
     final snapshot = graph.valueOrNull;
+    final expansion = ref.watch(graphExpansionProvider);
+
+    ref.listen<GraphExpansion>(graphExpansionProvider, (previous, next) {
+      final id = next.nodeId;
+      if (id != null && id != previous?.nodeId) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _bringIntoView(id);
+        });
+      }
+    });
+
+    final byId = {
+      if (snapshot != null)
+        for (final n in snapshot.nodes) n.id: n,
+    };
+    final expanded = expansion.nodeId == null ? null : byId[expansion.nodeId];
 
     return Scaffold(
       backgroundColor: AppColors.bgBase,
       body: Stack(
         children: [
-          Positioned.fill(child: _body(graph, snapshot)),
+          Positioned.fill(child: _body(graph, snapshot, byId, expansion)),
           Positioned.fill(
             child: SafeArea(
               child: Padding(
@@ -183,14 +205,21 @@ class _GraphScreenState extends ConsumerState<GraphScreen> {
                     ),
                     if (snapshot != null) _Notes(snapshot: snapshot),
                     const Spacer(),
-                    GraphAskBar(controller: _askController, onAsk: _handleAsk),
+                    if (expanded == null)
+                      GraphAskBar(
+                        controller: _askController,
+                        onAsk: _handleAsk,
+                      ),
                     const SizedBox(height: AppSpacing.s2),
                   ],
                 ),
               ),
             ),
           ),
-          if (_showLegend && snapshot != null && snapshot.nodes.isNotEmpty)
+          if (_showLegend &&
+              expanded == null &&
+              snapshot != null &&
+              snapshot.nodes.isNotEmpty)
             Positioned(
               left: AppSpacing.s4,
               bottom: AppSpacing.s20,
@@ -200,12 +229,37 @@ class _GraphScreenState extends ConsumerState<GraphScreen> {
                 ),
               ),
             ),
+          if (expanded != null)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: NodeInfoPanel(
+                node: expanded,
+                expansion: expansion,
+                onClose: ref.read(graphExpansionProvider.notifier).collapse,
+                onRetry: ref.read(graphExpansionProvider.notifier).retry,
+                onSelectChunk: ref
+                    .read(graphExpansionProvider.notifier)
+                    .selectChunk,
+                // Routing a node to Chat is a later milestone.
+                onChatAboutThis: ref
+                    .read(graphExpansionProvider.notifier)
+                    .collapse,
+                onOpenInDocuments: () => _openDocument(expanded.id),
+              ),
+            ),
         ],
       ),
     );
   }
 
-  Widget _body(AsyncValue<GraphSnapshot> graph, GraphSnapshot? snapshot) {
+  Widget _body(
+    AsyncValue<GraphSnapshot> graph,
+    GraphSnapshot? snapshot,
+    Map<String, GraphNodeData> byId,
+    GraphExpansion expansion,
+  ) {
     if (snapshot == null) {
       if (graph.hasError) {
         final error = graph.error;
@@ -238,7 +292,7 @@ class _GraphScreenState extends ConsumerState<GraphScreen> {
       );
     }
 
-    final byId = {for (final n in snapshot.nodes) n.id: n};
+    final toggle = ref.read(graphExpansionProvider.notifier).toggle;
     return ForceDirectedGraphWidget<String>(
       key: const Key('graph_canvas'),
       controller: _controllerFor(snapshot),
@@ -248,13 +302,13 @@ class _GraphScreenState extends ConsumerState<GraphScreen> {
         final node = byId[id];
         if (node == null) return const SizedBox.shrink();
         final matched = _matches(node);
-        final selected = node.id == _selectedId;
+        final selected = node.id == expansion.nodeId;
         return GraphNodeDot(
           node: node,
           matched: matched,
           selected: selected,
           dimmed: _query.isNotEmpty && !matched && !selected,
-          onTap: () => _select(node),
+          onTap: () => toggle(node.id),
         );
       },
       edgesBuilder: (context, a, b, distance) =>

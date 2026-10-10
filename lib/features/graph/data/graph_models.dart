@@ -118,3 +118,54 @@ class GraphSnapshot {
   /// Whether any node carries a server-computed position.
   bool get isClustered => nodes.any((n) => n.hasPosition);
 }
+
+/// One chunk of a document, from `GET /graph/nodes/{id}/chunks`: a passage
+/// of text (or, for an image, its description) that retrieval can cite.
+class DocumentChunk {
+  const DocumentChunk({
+    required this.id,
+    required this.ordinal,
+    required this.content,
+    this.page,
+    this.regionType,
+  });
+
+  final String id;
+  final int ordinal;
+
+  /// May be empty (an image with no description) or very long (a whole
+  /// section of a Markdown file), so callers truncate what they show.
+  final String content;
+
+  /// 1-based page in the source, when the source has pages.
+  final int? page;
+
+  /// What kind of region this was cut from (`paragraph`, `heading`, …).
+  final String? regionType;
+
+  /// [content] on one line, cut to [max] characters.
+  String preview([int max = 140]) {
+    final flat = content.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (flat.isEmpty) return '(no text)';
+    return flat.length <= max ? flat : '${flat.substring(0, max).trimRight()}…';
+  }
+
+  /// Null when the row has no usable id.
+  static DocumentChunk? fromJson(Object? json) {
+    if (json is! Map) return null;
+    final id = json['id'];
+    if (id is! String || id.isEmpty) return null;
+    final ordinal = json['ordinal'];
+    final content = json['content'];
+    final meta = json['meta'];
+    final page = meta is Map ? meta['page'] : null;
+    final region = meta is Map ? meta['region_type'] : null;
+    return DocumentChunk(
+      id: id,
+      ordinal: ordinal is num ? ordinal.toInt() : 0,
+      content: content is String ? content : '',
+      page: page is num ? page.toInt() : null,
+      regionType: region is String && region.isNotEmpty ? region : null,
+    );
+  }
+}

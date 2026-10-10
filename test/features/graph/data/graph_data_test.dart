@@ -445,4 +445,7 @@ class _Api implements GraphApi {
     if (edgesError != null) throw edgesError!;
     return edgeRows;
   }
+
+  @override
+  Future<List<DocumentChunk>> chunks(String documentId) async => const [];
 }
