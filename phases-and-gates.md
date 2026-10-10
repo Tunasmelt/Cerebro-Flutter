@@ -791,6 +791,16 @@ session-scoped 15-minute unlock claim enforced.
   confirm it locks again automatically without requiring the app to be
   restarted.
 
+**Status (2026-10-11): implementation complete; functional checks partial.**
+Production document controls, in-memory claims/countdown, expiry/resume
+cleanup and chat claim payloads are implemented. Unit/widget checks pass.
+Real Android 60-chunk sealing/unlock, locked-chat exclusion and actual
+server claim-expiry rejection passed.
+Unlocked chat retrieves/answers but fails backend UUID persistence.
+No-restart expiry/expired-chat proof remains unverified after the emulator
+shut down before expiry; independent server-expiry results are in the
+[verification record](docs/milestone-5.3-seal-unlock.md). No owner phase gate changed.
+
 ### Milestone 5.4 — Adversarial security testing
 **Exit criteria:** Sealed content cannot be extracted through this
 client by any query phrasing, malformed request, or cross-user access

@@ -12,6 +12,7 @@ import '../data/delete_document_controller.dart';
 import '../data/document_detail_provider.dart';
 import '../data/ingest_retry_controller.dart';
 import '../data/ingest_status.dart';
+import '../../sealed/presentation/sealed_document_controls.dart';
 import 'document_presentation.dart';
 
 class DocumentDetailScreen extends ConsumerWidget {
@@ -153,6 +154,7 @@ class _DocumentDetailBody extends ConsumerWidget {
             stalled: gaveUp || abandoned,
             abandoned: abandoned,
           ),
+          SealedDocumentControls(documentId: documentId, status: status),
           if (abandoned) ...[
             Container(
               key: const Key('document_detail_abandoned'),
@@ -223,7 +225,9 @@ class _DocumentDetailBody extends ConsumerWidget {
               Text(
                 'Upload the file again to try again.',
                 key: const Key('document_detail_reupload_hint'),
-                style: AppTypography.xs.copyWith(color: AppColors.textSecondary),
+                style: AppTypography.xs.copyWith(
+                  color: AppColors.textSecondary,
+                ),
               ),
             const SizedBox(height: AppSpacing.s2),
             _DeleteButton(documentId: documentId),
@@ -331,7 +335,8 @@ class _RetryButton extends ConsumerWidget {
           key: const Key('document_detail_retry'),
           onPressed: retry.isLoading
               ? null
-              : () => ref.read(retryIngestProvider(documentId).notifier).retry(),
+              : () =>
+                    ref.read(retryIngestProvider(documentId).notifier).retry(),
           icon: retry.isLoading
               ? const SizedBox(
                   width: 16,
@@ -384,9 +389,7 @@ class _IngestProgress extends StatelessWidget {
     if (document.ingestState == null) return const SizedBox.shrink();
     final stage = IngestStage.fromApi(document.ingestState);
     final inProgress =
-        !stage.isTerminal &&
-        status == DocumentStatus.processing &&
-        !stalled;
+        !stage.isTerminal && status == DocumentStatus.processing && !stalled;
 
     return Column(
       key: const Key('document_detail_ingest'),
@@ -462,10 +465,7 @@ class _StatusBadge extends StatelessWidget {
         color: color.withValues(alpha: 0.12),
         borderRadius: AppRadius.pillRadius,
       ),
-      child: Text(
-        label,
-        style: AppTypography.xs.copyWith(color: color),
-      ),
+      child: Text(label, style: AppTypography.xs.copyWith(color: color)),
     );
   }
 }

@@ -1783,3 +1783,61 @@ with a failing test before fixing it.
 - Milestone 5.2 functional verification passed; production UI remains 5.3.
   Phase 4 and Phase 5 owner gates remain open. No iOS or multi-chunk
   functional proof is claimed.
+
+## 2026-10-11 — Implement milestone 5.3 seal/unlock integration
+
+- Add production document seal/unlock controls using the existing crypto
+  and generated API client. Passphrases are obscured and cleared; unlock
+  failures use the generic message required by the owner.
+- Keep active claims, keys and visible plaintext only in memory. Display
+  a countdown, remove expired entries on timer/resume, send active claims
+  with chat, and clear access on manual lock, deletion or user change.
+- Guard late unlock responses across navigation/account changes; refresh
+  the owner's document list when sealing finishes after navigation.
+- Add unit/widget checks and a repeatable production-app device entrypoint
+  for real locked/unlocked/expired chat and server claim-expiry assertions.
+- Real Android sealing and fresh locked-chat exclusion passed. Unlock
+  hit the backend's shared five-per-hour limit (429; next slot predicted
+  around 01:38 Dubai). Keep the synthetic fixture for remaining tests;
+  remove the test chat and restore the normal app. Live unlock and real
+  15-minute expiry remain pending; milestone and owner gates stay open.
+
+## 2026-10-11 — Audit and fix milestone 5.3
+
+- Reproduce and fix a pending unlock restoring content/chat access after
+  explicit manual lock. Shared per-document operation tokens ensure only
+  the newest response can commit; lock/deletion/user reset cancel it.
+- Add the failing-before/passing-after widget regression and session
+  operation checks. Add real generated-client transport coverage for
+  multi-chunk sealing, exact web key/claim bodies and failed unlock/unseal.
+- Full suite: 697 passed, 30 gated skips. Corrected Android build compiled
+  and installed; real unlock/expiry verification remains separately gated
+  by backend availability. See the 5.3 audit and verification records.
+- Analysis clean. Locked-chat exclusion passed again on the corrected
+  build. Backend confirmed 429 with Retry-After 1209 at 21:18:20 UTC;
+  test-created chat deleted, synthetic document retained and normal app
+  restored. No milestone or owner gate passed based on local tests alone.
+
+## 2026-10-11 — Extend milestone 5.3 test coverage
+
+- Delegate API, UI and session/chat/deletion gaps to three subagents with
+  disjoint ownership; record cases and evidence in the 5.3 test plan.
+- Add 54 regression cases; strengthen the late-disposal assertion. Fix
+  pending unlock acceptance across a lazy account transition, reject empty
+  claim IDs and avoid unseal requests for already expired claims.
+- Combined full suite: 751 passed, 30 gated skips. Analysis and whitespace
+  checks pass. No dependencies or backend changes. Real-device completion
+  remains separately recorded; owner gates remain open.
+
+- Real Android production sealing/unlock/unseal passed with a 60-chunk
+  fixture and exact full-content hash. Locked-chat exclusion passed;
+  the original claim was rejected with 401/claim_expired after its actual
+  15-minute server expiry. No rate limit or expiry setting was changed.
+- Real unlocked chat retrieved/answered but failed to complete: backend
+  synthetic sealed chunk IDs are rejected by UUID-array persistence.
+  Flag the cross-repo defect; preserve the client's incomplete-answer UI.
+- Emulator shutdown interrupted same-process local expiry/expired-chat
+  proof; keep those checks unverified. Improve the verification harness
+  to continue independent expiry assertions after unlocked-chat failure.
+  Delete all disposable fixtures (verified GET 404), clean up test chats
+  and restore the normal app. No owner gate or dependent milestone advanced.

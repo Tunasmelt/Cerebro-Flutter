@@ -11,6 +11,7 @@ import 'package:cerebro_mobile/features/documents/data/documents_repository_prov
 import 'package:cerebro_mobile/features/documents/data/ingest_polling.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:cerebro_mobile/features/sealed/data/unlock_session.dart';
 
 import '../scripted_documents_repository.dart';
 
@@ -58,6 +59,105 @@ List<String> _ids(ProviderContainer c) => [
 ];
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  for (final alreadyGone in [false, true]) {
+    test(
+      'successful deletion cancels pending unlock (already gone: $alreadyGone)',
+      () async {
+        final (:container, :api) = _setup(_repoWith([]));
+        if (alreadyGone) {
+          api.error = const RequestRejectedException('gone', code: 'not_found');
+        }
+        final unlocks = container.read(unlockSessionProvider.notifier);
+        final operation = unlocks.beginUnlock('sealed');
+        container.listen(deleteDocumentProvider('sealed'), (_, _) {});
+        expect(
+          await container
+              .read(deleteDocumentProvider('sealed').notifier)
+              .delete(),
+          isTrue,
+        );
+        expect(
+          unlocks.remember(
+            ActiveUnlock(
+              documentId: 'sealed',
+              claimId: 'claim',
+              key: 'key',
+              expiresAt: DateTime.now().add(const Duration(minutes: 15)),
+              content: 'private',
+            ),
+            operation: operation,
+          ),
+          isFalse,
+        );
+        expect(container.read(unlockSessionProvider), isEmpty);
+      },
+    );
+  }
+
+  test(
+    'failed deletion preserves other document access and pending unlock',
+    () async {
+      final (:container, :api) = _setup(_repoWith([]));
+      api.error = const NetworkUnreachableException();
+      final unlocks = container.read(unlockSessionProvider.notifier);
+      final operation = unlocks.beginUnlock('sealed');
+      final expiry = DateTime.now().add(const Duration(minutes: 15));
+      unlocks.remember(
+        ActiveUnlock(
+          documentId: 'other',
+          claimId: 'other-claim',
+          key: 'other-key',
+          expiresAt: expiry,
+          content: 'other-private',
+        ),
+      );
+      container.listen(deleteDocumentProvider('sealed'), (_, _) {});
+      expect(
+        await container
+            .read(deleteDocumentProvider('sealed').notifier)
+            .delete(),
+        isFalse,
+      );
+      expect(
+        unlocks.remember(
+          ActiveUnlock(
+            documentId: 'sealed',
+            claimId: 'claim',
+            key: 'key',
+            expiresAt: expiry,
+            content: 'private',
+          ),
+          operation: operation,
+        ),
+        isTrue,
+      );
+      expect(
+        container.read(unlockSessionProvider).keys,
+        unorderedEquals(['other', 'sealed']),
+      );
+    },
+  );
+  test('deleting an unlocked document drops its content and claim', () async {
+    final (:container, :api) = _setup(_repoWith([]));
+    final unlocks = container.read(unlockSessionProvider.notifier);
+    unlocks.remember(
+      ActiveUnlock(
+        documentId: 'sealed',
+        claimId: 'claim',
+        key: 'key',
+        expiresAt: DateTime.now().add(const Duration(minutes: 15)),
+        content: 'private',
+      ),
+    );
+    container.listen(deleteDocumentProvider('sealed'), (_, _) {});
+    expect(
+      await container.read(deleteDocumentProvider('sealed').notifier).delete(),
+      isTrue,
+    );
+    expect(api.deleted, ['sealed']);
+    expect(container.read(unlockSessionProvider), isEmpty);
+  });
   group('DeleteDocumentController', () {
     test(
       'deletes on the server and takes the document out of the list',

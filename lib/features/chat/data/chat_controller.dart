@@ -8,6 +8,7 @@ import '../../../core/network/generated_api_client_provider.dart';
 import '../../auth/data/current_user_provider.dart';
 import '../../documents/data/documents_list_notifier.dart';
 import '../../graph/data/graph_pulse.dart';
+import '../../sealed/data/unlock_session.dart';
 import 'chat_history_api.dart';
 import 'chat_message.dart';
 import 'chat_sessions_api.dart';
@@ -16,7 +17,11 @@ import 'chat_stream_event.dart';
 import 'document_titles_provider.dart';
 
 final chatStreamApiProvider = Provider<ChatStreamApi>((ref) {
-  return DioChatStreamClient(ref.watch(apiClientProvider).dio);
+  return DioChatStreamClient(
+    ref.watch(apiClientProvider).dio,
+    activeUnlocks: () =>
+        ref.read(unlockSessionProvider.notifier).activeForChat(),
+  );
 });
 
 final chatSessionsApiProvider = Provider<ChatSessionsApi>((ref) {
