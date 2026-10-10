@@ -740,7 +740,8 @@ description, including this doc set's own.
 
 **Status (2026-10-10): implemented and tested.** Exact parameters verified
 against web source; independent web key/ciphertext vectors match Dart.
-Five crypto tests pass, and the Android emulator independently derived,
+Seven crypto tests pass, including empty-passphrase rejection and a second
+web vector with Unicode/nonzero salt. The Android emulator independently derived,
 encrypted, and decrypted the same vectors. See
 [verification](docs/milestone-5.1-crypto-parity.md). Real stored-document
 interoperability remains Milestone 5.2. The owner explicitly authorized
@@ -762,6 +763,15 @@ parameters are wrong, full stop.
   the opposite platform from where it was sealed, confirm it fails the
   same way (generic failure message, no hint of cause) as a same-
   platform wrong-passphrase attempt.
+
+**Status (2026-10-11): functional verification passed.** Owner approved a dedicated
+device verification screen and requires generic messages on both platforms.
+Both cross-platform exact-content comparisons passed. The generic web
+message fix was approved, merged and deployed. Real web wrong-key checks
+passed for both documents, as did Android HTTP 401/`invalid_key` checks.
+Same-platform and opposite-platform failures show the identical generic
+message. Both disposable fixtures were deleted and the normal app restored. See
+[verification record](docs/milestone-5.2-round-trip.md). No phase gate changed.
 
 ### Milestone 5.3 — Seal/unlock UI & API integration
 **Exit criteria:** Seal and unlock flows wired to the real

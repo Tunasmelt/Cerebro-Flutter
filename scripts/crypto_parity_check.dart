@@ -36,6 +36,26 @@ Future<void> main() async {
       clear != 'known-answer plaintext') {
     throw StateError('Crypto parity failed');
   }
+  final unicodeKey = await deriveSealedKey(
+    '  café 🔒  ',
+    List.generate(16, (i) => i),
+  );
+  final unicodeHex = (await unicodeKey.extractBytes())
+      .map((b) => b.toRadixString(16).padLeft(2, '0'))
+      .join();
+  if (unicodeHex !=
+      '41bfbcd3214c359fe5d7f1c6e9c4f2fae4b7aefbe06ac9d034ff3c64c3834366') {
+    throw StateError('Unicode/nonzero salt parity failed');
+  }
+  var emptyRejected = false;
+  try {
+    await deriveSealedKey('', Uint8List(16));
+  } on ArgumentError {
+    emptyRejected = true;
+  }
+  if (!emptyRejected) {
+    throw StateError('Empty password was accepted');
+  }
   debugPrint('MILESTONE_5_1_DEVICE_PARITY_PASS');
   runApp(
     const MaterialApp(

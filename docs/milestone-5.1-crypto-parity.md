@@ -2,7 +2,10 @@
 
 Follow-up [implementation audit](milestone-5.1-audit.md) found an empty-
 passphrase compatibility defect and missing KDF input-wiring coverage.
-The passing results below do not resolve those findings.
+Both are now resolved: seven crypto tests, 679 full-suite passes (30 gated
+skips), and a repeated Android check covering empty-password rejection and
+the Unicode/nonzero-salt vector. Original validation below records 5.1's
+initial implementation run.
 
 The exit criteria require identical web/Dart Argon2id parameters and a
 known-answer derived key, plus AES-256-GCM byte-preserving round trips.

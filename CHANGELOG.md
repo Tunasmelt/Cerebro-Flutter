@@ -1738,3 +1738,48 @@ with a failing test before fixing it.
   repeatable device entrypoint and verification report were added.
 - Owner authorized starting 5.1 with Phase 4's owner gate open. No gate
   changed. Real stored-document interoperability remains milestone 5.2.
+
+## 2026-10-10 — Resolve 5.1 audit findings; begin 5.2
+
+- Reject empty passphrases before Argon2id, matching actual web behavior.
+- Add an independently computed Unicode/nonzero-salt web vector and
+  changed-password/changed-salt regression assertions. Seven crypto tests
+  and the expanded Android parity check pass. Full suite: 679 passed,
+  30 gated skips; analysis clean.
+- Add a dedicated native sealed round-trip verification screen, approved
+  by the owner while production UI integration remains 5.3. Real deployed
+  web sealing followed by Android unlock matched captured content exactly;
+  reverse sealing succeeded on Android, but web unlock is pending the
+  backend's shared five-per-hour sealed-operation rate window.
+- Owner requires generic messages on both platforms. Prepare the web-side
+  catch-handler change separately; publication approval and deployed
+  negative tests remain pending. Both phase gates stay open. See the
+  5.2 verification record for remaining checks and retained test fixtures.
+
+## 2026-10-11 — 5.2 reverse verification and web publication
+
+- Android → deployed web unlock matched the captured synthetic content
+  exactly; both cross-platform positive comparisons have now passed.
+- With explicit owner approval, published the generic web unlock-error
+  fix through Cerebro-2.0 PR #91 (main `7cc30c7`). Required CI passed and
+  Vercel deployed it. Real wrong-key web responses show the same generic
+  message for both test documents.
+- Explicit mobile negative checks remain incomplete. The backend returned
+  429 with Retry-After 3309 at 20:03:12 UTC on October 10. Retain the two
+  disposable fixtures for the remaining checks; normal app restored.
+  Milestone 5.2 and both owner phase gates remain open.
+
+## 2026-10-11 — Complete milestone 5.2 functional checks
+
+- Correct the dedicated verification screen's error assertion: Chopper
+  leaves failed response bodies null; decode the raw JSON to check
+  `invalid_key`. Analysis passed and the corrected real Android build ran.
+- Mobile wrong-passphrase checks passed on both the web-sealed and
+  mobile-sealed fixtures (HTTP 401/`invalid_key`). Explicit deployed-web
+  checks also passed for both. All show the identical generic message.
+- Both cross-platform content comparisons had already passed. Delete both
+  disposable fixtures through the backend and confirm subsequent GETs
+  return 404. Restore the normal Android entrypoint.
+- Milestone 5.2 functional verification passed; production UI remains 5.3.
+  Phase 4 and Phase 5 owner gates remain open. No iOS or multi-chunk
+  functional proof is claimed.
