@@ -4,6 +4,7 @@ import '../../../../shared/tokens/app_colors.dart';
 import '../../../../shared/tokens/app_radius.dart';
 import '../../../../shared/tokens/app_spacing.dart';
 import '../../../../shared/tokens/app_typography.dart';
+import '../../data/graph_models.dart';
 import '../models/graph_node.dart';
 
 /// Node-detail chrome shown on tap, adapted from Brain.tsx's slide-in
@@ -27,7 +28,7 @@ class NodeDetailSheet extends StatelessWidget {
     required this.onZoomOut,
   });
 
-  final GraphNode node;
+  final GraphNodeData node;
   final VoidCallback onChatAboutThis;
   final VoidCallback onOpenInDocuments;
   final VoidCallback onZoomOut;
@@ -55,86 +56,83 @@ class NodeDetailSheet extends StatelessWidget {
             AppSpacing.s5,
           ),
           child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 36,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: AppSpacing.s4),
-                decoration: BoxDecoration(
-                  color: AppColors.borderStrong,
-                  borderRadius: AppRadius.pillRadius,
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: AppSpacing.s4),
+                  decoration: BoxDecoration(
+                    color: AppColors.borderStrong,
+                    borderRadius: AppRadius.pillRadius,
+                  ),
                 ),
               ),
-            ),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        node.label,
-                        style: AppTypography.md.copyWith(
-                          color: AppColors.textPrimary,
-                          fontWeight: AppTypography.weightMedium,
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          node.title,
+                          style: AppTypography.md.copyWith(
+                            color: AppColors.textPrimary,
+                            fontWeight: AppTypography.weightMedium,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: AppSpacing.s1),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 6,
-                            height: 6,
-                            decoration: BoxDecoration(
-                              color: node.type.color,
-                              shape: BoxShape.circle,
+                        const SizedBox(height: AppSpacing.s1),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                color: node.type.color,
+                                shape: BoxShape.circle,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: AppSpacing.s2),
-                          Text(
-                            node.type.label,
-                            style: AppTypography.sm
-                                .copyWith(color: node.type.color),
-                          ),
-                        ],
-                      ),
-                    ],
+                            const SizedBox(width: AppSpacing.s2),
+                            Text(
+                              node.type.label,
+                              style: AppTypography.sm.copyWith(
+                                color: node.type.color,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                SizedBox(
-                  width: AppSpacing.minTouchTarget,
-                  height: AppSpacing.minTouchTarget,
-                  child: IconButton(
-                    padding: EdgeInsets.zero,
-                    icon: const Icon(Icons.close, color: AppColors.grayDim),
-                    onPressed: () => Navigator.of(context).maybePop(),
+                  SizedBox(
+                    width: AppSpacing.minTouchTarget,
+                    height: AppSpacing.minTouchTarget,
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      icon: const Icon(Icons.close, color: AppColors.grayDim),
+                      onPressed: () => Navigator.of(context).maybePop(),
+                    ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.s4),
-            _DetailAction(
-              label: 'Chat about this',
-              highlighted: true,
-              onTap: onChatAboutThis,
-            ),
-            const SizedBox(height: AppSpacing.s2),
-            _DetailAction(
-              label: 'Open in Documents',
-              onTap: onOpenInDocuments,
-            ),
-            const SizedBox(height: AppSpacing.s2),
-            _DetailAction(
-              label: 'Zoom out',
-              muted: true,
-              onTap: onZoomOut,
-            ),
-          ],
+                ],
+              ),
+              const SizedBox(height: AppSpacing.s4),
+              _DetailAction(
+                label: 'Chat about this',
+                highlighted: true,
+                onTap: onChatAboutThis,
+              ),
+              const SizedBox(height: AppSpacing.s2),
+              _DetailAction(
+                label: 'Open in Documents',
+                onTap: onOpenInDocuments,
+              ),
+              const SizedBox(height: AppSpacing.s2),
+              _DetailAction(label: 'Zoom out', muted: true, onTap: onZoomOut),
+            ],
           ),
         ),
       ),
@@ -167,10 +165,9 @@ class _DetailAction extends StatelessWidget {
           backgroundColor: highlighted
               ? AppColors.accentPrimarySubtle
               : muted
-                  ? Colors.transparent
-                  : AppColors.surfaceHover,
-          foregroundColor:
-              muted ? AppColors.grayDim : AppColors.textSecondary,
+              ? Colors.transparent
+              : AppColors.surfaceHover,
+          foregroundColor: muted ? AppColors.grayDim : AppColors.textSecondary,
           shape: RoundedRectangleBorder(borderRadius: AppRadius.mdRadius),
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s3),
         ),

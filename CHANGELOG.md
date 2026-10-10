@@ -1460,3 +1460,104 @@ with a failing test before fixing it.
 - The README was still the Flutter template. Rewritten with the real status,
   stack, layout, run/test instructions and phase table. GitHub description and
   topics set.
+
+## Phase 4 — Brain graph (2D)
+
+### Milestone 4.1 — Graph API consumption & static rendering
+- **Contract, read from the backend source (`routes/graph.py`, web's
+  `lib/graph/types.ts` and `GraphCanvas.tsx`) and confirmed against the real
+  API — the OpenAPI spec has no response schemas for these endpoints:** `GET
+  /graph/nodes` -> `{nodes: [{id, title, cluster_id, x, y, z, mime, status}]}`
+  (`status` is `ready` or `sealed`; a document uploaded since the last recluster
+  still appears, with `cluster_id`/`x`/`y`/`z` null); `GET /graph/edges` ->
+  `{edges: [{document_id, neighbor_document_id, distance, rank}]}` (kNN, as of
+  the last recluster, so they go stale); `?include=associative` adds
+  `associative_edges` (not used yet).
+- **Data layer:** `GraphApi` (+ `ApiGraphApi`), `GraphNodeData` /
+  `GraphEdgeData` / `GraphSnapshot`, and `graphProvider`. Nodes are required;
+  if only the edges fail the graph still shows, with a plain note that links
+  could not be loaded. A refresh keeps the current graph on screen, and a slow
+  answer for the previous user is dropped.
+- **Mapper (`buildForceGraph`):** the layout is the server's, not a local
+  simulation. A node with a position keeps it (fitted to a fixed radius so the
+  server's arbitrary PCA units always fit the screen); every node is static, so
+  nothing jitters and no battery goes on ticking physics. Nodes the server has
+  not placed are spread on a golden-angle spiral **assigned by sorted id**.
+  Links to a document that is not in the node list (stale), self-links and
+  duplicate/reversed links are dropped rather than drawn or crashed on.
+- **Screen:** the wireframe's custom painter and mock data are gone; the real
+  graph is drawn with `flutter_force_directed_graph` (1.0.8). Loading, error
+  with retry, empty library, and a refresh button (tabs stay mounted, so
+  without it the graph would go stale after an upload). Plain notes when groups
+  are not computed yet or links could not be loaded. Search dims non-matches and
+  labels matches; tapping a node opens the detail sheet, and **Open in
+  Documents** now really opens that document.
+- **Found only by running it (all fixed, each with a regression test):**
+  1. The package puts its origin at the centre of the view but only builds the
+     nodes inside an area it measures during the first layout, and never
+     re-measures unless something moves. Ours are static, so the first frame
+     showed only a node sitting exactly at the origin. The graph is now
+     centred once after the first frame, which restarts the package's ticker.
+  2. Touching any node makes the package un-fix **every** node and run
+     physics. With no centring force the documents repelled each other and
+     scattered off the screen on the first tap, and the tap did not reach the
+     detail sheet. The package calls the drag callbacks right after un-fixing,
+     so they now re-fix every node: a drag moves only the dragged node, and the
+     layout stays where the server put it. Reproduced in a widget test first
+     (an untouched node moved), then fixed.
+  3. The server lists nodes in a different order between requests, and the
+     spiral spots were handed out by list position, so two documents swapped
+     places between loads. Spots now go by sorted id. Seen live as two nodes
+     trading colours.
+- **Tests:** models + mapper + provider (24), screen (14), plus a gated
+  real-backend test (1). Mutation-checked: 17 injected faults (nodes not
+  static, stale links kept, self-links kept, duplicate links kept, positions
+  not fitted, unplaced nodes stacked, repeated id drawn twice, sealed not
+  winning, images not teal, NaN accepted as a position, edge failure hidden,
+  edge failure killing the graph, stale refresh landing, graph never centred,
+  no "groups not computed" note, search never dimming, spiral by list order).
+  Two initially survived — a guard that turned out to be redundant (Riverpod
+  already discards a stale `build`; the guard that matters is in `refresh()`,
+  and its test was strengthened so the stale answer arrives *after* the new
+  user's) and the list-order case, which got its own test. Suite: 586 passing,
+  28 skipped (gated real-backend).
+- **Real backend (2026-10-10):** the real account's graph has 18 nodes for its
+  18 documents (8 image, 1 sealed, 9 document); the node set equals the
+  Documents tab's ready+sealed set, sealed/image types agree with the document
+  list, and all 18 map into the package's graph. Read-only: nothing was
+  reclustered or changed.
+- **Emulator (debug build):** the real graph draws 18 nodes in the three
+  colours; the "groups are not computed" note shows; tapping a node opens its
+  sheet; **Open in Documents** opened the matching real document (a 307.1 kb
+  PDF); dragging one node moved only that node. Screenshots:
+  `docs/screenshots/milestone-4.1-*.png`.
+
+**Deviations from the milestone text, stated plainly:**
+- *"Node color reflecting cluster membership"* is **not** what web does and not
+  what was built. Web colours by **type** (sealed amber, image teal, document
+  violet — `nodeBaseColor`), and cluster membership shows only through
+  position. This follows web (the source of truth) and the existing wireframe;
+  the mapper unit test covers the type colours and that cluster ids/positions
+  are carried, not a cluster-to-hue table. If cluster hues are wanted, that is
+  a product decision to make, not an oversight.
+- *"Correct cluster-to-colour assignment"* therefore has no test, and the real
+  account has **never been reclustered** (every `cluster_id`/`x`/`y` is null,
+  no edges), so the server-placed layout and real edges were exercised only
+  with fixtures. Calling `POST /graph/recluster` would change that account's
+  server-side state, so it was not done without asking.
+- The edge response shape comes from the backend source and web's types, not
+  from a real response (the account has none).
+- The seed-scale **performance check was not done on a real mid-range
+  device**. What exists: mapping 300 documents / 900 links is unit-timed, and a
+  300-node screen renders without errors in a widget test (298 ms on the test
+  host — not a device figure). Frame rate on hardware is still owed.
+- 2D only: `z` is ignored. The package flips the y axis (screen y = -y), which
+  is cosmetic for a PCA projection.
+
+**Noted, not fixed:**
+- "Chat about this" and the Ask bar are still wireframe stubs (they close the
+  sheet / clear the box); routing a question to Chat is later work.
+- The legend can sit over a node (it is dismissable).
+- A dragged node stays where it is dropped until the graph is reloaded.
+- Pan and pinch-zoom are the package's built-in gestures and were not
+  evaluated for feel (Milestone 4.2 owns that).

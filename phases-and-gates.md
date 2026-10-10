@@ -600,6 +600,23 @@ membership.
   and remains interactive — frame rate measured on a real mid-range
   device, not just a high-end one.
 
+**Status: code complete, tests passing (586, 28 skipped = gated real-backend),
+mapped and rendered against the real backend and on the emulator (see CHANGELOG
+"Milestone 4.1").** The real account's 18 documents become 18 nodes; the node
+set matches the Documents tab; tapping a node opens the right document.
+**Deviations (important):**
+- Node colour follows **type** (sealed/image/document), as web does, **not**
+  cluster membership as the exit criteria say; the mapper test covers that, not
+  a cluster-to-colour table.
+- The real account was never reclustered, so server positions and real edges
+  were tested with fixtures only; nothing was reclustered (a write).
+- The 300-document performance check was **not** run on a real mid-range
+  device; only synthetic timing and a render smoke test exist. Frame rate on
+  hardware is owed.
+**Found by running it:** first-frame culling in the package, a physics scatter
+on first touch, and unstable layout across loads — all fixed with regression
+tests.
+
 ### Milestone 4.2 — Interaction
 **Exit criteria:** Pan, zoom, tap-to-expand a node into its chunk
 satellites, matching the package's built-in gesture support.

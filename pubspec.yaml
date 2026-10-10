@@ -44,6 +44,8 @@ dependencies:
   image_picker: ^1.2.3
   share_plus: ^13.3.1
   path_provider: ^2.1.6
+  flutter_force_directed_graph: ^1.0.8
+  vector_math: ^2.2.0
 
 dev_dependencies:
   flutter_test:
