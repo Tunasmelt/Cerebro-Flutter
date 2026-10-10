@@ -7,6 +7,7 @@ import '../../../core/network/app_exception.dart';
 import '../../../core/network/generated_api_client_provider.dart';
 import '../../auth/data/current_user_provider.dart';
 import '../../documents/data/documents_list_notifier.dart';
+import '../../graph/data/graph_pulse.dart';
 import 'chat_history_api.dart';
 import 'chat_message.dart';
 import 'chat_sessions_api.dart';
@@ -77,6 +78,7 @@ final chatControllerProvider = NotifierProvider<ChatController, ChatState>(
 /// answer into an assistant message, and handles Stop, retry and "new chat".
 class ChatController extends Notifier<ChatState> {
   int _nextId = 0;
+  bool _replayHistory = true;
 
   /// Bumped when the signed-in user changes, on "new chat" and on dispose.
   /// Everything that awaits compares against the generation it started in and
@@ -107,6 +109,7 @@ class ChatController extends Notifier<ChatState> {
   /// Starts a fresh conversation (the next question opens a new session).
   void newChat() {
     _reset();
+    ref.read(graphPulseProvider.notifier).clear();
     state = const ChatState();
   }
 
@@ -130,8 +133,13 @@ class ChatController extends Notifier<ChatState> {
   /// already resolved by the server) and makes it the conversation follow-up
   /// questions go to. Whatever was on screen — including a running turn — is
   /// replaced.
-  Future<void> openSession(ChatSessionSummary session) async {
+  Future<void> openSession(
+    ChatSessionSummary session, {
+    bool replay = true,
+  }) async {
     _reset();
+    _replayHistory = replay;
+    ref.read(graphPulseProvider.notifier).stopReplay();
     final generation = _generation;
     state = ChatState(
       sessionId: session.id,
@@ -139,6 +147,13 @@ class ChatController extends Notifier<ChatState> {
       loading: true,
     );
     await _loadHistory(session.id, generation);
+    if (replay && generation == _generation && state.loadError == null) {
+      unawaited(
+        ref
+            .read(graphPulseProvider.notifier)
+            .replay(replaySteps(state.messages)),
+      );
+    }
   }
 
   /// Tries again after a failed [openSession].
@@ -148,6 +163,15 @@ class ChatController extends Notifier<ChatState> {
     final generation = _generation;
     state = state.copyWith(loading: true, clearLoadError: true);
     await _loadHistory(id, generation);
+    if (_replayHistory &&
+        generation == _generation &&
+        state.loadError == null) {
+      unawaited(
+        ref
+            .read(graphPulseProvider.notifier)
+            .replay(replaySteps(state.messages)),
+      );
+    }
   }
 
   Future<void> _loadHistory(String sessionId, int generation) async {
@@ -264,14 +288,18 @@ class ChatController extends Notifier<ChatState> {
     switch (event) {
       case ChatHeartbeat():
         break;
-      case ChatRetrieval(:final chunkIds):
+      case ChatRetrieval(:final chunkIds, :final documentIds):
         _update(
           id,
           (m) => m.copyWith(
             retrievalDone: true,
             retrievedChunkIds: chunkIds.toSet(),
+            retrievedDocumentIds: documentIds,
           ),
         );
+        // The graph pulses the documents retrieval just drew from, exactly as
+        // the event reported them.
+        ref.read(graphPulseProvider.notifier).trigger(documentIds);
       case ChatToken(:final text):
         _update(id, (m) => m.copyWith(text: m.text + text));
       case ChatCitation(:final chunkId, :final documentId):

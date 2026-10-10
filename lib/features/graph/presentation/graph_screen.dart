@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_force_directed_graph/flutter_force_directed_graph.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,18 +7,24 @@ import 'package:go_router/go_router.dart';
 import '../../../app/app_routes.dart';
 import '../../../core/network/app_exception.dart';
 import '../../../shared/tokens/app_colors.dart';
+import '../../../shared/tokens/app_radius.dart';
 import '../../../shared/tokens/app_spacing.dart';
 import '../../../shared/tokens/app_typography.dart';
 import '../../../shared/widgets/error_view.dart';
+import '../../chat/data/chat_controller.dart';
+import '../../chat/data/chat_history_api.dart';
 import '../data/graph_api.dart';
 import '../data/graph_expansion.dart';
 import '../data/graph_layout.dart';
 import '../data/graph_models.dart';
+import '../data/graph_pulse.dart';
+import 'widgets/graph_answer_card.dart';
 import 'widgets/graph_ask_bar.dart';
 import 'widgets/graph_legend.dart';
 import 'widgets/graph_node_dot.dart';
 import 'widgets/graph_search_bar.dart';
 import 'widgets/node_info_panel.dart';
+import 'widgets/replay_sheet.dart';
 
 /// What share of the screen's height the node panel may cover; an expanded
 /// node is brought into the part above it.
@@ -43,12 +50,25 @@ class GraphScreen extends ConsumerStatefulWidget {
   ConsumerState<GraphScreen> createState() => _GraphScreenState();
 }
 
-class _GraphScreenState extends ConsumerState<GraphScreen> {
+class _GraphScreenState extends ConsumerState<GraphScreen>
+    with SingleTickerProviderStateMixin {
   final _searchController = TextEditingController();
   final _askController = TextEditingController();
 
   String _query = '';
   bool _showLegend = true;
+
+  /// The latest answer is shown over the graph once a question has been asked
+  /// from it (until dismissed).
+  bool _showAnswer = false;
+
+  /// The pulse animation: restarted by every pulse, 0 -> 1 over
+  /// [pulseDuration]. The dots listen to it directly, so a pulse repaints only
+  /// the pulsing dots.
+  late final AnimationController _pulseAnim;
+
+  /// The documents of the pulse in flight.
+  Set<String> _pulsingIds = const {};
 
   /// The package's graph for [_builtFrom]; rebuilt only when a new snapshot
   /// arrives, never on every frame.
@@ -56,9 +76,30 @@ class _GraphScreenState extends ConsumerState<GraphScreen> {
   GraphSnapshot? _builtFrom;
 
   @override
+  void initState() {
+    super.initState();
+    _pulseAnim = AnimationController(
+      vsync: this,
+      duration: pulseDuration,
+      value: 1, // finished: nothing pulsing until the first pulse
+    );
+    ref.listenManual<GraphPulseState>(graphPulseProvider, (previous, next) {
+      final pulse = next.pulse;
+      if (pulse == null && previous?.pulse != null) {
+        _pulsingIds = const {};
+        _pulseAnim.value = 1;
+        _controller?.needUpdate();
+      } else if (pulse != null && pulse.key != previous?.pulse?.key) {
+        _startPulse(pulse);
+      }
+    }, fireImmediately: true);
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     _askController.dispose();
+    _pulseAnim.dispose();
     _controller?.dispose();
     super.dispose();
   }
@@ -137,9 +178,68 @@ class _GraphScreenState extends ConsumerState<GraphScreen> {
     }
   }
 
+  /// A pulse arrived: light up its documents and run the animation from the
+  /// start. The package builds its nodes only when told something changed, so
+  /// it is told once here; after that the dots animate themselves.
+  void _startPulse(GraphPulse pulse) {
+    _pulsingIds = pulse.documentIds.toSet();
+    HapticFeedback.lightImpact();
+    _pulseAnim.forward(from: 0);
+    _controller?.needUpdate();
+  }
+
   void _handleAsk(String text) {
+    final chat = ref.read(chatControllerProvider);
+    if (chat.busy || chat.loading) return; // one question at a time
+    FocusScope.of(context).unfocus();
     _askController.clear();
-    // Routing a question to Chat (pre-filled) is a later milestone.
+    setState(() => _showAnswer = true);
+    ref.read(chatControllerProvider.notifier).send(text);
+  }
+
+  void _openReplayPicker() {
+    FocusScope.of(context).unfocus();
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (sheetContext) => ReplaySheet(
+        onSelect: (session) {
+          Navigator.of(sheetContext).pop();
+          _replay(session);
+        },
+      ),
+    );
+  }
+
+  /// Reopens [session] (the Chat tab shows it too) and plays its retrievals
+  /// back on the graph, one answer's pulse at a time.
+  Future<void> _replay(ChatSessionSummary session) async {
+    final chat = ref.read(chatControllerProvider.notifier);
+    await chat.openSession(session, replay: false);
+    if (!mounted) return;
+    final state = ref.read(chatControllerProvider);
+    if (state.sessionId != session.id || state.loading) return;
+    final steps = replaySteps(state.messages);
+    final message = state.loadError != null
+        ? "Couldn't load that conversation."
+        : steps.isEmpty
+        ? 'That conversation drew on no documents, so there is nothing to '
+              'replay.'
+        : null;
+    if (message != null) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            key: const Key('graph_replay_message'),
+            content: Text(message),
+          ),
+        );
+      return;
+    }
+    setState(() => _showAnswer = false);
+    await ref.read(graphPulseProvider.notifier).replay(steps);
   }
 
   @override
@@ -148,6 +248,11 @@ class _GraphScreenState extends ConsumerState<GraphScreen> {
     // Keep the last graph on screen while a refresh is in flight.
     final snapshot = graph.valueOrNull;
     final expansion = ref.watch(graphExpansionProvider);
+    // Only the flag: the dots are told to redraw explicitly in _startPulse, not
+    // by this screen happening to rebuild on every pulse.
+    final replaying = ref.watch(
+      graphPulseProvider.select((state) => state.replaying),
+    );
 
     ref.listen<GraphExpansion>(graphExpansionProvider, (previous, next) {
       final id = next.nodeId;
@@ -204,11 +309,22 @@ class _GraphScreenState extends ConsumerState<GraphScreen> {
                       ],
                     ),
                     if (snapshot != null) _Notes(snapshot: snapshot),
+                    if (replaying) const _ReplayingPill(),
                     const Spacer(),
+                    if (expanded == null && _showAnswer)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: AppSpacing.s2),
+                        child: GraphAnswerCard(
+                          onClose: () => setState(() => _showAnswer = false),
+                          onOpenInChat: () => context.go(AppRoutes.chat),
+                          onOpenDocument: _openDocument,
+                        ),
+                      ),
                     if (expanded == null)
                       GraphAskBar(
                         controller: _askController,
                         onAsk: _handleAsk,
+                        onHistory: _openReplayPicker,
                       ),
                     const SizedBox(height: AppSpacing.s2),
                   ],
@@ -217,6 +333,7 @@ class _GraphScreenState extends ConsumerState<GraphScreen> {
             ),
           ),
           if (_showLegend &&
+              !_showAnswer &&
               expanded == null &&
               snapshot != null &&
               snapshot.nodes.isNotEmpty)
@@ -308,6 +425,8 @@ class _GraphScreenState extends ConsumerState<GraphScreen> {
           matched: matched,
           selected: selected,
           dimmed: _query.isNotEmpty && !matched && !selected,
+          pulsing: _pulsingIds.contains(node.id),
+          pulse: _pulseAnim,
           onTap: () => toggle(node.id),
         );
       },
@@ -341,6 +460,47 @@ class _Notes extends StatelessWidget {
         child: Text(
           notes.join(' '),
           style: AppTypography.xs.copyWith(color: AppColors.textSecondary),
+        ),
+      ),
+    );
+  }
+}
+
+/// Shown while a past conversation's pulses are being played back, with the
+/// way to stop it.
+class _ReplayingPill extends ConsumerWidget {
+  const _ReplayingPill();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Padding(
+      key: const Key('graph_replaying'),
+      padding: const EdgeInsets.only(top: AppSpacing.s2),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Container(
+          padding: const EdgeInsets.only(left: AppSpacing.s3),
+          decoration: BoxDecoration(
+            color: AppColors.bgElevated.withValues(alpha: 0.92),
+            borderRadius: AppRadius.pillRadius,
+            border: Border.all(color: AppColors.borderDefault),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Replaying a conversation',
+                style: AppTypography.xs.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              TextButton(
+                key: const Key('graph_replay_stop'),
+                onPressed: ref.read(graphPulseProvider.notifier).stopReplay,
+                child: const Text('Stop'),
+              ),
+            ],
+          ),
         ),
       ),
     );

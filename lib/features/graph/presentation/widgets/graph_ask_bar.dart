@@ -5,19 +5,21 @@ import '../../../../shared/tokens/app_radius.dart';
 import '../../../../shared/tokens/app_spacing.dart';
 import '../../../../shared/tokens/app_typography.dart';
 
-/// Bottom "ask about your documents" bar, ported from Brain.tsx's ask
-/// input. Submitting is a stub here (`onAsk` callback) — this wireframe
-/// pass does not wire real navigation to chat, per the task constraints;
-/// a later milestone plugs a real `onAsk` in that pushes the chat route.
+/// Ask a real question over the graph or pick a conversation to replay.
+/// The screen submits through the shared chat controller.
 class GraphAskBar extends StatelessWidget {
   const GraphAskBar({
     super.key,
     required this.controller,
     required this.onAsk,
+    this.onHistory,
   });
 
   final TextEditingController controller;
   final ValueChanged<String> onAsk;
+
+  /// Opens the list of past conversations to replay on the graph.
+  final VoidCallback? onHistory;
 
   @override
   Widget build(BuildContext context) {
@@ -38,24 +40,41 @@ class GraphAskBar extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Container(
-                height: 28,
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s2),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceHover,
-                  borderRadius: AppRadius.mdRadius,
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  'history',
-                  style: AppTypography.xs.copyWith(color: AppColors.grayDim),
+              InkWell(
+                key: const Key('graph_history'),
+                onTap: onHistory,
+                borderRadius: AppRadius.mdRadius,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    minHeight: AppSpacing.minTouchTarget,
+                  ),
+                  child: Container(
+                    height: 28,
+                    margin: const EdgeInsets.symmetric(vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.s2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceHover,
+                      borderRadius: AppRadius.mdRadius,
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      'history',
+                      style: AppTypography.xs.copyWith(
+                        color: AppColors.grayDim,
+                      ),
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: AppSpacing.s2),
               Expanded(
                 child: TextField(
                   controller: controller,
-                  style: AppTypography.sm.copyWith(color: AppColors.textPrimary),
+                  style: AppTypography.sm.copyWith(
+                    color: AppColors.textPrimary,
+                  ),
                   onSubmitted: (v) {
                     if (v.trim().isNotEmpty) onAsk(v);
                   },
@@ -64,10 +83,12 @@ class GraphAskBar extends StatelessWidget {
                     filled: false,
                     border: InputBorder.none,
                     hintText: 'Ask about your documents…',
-                    hintStyle:
-                        AppTypography.sm.copyWith(color: AppColors.grayDim),
-                    contentPadding:
-                        const EdgeInsets.symmetric(vertical: AppSpacing.s3),
+                    hintStyle: AppTypography.sm.copyWith(
+                      color: AppColors.grayDim,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.s3,
+                    ),
                   ),
                 ),
               ),
@@ -77,14 +98,16 @@ class GraphAskBar extends StatelessWidget {
                   onPressed: hasText ? () => onAsk(controller.text) : null,
                   style: TextButton.styleFrom(
                     backgroundColor: AppColors.accentPrimary,
-                    disabledBackgroundColor:
-                        AppColors.accentPrimary.withValues(alpha: 0.5),
+                    disabledBackgroundColor: AppColors.accentPrimary.withValues(
+                      alpha: 0.5,
+                    ),
                     foregroundColor: AppColors.textOnAccent,
                     shape: RoundedRectangleBorder(
                       borderRadius: AppRadius.mdRadius,
                     ),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: AppSpacing.s3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.s3,
+                    ),
                   ),
                   child: const Text(
                     'Ask',
