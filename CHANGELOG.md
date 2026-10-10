@@ -1373,3 +1373,90 @@ with a failing test before fixing it.
 - Chip numbering restarts in every answer (each answer has its own [1]).
 - Everything here is in-memory: a conversation is lost when the app restarts
   (3.3 adds history).
+
+### Milestone 3.3 — Chat session management
+- **Backend contract, read from the generated client / OpenAPI spec:** `GET
+  /chat/sessions` -> `{sessions: [{id, created_at, preview}]}` (newest first,
+  `preview` is the first question or null), `GET /chat/sessions/{id}/messages`
+  (user and assistant rows; assistant rows carry `retrieved_chunk_ids` and
+  `citations` with `document_title`), `DELETE /chat/sessions/{id}`. Export is
+  client-side on web too, so there is no export endpoint.
+- **Reopen:** a reopened answer goes through the same citation pipeline as a
+  live one (chips only where both the stored retrieval set and the stored
+  citations back them; raw `[[chunk:...]]` never shown). The server's own
+  document title travels with each citation, so a restored chip is titled and
+  usable even before the documents list has loaded. Loading and failure are
+  states of the Chat screen (spinner; error with retry; "no longer exists"
+  offers New chat instead of a pointless retry) and the composer is off while
+  either is showing, so a follow-up can never go to history the user cannot see.
+  A follow-up on a reopened conversation continues the same session.
+- **History screen** (`/chat/history`, the clock icon on Chat): preview + date
+  per row, pull to refresh, per-row Export / Delete. Delete asks first, treats
+  "already gone" (404) as success, leaves the row and says why on failure, and
+  clears the Chat tab if that conversation is the one open there.
+- **Export:** `# Chat - <date>`, `## You` / `## Cerebro` sections, citations as
+  numbered footnotes shared across the whole conversation with a `**Sources**`
+  list, then handed to the Android/iOS share sheet as
+  `cerebro-chat-<first 8 of id>.md`. Message text cannot change the file's own
+  structure: heading and horizontal-rule lines are escaped, and an unclosed code
+  fence is closed so it cannot swallow the next message. Markers the server does
+  not back are removed rather than exported as dead footnotes.
+- **Tests:** formatter (21), history models (10), sessions/reopen/delete/export
+  state (21 + audit 4), screens (13), plus a gated real-backend suite (3).
+  Mutation-checked: 10 injected faults (stale load landing, send while loading,
+  delete not clearing the open chat, 404 treated as failure, failed delete
+  removing the row, un-escaped headings, unclosed fence, composer ignoring
+  loading, server titles ignored, retry offered for a missing conversation);
+  one survived (Send stayed enabled while loading), a regression test was added
+  and it is now caught. Suite: 550 passing, 27 skipped (gated real-backend).
+- **Real backend (run 2026-10-10):** a conversation created through the real
+  chat endpoint was still listed after a simulated restart (a brand-new
+  container), reopened with identical text, retrieval set and 3 citations, and a
+  follow-up continued the same session. Delete removed it from the list, cleared
+  the open chat, and `GET messages` then returned `not_found`; deleting again is
+  still a success. The exported file had the header, both sections, no raw
+  markers, and ended with exactly one newline. (My first run of this suite failed
+  twice for a test-only reason: it read an auto-dispose provider with nothing
+  watching it, so Riverpod disposed it mid-fetch. The screen always watches it.)
+- **Emulator (Pixel emulator, debug build):** empty state; live conversation
+  with chips; force-stop and relaunch (still signed in, Chat starts fresh, the
+  conversation is in History with preview and date); reopen (identical answer,
+  chips and source); Export opens the system share sheet on
+  `cerebro-chat-<id>.md`; Delete shows the confirmation, empties the list and
+  clears Chat. Screenshots: `docs/screenshots/milestone-3.3-*.png`.
+
+**Audit of Milestone 3.3 (before merge):**
+- *Found and fixed:* the exported file, which holds the whole conversation,
+  was written to the temp directory and never deleted. It is now removed as soon
+  as the share sheet is done with it, including when sharing fails. And
+  exporting a conversation with no messages from the history list produced a
+  header-only file; it now says "There is nothing to export yet." Both have
+  regression tests that fail when the fix is reverted.
+- *Suspected, could not reproduce, dropped:* leaving the History screen
+  mid-delete breaking the "clear the open chat" step (a test showed it works).
+- *Process slip, reverted:* `dart format` run over all of `lib` and `test`
+  reformatted about 60 unrelated files; reverted so the change contains only
+  3.3.
+
+**Noted, not fixed:**
+- `share_plus` keeps its own copy of the shared file in the app's private cache
+  (`cache/share_plus/`, found live). It is not deleted here because on Android
+  `share()` returns when the chooser opens, before the target app has read the
+  file, so deleting it could break the share. `share_plus` clears that folder at
+  its next share, so a conversation can sit in the app-private cache until the
+  next export or an OS cache clear.
+- Export goes through the system share sheet only; whether a given target app
+  (Gmail, Drive) can read the file was not exercised.
+- Sources are written as a `**Sources**` list, not `[n]: title` reference-style
+  links; web's exact export layout was not reproduced byte for byte.
+- The "No matching documents" state still cannot be provoked on the real backend
+  (see 3.2).
+- Chat history is fetched whole (no pagination) and the list is re-fetched each
+  time the History screen opens.
+- Reopened conversations show the server's document title even if the document
+  was later renamed (the title is a snapshot from when it was cited).
+
+### README and repository
+- The README was still the Flutter template. Rewritten with the real status,
+  stack, layout, run/test instructions and phase table. GitHub description and
+  topics set.

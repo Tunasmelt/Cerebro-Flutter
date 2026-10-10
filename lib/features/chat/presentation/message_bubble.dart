@@ -100,10 +100,15 @@ class _AnswerBubble extends ConsumerWidget {
     final titles = ref.watch(documentTitlesProvider);
     final sources = sourcesOf(parts);
 
-    // null = list not loaded yet: assume the document exists.
+    // A reopened answer carries the server's own title for each source, which
+    // also proves the document existed. Otherwise fall back to the documents
+    // list; null = list not loaded yet: assume the document exists.
     bool available(String documentId) =>
-        titles == null || titles.containsKey(documentId);
-    String titleOf(String documentId) => titles?[documentId] ?? 'Source';
+        message.citationTitles.containsKey(documentId) ||
+        titles == null ||
+        titles.containsKey(documentId);
+    String titleOf(String documentId) =>
+        titles?[documentId] ?? message.citationTitles[documentId] ?? 'Source';
 
     final hasText = parts.any((p) => p is TextPart && p.text.trim().isNotEmpty);
 

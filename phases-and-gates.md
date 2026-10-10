@@ -554,6 +554,23 @@ before building against it.
 - Integration test: export a real conversation and confirm the produced
   Markdown file opens correctly and reflects the actual exchange.
 
+**Status: code complete, tests passing (550, 27 skipped = gated real-backend),
+verified against the real backend and on the emulator (see CHANGELOG
+"Milestone 3.3").** All three functional tests were run against the real
+backend: a real conversation survived a simulated restart and reopened with its
+history and 3 citations intact; delete removed it from the client list and the
+backend (`GET messages` -> `not_found`); the exported file reflected the
+exchange with no raw markers. The same flow was driven on the emulator
+(list, reopen after a force-stop, share sheet, delete). The formatter unit test
+is covered by 21 tests, including hostile message text (headings, rules,
+unclosed fences).
+**Audit (CHANGELOG "Audit of Milestone 3.3"):** two defects fixed (exported
+file left in the temp directory; header-only export of an empty conversation).
+**Known limitation:** `share_plus` keeps its own copy of the shared file in the
+app-private cache until its next share.
+**Deviations:** export is client-side (web's is too, so there is no endpoint to
+build against); sources are a `**Sources**` list rather than reference links.
+
 ### Phase 3 Gate
 All milestones 3.1–3.3 pass their tests, **and** the project owner
 confirms live:

@@ -7,6 +7,7 @@ import '../../../core/network/app_exception.dart';
 import '../../../core/network/generated_api_client_provider.dart';
 import '../../auth/data/current_user_provider.dart';
 import '../../documents/data/documents_list_notifier.dart';
+import 'chat_history_api.dart';
 import 'chat_message.dart';
 import 'chat_sessions_api.dart';
 import 'chat_stream_client.dart';
@@ -21,22 +22,51 @@ final chatSessionsApiProvider = Provider<ChatSessionsApi>((ref) {
   return ApiChatSessionsApi(ref.watch(generatedApiClientProvider));
 });
 
+final chatHistoryApiProvider = Provider<ChatHistoryApi>((ref) {
+  return ApiChatHistoryApi(ref.watch(generatedApiClientProvider));
+});
+
 /// The conversation on screen.
 class ChatState {
-  const ChatState({this.sessionId, this.messages = const []});
+  const ChatState({
+    this.sessionId,
+    this.messages = const [],
+    this.startedAt,
+    this.loading = false,
+    this.loadError,
+  });
 
-  /// The server-side conversation id, created lazily on the first question.
+  /// The server-side conversation id: created lazily on the first question,
+  /// or the one of a past conversation that was reopened.
   final String? sessionId;
   final List<ChatMessage> messages;
+
+  /// When the conversation began, if known (a reopened one; a live one is
+  /// dated by its first message).
+  final DateTime? startedAt;
+
+  /// A past conversation is being fetched.
+  final bool loading;
+
+  /// Why fetching a past conversation failed.
+  final AppException? loadError;
 
   /// A turn is in flight (waiting for retrieval, or the answer is streaming).
   bool get busy => messages.isNotEmpty && messages.last.isStreaming;
 
-  ChatState copyWith({String? sessionId, List<ChatMessage>? messages}) =>
-      ChatState(
-        sessionId: sessionId ?? this.sessionId,
-        messages: messages ?? this.messages,
-      );
+  ChatState copyWith({
+    String? sessionId,
+    List<ChatMessage>? messages,
+    bool? loading,
+    AppException? loadError,
+    bool clearLoadError = false,
+  }) => ChatState(
+    sessionId: sessionId ?? this.sessionId,
+    messages: messages ?? this.messages,
+    startedAt: startedAt,
+    loading: loading ?? this.loading,
+    loadError: clearLoadError ? null : (loadError ?? this.loadError),
+  );
 }
 
 final chatControllerProvider = NotifierProvider<ChatController, ChatState>(
@@ -84,12 +114,72 @@ class ChatController extends Notifier<ChatState> {
   /// stopped). Ignored while another turn is running or if blank.
   Future<void> send(String question) async {
     final query = question.trim();
-    if (query.isEmpty || state.busy) return;
+    if (query.isEmpty || state.busy || state.loading) return;
 
-    final user = ChatMessage.user(id: _nextId++, text: query);
+    final user = ChatMessage.user(
+      id: _nextId++,
+      text: query,
+      createdAt: DateTime.now(),
+    );
     final assistant = ChatMessage.assistantPending(id: _nextId++);
     state = state.copyWith(messages: [...state.messages, user, assistant]);
     await _runTurn(query, assistant.id);
+  }
+
+  /// Reopens a past conversation: shows its messages (with their citations,
+  /// already resolved by the server) and makes it the conversation follow-up
+  /// questions go to. Whatever was on screen — including a running turn — is
+  /// replaced.
+  Future<void> openSession(ChatSessionSummary session) async {
+    _reset();
+    final generation = _generation;
+    state = ChatState(
+      sessionId: session.id,
+      startedAt: session.createdAt,
+      loading: true,
+    );
+    await _loadHistory(session.id, generation);
+  }
+
+  /// Tries again after a failed [openSession].
+  Future<void> reloadHistory() async {
+    final id = state.sessionId;
+    if (id == null || state.loading || state.loadError == null) return;
+    final generation = _generation;
+    state = state.copyWith(loading: true, clearLoadError: true);
+    await _loadHistory(id, generation);
+  }
+
+  Future<void> _loadHistory(String sessionId, int generation) async {
+    try {
+      final history = await ref
+          .read(chatHistoryApiProvider)
+          .messages(sessionId);
+      if (generation != _generation) return;
+      _nextId = history.messages.length;
+      state = state.copyWith(
+        messages: history.messages,
+        loading: false,
+        clearLoadError: true,
+      );
+    } on AppException catch (e) {
+      if (generation != _generation) return;
+      state = state.copyWith(
+        loading: false,
+        loadError: e is RequestRejectedException && e.code == 'not_found'
+            ? const RequestRejectedException(
+                'This conversation no longer exists.',
+                code: 'not_found',
+              )
+            : e,
+      );
+    } catch (_) {
+      if (generation != _generation) return;
+      state = state.copyWith(
+        loading: false,
+        loadError: const UnknownApiException(),
+      );
+    }
   }
 
   /// Re-asks the question behind the last failed answer, replacing it.

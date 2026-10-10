@@ -6,6 +6,7 @@ import '../features/auth/data/auth_notifier.dart';
 import '../features/auth/data/auth_state.dart';
 import '../features/auth/presentation/sign_in_screen.dart';
 import '../features/auth/presentation/sign_up_screen.dart';
+import '../features/chat/presentation/chat_history_screen.dart';
 import '../features/chat/presentation/chat_screen.dart';
 import '../features/documents/presentation/document_detail_screen.dart';
 import '../features/documents/presentation/documents_screen.dart';
@@ -17,7 +18,6 @@ import 'app_routes.dart';
 import 'app_shell.dart';
 
 export 'app_routes.dart';
-
 
 const _authRoutes = {AppRoutes.signIn, AppRoutes.signUp};
 
@@ -93,6 +93,12 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: AppRoutes.chat,
                 builder: (context, state) => const ChatScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'history',
+                    builder: (context, state) => const ChatHistoryScreen(),
+                  ),
+                ],
               ),
             ],
           ),
