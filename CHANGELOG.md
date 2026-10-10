@@ -1724,3 +1724,17 @@ with a failing test before fixing it.
 - Separate authenticated backend replay comparison passed again (4 and 2
   documents matched live SSE and reopened history); test-created session
   removed by teardown.
+
+## 2026-10-10 — Milestone 5.1 crypto module
+
+- Added cryptography 2.9.0 and an isolated sealed crypto module, matching
+  actual web Argon2id parameters: 65536 KiB, 3 iterations, parallelism 1,
+  16-byte salt and 32-byte key. KDF runs outside the UI isolate.
+- AES-256-GCM uses fresh 12-byte nonces and web's ciphertext-plus-16-byte-tag
+  format. Wrong keys or tampering fail authenticated decryption.
+- Five crypto tests cover independent actual-web key/ciphertext vectors,
+  byte/empty round trips, tampering, randomness and input lengths. Full
+  suite: 677 passed, 30 skipped. Android emulator parity verified; a
+  repeatable device entrypoint and verification report were added.
+- Owner authorized starting 5.1 with Phase 4's owner gate open. No gate
+  changed. Real stored-document interoperability remains milestone 5.2.

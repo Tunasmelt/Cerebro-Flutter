@@ -36,8 +36,8 @@ product on a phone.
 | Streaming | A purpose-built SSE parser and typed chat events in `lib/core/sse` |
 | Files / sharing | `file_picker`, `image_picker`, `share_plus`, `path_provider` |
 
-Planned: `flutter_force_directed_graph` for the 2D brain view, and
-`package:cryptography` for the sealed tier.
+Graph rendering uses `flutter_force_directed_graph`; sealed crypto uses
+`cryptography` 2.9.0. Sealed UI and backend integration are still pending.
 
 ## Project layout
 
@@ -98,7 +98,7 @@ and a gate that the project owner confirms on a real device
 | 2 | Documents and upload | Done (device gate checks pending with the owner) |
 | 3 | Chat and retrieval: SSE client, chat screen, session management | Done (device gate checks pending with the owner) |
 | 4 | 2D brain graph | 4.1–4.3 implemented; 4.3 checked against the real backend and Android emulator (live pulses, Graph replay picker, automatic Chat History replay). Phase 4 owner gate open; physical-device feel and iOS checks remain. |
-| 5 | Sealed tier (Argon2id + AES-256-GCM, parameter-identical to web) | Not started |
+| 5 | Sealed tier (Argon2id + AES-256-GCM, parameter-identical to web) | 5.1 implemented; web vectors pass in Dart and on Android emulator. 5.2–5.4 pending; owner gate open. |
 | 6 | Kanban, todo, token playground | Not started (screen shells only) |
 | 7 | Platform polish and release readiness | Not started |
 
