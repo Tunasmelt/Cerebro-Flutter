@@ -26,6 +26,7 @@ final class ChatMessage {
     this.status = ChatMessageStatus.complete,
     this.retrievalDone = false,
     this.retrievedChunkIds = const {},
+    this.retrievedDocumentIds = const [],
     this.citedDocuments = const {},
     this.citationTitles = const {},
     this.createdAt,
@@ -57,6 +58,12 @@ final class ChatMessage {
     }
 
     final chunkIds = json['retrieved_chunk_ids'];
+    final storedDocuments = json['retrieved_document_ids'];
+    final documentIds = <String>[
+      if (storedDocuments is List)
+        for (final d in storedDocuments)
+          if (d is String && d.isNotEmpty) d,
+    ];
     final citedDocuments = <String, String>{};
     final citationTitles = <String, String>{};
     final citations = json['citations'];
@@ -86,6 +93,7 @@ final class ChatMessage {
           for (final c in chunkIds)
             if (c is String) c,
       },
+      retrievedDocumentIds: documentIds,
       citedDocuments: citedDocuments,
       citationTitles: citationTitles,
     );
@@ -112,6 +120,11 @@ final class ChatMessage {
 
   /// The chunk ids retrieval returned for this turn.
   final Set<String> retrievedChunkIds;
+
+  /// The documents retrieval drew from, in the order the server listed them
+  /// (the live `retrieval` event's order is not the stored order — treat it as
+  /// a set). These are what the graph pulses.
+  final List<String> retrievedDocumentIds;
 
   /// The server's `citation` events: chunk id → document id.
   final Map<String, String> citedDocuments;
@@ -140,6 +153,7 @@ final class ChatMessage {
     ChatMessageStatus? status,
     bool? retrievalDone,
     Set<String>? retrievedChunkIds,
+    List<String>? retrievedDocumentIds,
     Map<String, String>? citedDocuments,
     AppException? error,
   }) => ChatMessage(
@@ -149,6 +163,7 @@ final class ChatMessage {
     status: status ?? this.status,
     retrievalDone: retrievalDone ?? this.retrievalDone,
     retrievedChunkIds: retrievedChunkIds ?? this.retrievedChunkIds,
+    retrievedDocumentIds: retrievedDocumentIds ?? this.retrievedDocumentIds,
     citedDocuments: citedDocuments ?? this.citedDocuments,
     citationTitles: citationTitles,
     createdAt: createdAt,

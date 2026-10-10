@@ -664,6 +664,29 @@ phone, a status-bar-sized gap in the list, and a label sitting on the nodes —
 all fixed with regression tests.
 
 ### Milestone 4.3 — Retrieval-replay animation
+**Audit follow-up (2026-10-10):** Fixed the three requested lifecycle defects:
+Graph entry replays current history after graph data loads, New chat/deletion
+clear replay, and successful history retry follows the original replay policy.
+Permanent regressions cover the real router's first Graph visit with a slow
+graph response, New chat, active-session deletion, and retry/opt-out. See
+`docs/phase-4-audit-2026-10-10.md`. The Phase 4 owner gate remains open.
+
+**Status (2026-10-10): Milestone checks passed on Android emulator and real
+backend; Phase 4 owner gate remains open.** Resumed the uncommitted
+implementation: live retrieval events drive animated document pulses; stored
+server-resolved `retrieved_document_ids` drive sequential replay. Replay is
+available from the Graph picker and starts automatically when Chat History
+opens a conversation (owner instruction). Added one haptic impact per pulse
+and clear active animation on a user-session reset. Full local suite: 668
+passed, 30 skipped (other credential-gated suites remain skipped). The 4.3
+authenticated integration test was run separately: two live retrievals
+(4 and 2 documents) matched pulse IDs exactly, including automatic replay
+after reopening history at production timing. Android emulator screenshots
+confirm live rings, replay rings and their fade; the answer-card legend
+overlap and keyboard obstruction found during verification were fixed.
+Screenshots: `docs/screenshots/milestone-4.3-*.png`. No physical-device haptic
+feel check or iOS verification claimed. No Phase 4 gate approval is recorded.
+
 **Exit criteria:** On a chat query's `retrieval` SSE event, the
 corresponding document nodes visibly pulse; reopening a past
 conversation replays the same pulse from its stored

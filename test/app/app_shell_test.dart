@@ -4,6 +4,10 @@ import 'package:cerebro_mobile/features/documents/data/documents_repository_prov
 import 'package:cerebro_mobile/features/graph/data/graph_api.dart';
 import 'package:cerebro_mobile/features/graph/data/graph_models.dart';
 import 'package:cerebro_mobile/features/graph/presentation/graph_screen.dart';
+import 'package:cerebro_mobile/features/chat/data/chat_history_api.dart';
+import 'package:cerebro_mobile/features/chat/data/chat_controller.dart';
+import 'package:cerebro_mobile/features/chat/data/chat_message.dart';
+import 'package:cerebro_mobile/features/graph/data/graph_pulse.dart';
 import 'package:cerebro_mobile/main.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,7 +20,7 @@ import '../features/documents/fake_documents_repository.dart';
 void main() {
   late FakeAuthRepository fakeRepository;
 
-  Widget buildApp() {
+  Widget buildApp({GraphApi? graph}) {
     return ProviderScope(
       overrides: [
         authRepositoryProvider.overrideWithValue(fakeRepository),
@@ -32,7 +36,8 @@ void main() {
           FakeDocumentsRepository(),
         ),
         // The Graph screen (Milestone 4.1) calls the real backend too.
-        graphApiProvider.overrideWithValue(_EmptyGraphApi()),
+        graphApiProvider.overrideWithValue(graph ?? _EmptyGraphApi()),
+        chatHistoryApiProvider.overrideWithValue(_ReplayHistory()),
       ],
       child: const CerebroApp(),
     );
@@ -40,6 +45,37 @@ void main() {
 
   setUp(() => fakeRepository = FakeAuthRepository(initialUserId: 'user-1'));
   tearDown(() => fakeRepository.dispose());
+
+  testWidgets(
+    'history opened before first Graph visit replays visibly on entry',
+    (tester) async {
+      await tester.pumpWidget(buildApp(graph: _ReplayGraph()));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(find.byKey(const Key('app_nav_chat')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(find.byKey(const Key('chat_history')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(find.text('Stored question'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      // Let the invisible automatic replay finish before Graph even exists.
+      await tester.pump(replayInterval + const Duration(milliseconds: 100));
+      expect(find.byType(GraphScreen), findsNothing);
+      await tester.tap(find.byKey(const Key('app_nav_graph')));
+      await tester.pump();
+      expect(find.byKey(const Key('graph_loading')), findsOneWidget);
+      await tester.pump(const Duration(seconds: 5));
+      for (var i = 0; i < 5; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(find.byKey(const Key('graph_pulse_d1')), findsOneWidget);
+      await tester.pump(replayInterval + pulseDuration);
+      expect(find.byKey(const Key('graph_pulse_d1')), findsNothing);
+    },
+  );
 
   testWidgets('an authenticated user lands on Documents by default', (
     tester,
@@ -167,4 +203,38 @@ class _EmptyGraphApi implements GraphApi {
 
   @override
   Future<List<DocumentChunk>> chunks(String documentId) async => const [];
+}
+
+class _ReplayGraph extends _EmptyGraphApi {
+  @override
+  Future<List<GraphNodeData>> nodes() async {
+    await Future<void>.delayed(const Duration(seconds: 5));
+    return const [
+      GraphNodeData(id: 'd1', title: 'Document', x: 0, y: 0, status: 'ready'),
+    ];
+  }
+}
+
+class _ReplayHistory implements ChatHistoryApi {
+  @override
+  Future<List<ChatSessionSummary>> list() async => [
+    ChatSessionSummary(
+      id: 's1',
+      createdAt: DateTime.utc(2026),
+      preview: 'Stored question',
+    ),
+  ];
+  @override
+  Future<ChatHistory> messages(String id) async => const ChatHistory(
+    messages: [
+      ChatMessage(
+        id: 1,
+        role: ChatRole.assistant,
+        text: 'Answer',
+        retrievedDocumentIds: ['d1'],
+      ),
+    ],
+  );
+  @override
+  Future<void> delete(String id) async {}
 }

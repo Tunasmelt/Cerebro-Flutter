@@ -1653,3 +1653,74 @@ with a failing test before fixing it.
 - The legend can still sit over part of the canvas (dismissable); it absorbs
   touches where it is.
 - "Chat about this" and the Ask bar remain stubs.
+
+### Milestone 4.3 — Resumed implementation (2026-10-10)
+- Preserved the existing uncommitted live-pulse, Graph question/answer, and
+  conversation replay work. Checked the local web/backend source: stored
+  `retrieved_document_ids` are resolved server-side from retrieved chunks;
+  mobile uses the same 2-second pulse and 2.4-second replay interval.
+- Added a native light haptic impact once per pulse, with a widget check.
+  Clear active animation when pulse state resets for a different user.
+- On the owner's instruction, opening a conversation from Chat History now
+  automatically starts replay. Guard against superseded history loads; cancel
+  an old replay before opening another session. The Graph picker opts out of
+  automatic replay and starts its own once, after checking the loaded session.
+- Added a regression check for automatic history replay; updated README and
+  milestone status to reflect work in progress rather than "not started".
+- Verification: graph/chat suite passed (312 tests, 12 credential-gated tests
+  skipped); subsequent automatic-replay regression suite passed (19 tests).
+  Flutter analysis clean; Android debug APK built and launched on the connected
+  emulator with the existing signed-in session. No authenticated node-ID
+  comparison or device animation pass claimed; Phase 4 gate remains open.
+
+### Milestone 4.3 — Remaining verification (2026-10-10)
+- Full local suite: 668 passed, 30 skipped. Authenticated 4.3 integration
+  run separately using the emulator's existing session token in a temporary
+  process environment (never printed or written to a file). Two real SSE
+  retrievals (4 and 2 document IDs) matched live pulse sets; automatic replay
+  on reopening history matched both sets in order at production timing.
+  The test-created sessions were deleted by teardown.
+- Fixed a test timing race: waiting exactly the replay duration can wake
+  before its final timer. Poll completion with a bounded 15-second deadline.
+- On the Android emulator, asked real questions and inspected screenshots
+  showing live rings, past-conversation replay rings and the finished state.
+  Real streamed answers and citations rendered. Saved evidence in
+  docs/screenshots/milestone-4.3-*.png. The manually created conversation is
+  retained for the owner's walkthrough; no existing user content deleted.
+- Emulator verification exposed the legend covering the answer card; hide
+  it while the answer is open and restore it on close, with a regression
+  check. Asking or opening replay now dismisses the keyboard. All 20 graph
+  pulse widget tests passed after these fixes; Android debug APK rebuilt
+  and installed; analysis clean.
+- Milestone checks passed for Android emulator + real backend. Phase 4
+  owner gate stays open. Physical-device haptic feel and iOS remain untested.
+
+### Phase 4 audit (2026-10-10)
+- Saved findings and evidence in docs/phase-4-audit-2026-10-10.md. Reproduced
+  invisible pre-mount pulses, replay continuing after New chat, and no replay
+  after a successful history retry. Static review also found graph staleness
+  after document changes and the enabled Chat about this stub.
+- Analysis clean; targeted suite: 133 passed, 3 gated tests skipped. Existing
+  tests miss these lifecycle cases. No application fixes made during audit.
+- Correction to the preceding 4.3 verification claim: controller/backend
+  comparisons and direct Graph replay passed, but automatic history replay
+  does not pass all navigation/lifecycle cases. 4.3 requires fixes before an
+  unconditional milestone exit. Hardware seed-scale performance and gesture
+  feel remain owed; Phase 4 owner gate remains open.
+
+### Implementation review fixes (2026-10-10)
+- Fixed the three requested replay defects: consume current pulse on Graph
+  listener initialization and replay the current conversation on Graph tab
+  entry; clear/cancel replay on New chat (including active-session deletion);
+  replay successful history retries while respecting the original opt-out.
+- Added a router regression opening real UI history before the first Graph
+  visit, allowing invisible replay to finish, then asserting visible rings
+  on Graph entry. Added cancellation, deletion and retry/opt-out regressions.
+- Full suite: 672 passed, 30 skipped; analysis clean. Android debug APK built
+  and installed on the emulator. Phase gate unchanged.
+- Follow-up emulator inspection found graph fetch can outlast replay. Graph
+  tab activation now waits for graph data and checks the live route before
+  replaying; the router regression includes a five-second graph response.
+- Separate authenticated backend replay comparison passed again (4 and 2
+  documents matched live SSE and reopened history); test-created session
+  removed by teardown.
