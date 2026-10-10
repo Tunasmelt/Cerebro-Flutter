@@ -6,13 +6,23 @@
 import 'dart:convert';
 
 import 'package:cerebro_mobile/core/config/supabase_config.dart';
+import 'package:cerebro_mobile/core/network/api_client.dart';
+import 'package:cerebro_mobile/core/network/api_client_provider.dart';
+import 'package:cerebro_mobile/core/network/app_exception.dart';
 import 'package:cerebro_mobile/core/network/generated_api_client.dart';
 import 'package:cerebro_mobile/core/network/session_token_provider.dart';
+import 'package:cerebro_mobile/features/auth/data/current_user_provider.dart';
+import 'package:cerebro_mobile/features/chat/data/chat_controller.dart';
+import 'package:cerebro_mobile/features/chat/data/chat_sessions_api.dart';
+import 'package:cerebro_mobile/features/chat/data/chat_stream_client.dart';
+import 'package:cerebro_mobile/core/network/generated_api_client.dart' as gen;
 import 'package:cerebro_mobile/features/documents/data/document.dart';
 import 'package:cerebro_mobile/features/documents/data/documents_repository.dart';
 import 'package:cerebro_mobile/features/graph/data/graph_api.dart';
+import 'package:cerebro_mobile/features/graph/data/graph_expansion.dart';
 import 'package:cerebro_mobile/features/graph/data/graph_layout.dart';
 import 'package:cerebro_mobile/features/graph/data/graph_models.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 
@@ -111,4 +121,124 @@ void main() {
       '${graph.nodes.length} nodes / ${graph.edges.length} edges',
     );
   }, timeout: const Timeout(Duration(minutes: 2)));
+
+  test("expanding every real document loads its real chunks, and a cited chunk "
+      "is in its document's list", () async {
+    if (_gated) {
+      return markTestSkipped(
+        'needs --dart-define=CEREBRO_TEST_EMAIL=... and '
+        '--dart-define=CEREBRO_TEST_PASSWORD=... (a confirmed test account)',
+      );
+    }
+    final token = await _signIn();
+    final fixed = _FixedToken(token);
+    final generated = gen.buildGeneratedApiClient(tokenProvider: fixed);
+    final api = ApiClient(tokenProvider: fixed);
+    final graphApi = ApiGraphApi(generated);
+    final c = ProviderContainer(
+      overrides: [
+        currentUserIdProvider.overrideWithValue('real-user'),
+        graphApiProvider.overrideWithValue(graphApi),
+        apiClientProvider.overrideWithValue(api),
+        chatStreamApiProvider.overrideWithValue(DioChatStreamClient(api.dio)),
+        chatSessionsApiProvider.overrideWithValue(
+          ApiChatSessionsApi(generated),
+        ),
+      ],
+    );
+    addTearDown(c.dispose);
+    c.listen(graphExpansionProvider, (_, _) {});
+    final ctl = c.read(graphExpansionProvider.notifier);
+
+    final nodes = await graphApi.nodes();
+    final lines = <String>[];
+    final chunksByDoc = <String, Set<String>>{};
+    for (final n in nodes) {
+      await ctl.toggle(n.id);
+      final s = c.read(graphExpansionProvider);
+      expect(s.nodeId, n.id);
+      expect(
+        s.load,
+        ChunkLoad.loaded,
+        reason: '${n.title}: ${s.error?.message}',
+      );
+
+      // Unique ids, in reading order, and a layout for every drawn chunk.
+      final ids = s.chunks.map((x) => x.id).toList();
+      expect(ids.toSet(), hasLength(ids.length), reason: n.title);
+      for (var i = 1; i < s.chunks.length; i++) {
+        expect(
+          s.chunks[i].ordinal,
+          greaterThanOrEqualTo(s.chunks[i - 1].ordinal),
+          reason: '${n.title}: chunks out of reading order',
+        );
+      }
+      expect(s.shown.length, lessThanOrEqualTo(maxSatellites));
+      expect(satelliteOffsets(s.shown.length), hasLength(s.shown.length));
+      if (n.type == GraphNodeType.sealed) {
+        expect(s.chunks, isEmpty, reason: 'a sealed document leaks chunks');
+      } else {
+        expect(s.chunks, isNotEmpty, reason: '${n.title} has no chunks');
+      }
+      chunksByDoc[n.id] = ids.toSet();
+      lines.add(
+        '${n.type.name} "${n.title}" -> ${s.chunks.length} chunks '
+        '(${s.shown.length} drawn)',
+      );
+      ctl.collapse();
+    }
+
+    // Collapsing leaves nothing behind.
+    expect(c.read(graphExpansionProvider).isExpanded, isFalse);
+
+    // A document that does not exist is a clean not_found.
+    await ctl.toggle('00000000-0000-4000-8000-000000000000');
+    final missing = c.read(graphExpansionProvider);
+    expect(missing.load, ChunkLoad.failed);
+    expect(
+      missing.error,
+      isA<RequestRejectedException>().having(
+        (e) => e.code,
+        'code',
+        'not_found',
+      ),
+    );
+    ctl.collapse();
+
+    // Independent cross-check: ask a real question; every chunk the answer
+    // cites must be one the graph lists under that same document.
+    final chat = c.read(chatControllerProvider.notifier);
+    await chat.send('How is authentication handled in Cerebro?');
+    final state = c.read(chatControllerProvider);
+    addTearDown(() async {
+      final id = state.sessionId;
+      if (id != null) {
+        await generated.apiV1ChatSessionsSessionIdDelete(sessionId: id);
+      }
+    });
+    final answer = state.messages.last;
+    expect(
+      answer.citedDocuments,
+      isNotEmpty,
+      reason: 'the answer cited nothing to cross-check',
+    );
+    answer.citedDocuments.forEach((chunkId, documentId) {
+      expect(
+        chunksByDoc[documentId],
+        contains(chunkId),
+        reason:
+            'cited chunk $chunkId is not among the graph chunks of '
+            'document $documentId',
+      );
+    });
+    // ignore: avoid_print
+    print('REAL CHUNKS');
+    // ignore: avoid_print
+    lines.forEach(print);
+    // ignore: avoid_print
+    print(
+      'CROSS-CHECK: ${answer.citedDocuments.length} cited chunk(s) all '
+      "found in their documents' chunk lists",
+    );
+  }, timeout: const Timeout(Duration(minutes: 5)));
 }

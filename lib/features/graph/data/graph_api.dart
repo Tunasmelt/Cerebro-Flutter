@@ -17,6 +17,10 @@ abstract interface class GraphApi {
 
   /// Nearest-neighbour links as of the last recluster.
   Future<List<GraphEdgeData>> edges();
+
+  /// A document's chunks, in reading order. A sealed document has none to
+  /// show. 404 (gone) is a `RequestRejectedException` with code `not_found`.
+  Future<List<ChunkSatellite>> chunks(String documentId);
 }
 
 class ApiGraphApi implements GraphApi {
@@ -58,6 +62,24 @@ class ApiGraphApi implements GraphApi {
     return [
       for (final row in _rows(response, 'edges')) ?GraphEdgeData.fromJson(row),
     ];
+  }
+
+  @override
+  Future<List<ChunkSatellite>> chunks(String documentId) async {
+    final response = await _run(
+      _api.apiV1GraphNodesDocumentIdChunksGet(documentId: documentId),
+    );
+    final chunks = [
+      for (final row in _rows(response, 'chunks'))
+        ?ChunkSatellite.fromJson(row),
+    ];
+    // Reading order; rows with equal ordinals keep the order they came in.
+    final indexed = chunks.indexed.toList()
+      ..sort((a, b) {
+        final byOrdinal = a.$2.ordinal.compareTo(b.$2.ordinal);
+        return byOrdinal != 0 ? byOrdinal : a.$1.compareTo(b.$1);
+      });
+    return [for (final (_, c) in indexed) c];
   }
 }
 

@@ -52,6 +52,19 @@ class _FakeGraph implements GraphApi {
     if (edgesError != null) throw edgesError!;
     return List.of(edgeRows);
   }
+
+  Map<String, List<ChunkSatellite>> chunkRows = {};
+  Map<String, Completer<void>> chunkGates = {};
+  Object? chunksError;
+  final chunkCalls = <String>[];
+
+  @override
+  Future<List<ChunkSatellite>> chunks(String documentId) async {
+    chunkCalls.add(documentId);
+    await chunkGates[documentId]?.future;
+    if (chunksError != null) throw chunksError!;
+    return chunkRows[documentId] ?? const [];
+  }
 }
 
 Future<List<String>> _pump(
@@ -227,8 +240,9 @@ void main() {
     await tester.tapAt(middle + const Offset(-graphLayoutRadius, 0));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
-    // The sheet's title, and the selected node's own label.
-    expect(find.text('Zanzibar notes'), findsNWidgets(2));
+    // In the panel (the node's own label is left off so it does not sit on
+    // its satellites).
+    expect(find.text('Zanzibar notes'), findsOneWidget);
     expect(find.text('Open in Documents'), findsOneWidget);
 
     await tester.tap(find.text('Open in Documents'));

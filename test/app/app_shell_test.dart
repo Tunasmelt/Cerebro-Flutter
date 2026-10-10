@@ -164,4 +164,7 @@ class _EmptyGraphApi implements GraphApi {
 
   @override
   Future<List<GraphEdgeData>> edges() async => const [];
+
+  @override
+  Future<List<ChunkSatellite>> chunks(String documentId) async => const [];
 }
