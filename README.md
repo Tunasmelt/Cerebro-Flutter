@@ -97,7 +97,7 @@ and a gate that the project owner confirms on a real device
 | 1 | Auth and app shell, error handling | Done |
 | 2 | Documents and upload | Done (device gate checks pending with the owner) |
 | 3 | Chat and retrieval: SSE client, chat screen, session management | Done (device gate checks pending with the owner) |
-| 4 | 2D brain graph | Not started (screen shell only) |
+| 4 | 2D brain graph | 4.1 done (real graph renders; colour by type, see CHANGELOG); 4.2 and 4.3 not started |
 | 5 | Sealed tier (Argon2id + AES-256-GCM, parameter-identical to web) | Not started |
 | 6 | Kanban, todo, token playground | Not started (screen shells only) |
 | 7 | Platform polish and release readiness | Not started |

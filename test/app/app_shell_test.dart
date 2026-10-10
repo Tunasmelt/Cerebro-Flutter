@@ -1,6 +1,8 @@
 import 'package:cerebro_mobile/core/network/connection_status_notifier.dart';
 import 'package:cerebro_mobile/features/auth/data/auth_notifier.dart';
 import 'package:cerebro_mobile/features/documents/data/documents_repository_provider.dart';
+import 'package:cerebro_mobile/features/graph/data/graph_api.dart';
+import 'package:cerebro_mobile/features/graph/data/graph_models.dart';
 import 'package:cerebro_mobile/features/graph/presentation/graph_screen.dart';
 import 'package:cerebro_mobile/main.dart';
 import 'package:flutter/material.dart';
@@ -29,6 +31,8 @@ void main() {
         documentsRepositoryProvider.overrideWithValue(
           FakeDocumentsRepository(),
         ),
+        // The Graph screen (Milestone 4.1) calls the real backend too.
+        graphApiProvider.overrideWithValue(_EmptyGraphApi()),
       ],
       child: const CerebroApp(),
     );
@@ -65,7 +69,7 @@ void main() {
   testWidgets('tapping the Graph destination renders the Graph screen', (
     tester,
   ) async {
-    // GraphScreen drives a repeating pulse animation that never settles
+    // (historical) the wireframe's Graph screen never settled
     // (see graph_screen_test.dart) — bounded pumps only here, no
     // pumpAndSettle for the rest of this test once it's mounted.
     await tester.pumpWidget(buildApp());
@@ -107,24 +111,21 @@ void main() {
     expect(find.text('Token Playground'), findsOneWidget);
   });
 
-  testWidgets(
-    'tapping the Settings destination renders the Settings screen',
-    (tester) async {
-      await tester.pumpWidget(buildApp());
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
-
-      await tester.tap(find.byKey(const Key('app_nav_settings')));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
-
-      expect(find.text('Alex Stone'), findsOneWidget);
-    },
-  );
-
-  testWidgets('signing out from Settings redirects to Sign in', (
+  testWidgets('tapping the Settings destination renders the Settings screen', (
     tester,
   ) async {
+    await tester.pumpWidget(buildApp());
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    await tester.tap(find.byKey(const Key('app_nav_settings')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('Alex Stone'), findsOneWidget);
+  });
+
+  testWidgets('signing out from Settings redirects to Sign in', (tester) async {
     await tester.pumpWidget(buildApp());
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
@@ -155,4 +156,12 @@ void main() {
 
     expect(find.byKey(const Key('sign_in_submit')), findsOneWidget);
   });
+}
+
+class _EmptyGraphApi implements GraphApi {
+  @override
+  Future<List<GraphNodeData>> nodes() async => const [];
+
+  @override
+  Future<List<GraphEdgeData>> edges() async => const [];
 }
