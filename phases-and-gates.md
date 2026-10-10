@@ -574,10 +574,23 @@ build against); sources are a `**Sources**` list rather than reference links.
 ### Phase 3 Gate
 All milestones 3.1–3.3 pass their tests, **and** the project owner
 confirms live:
-- [ ] Asked a real question on a real device and watched a real
+- [x] Asked a real question on a real device and watched a real
       streamed answer with a working citation.
-- [ ] Reopened a real past conversation and confirmed it looked right.
-- [ ] Exported a real conversation and opened the resulting file.
+- [x] Reopened a real past conversation and confirmed it looked right.
+- [x] Exported a real conversation and opened the resulting file.
+
+**Gate marked passed by the project owner, 2026-10-10.** The owner
+instructed the gate be marked; no agent decided it. Evidence behind it is
+from an **Android emulator, not a physical device**, so the "real device"
+wording above is met only in that weaker sense: a real question streamed
+with a chip that opened the cited document
+(`architecture-and-security.md`); after a force-stop and relaunch the
+conversation was listed and reopened identically; the Export share sheet
+opened and the exported `.md` was read back (question, answer with `[1]`/`[2]`
+footnotes, Sources list, no raw markers). Unchanged by the gate: a pass on
+physical hardware has not been done. Observed, out of scope: chat answers are
+shown as plain text, so Markdown (`**bold**`, `* ` bullets) appears raw on
+screen though the exported file keeps it.
 
 ---
 
