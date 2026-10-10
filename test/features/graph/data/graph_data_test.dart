@@ -447,5 +447,5 @@ class _Api implements GraphApi {
   }
 
   @override
-  Future<List<ChunkSatellite>> chunks(String documentId) async => const [];
+  Future<List<DocumentChunk>> chunks(String documentId) async => const [];
 }

@@ -1568,11 +1568,21 @@ with a failing test before fixing it.
   collapsing whichever was expanded; tapping the expanded node collapses it.
   The panel's close button also collapses. Pan, pinch-zoom and dragging a node
   are the package's built-in gestures (zoom limited to 0.3x-3x).
+- **Design change on the owner's instruction (2026-10-10): chunks are listed,
+  not drawn.** The first version drew each chunk as a small "satellite" dot on
+  rings around the document, joined to it by lines (capped at 64, as web does).
+  On a phone that was dense and unreadable, so on the owner's instruction the
+  satellites and their links were **removed from the canvas**: expanding a node
+  now shows its chunks in the node panel only. This deliberately departs from
+  the milestone's "tap-to-expand a node into its chunk satellites" wording and
+  from web; the ring layout, the 64 cap, satellite taps and the "follow a
+  dragged parent" logic were deleted, and the model renamed `DocumentChunk`.
+  If chunks are ever wanted on the canvas again, that is new work.
 - **Contract, confirmed against the real API:** `GET /graph/nodes/{id}/chunks`
   -> `{chunks: [{id, ordinal, content, meta}]}`, `meta` varying by source
   (`page`, `bbox`, `region_type`, `heading_level`); 404 `not_found` for a
   missing document. What the real account's 18 documents showed, and what the
-  design is built around: chunk counts from **0** (the sealed document — its
+  panel is built around: chunk counts from **0** (the sealed document — its
   chunks are not exposed) to **166**; one Markdown chunk of **37,351**
   characters; an image chunk with **empty** text.
 - **State (`GraphExpansion` / `graphExpansionProvider`):** loading, loaded,
@@ -1580,60 +1590,53 @@ with a failing test before fixing it.
   counter so a slow answer for a node the user already left — success or
   failure — is dropped. A new signed-in user starts with nothing expanded; a
   graph refresh collapses what was expanded.
-- **On the graph:** the expanded document's chunks become static satellite
-  nodes on concentric rings (16 / 20 / 28 at radii 70 / 110 / 150, odd rings
-  staggered, deterministic) linked to it by fainter lines. **Capped at 64, as web
-  does**; past that the panel says "93 chunks · the first 64 are drawn on the
-  graph". Satellite dots are 28 px touch targets, not 44 — 64 of them on three
-  rings would overlap at 44 — so the panel's chunk list (44 px rows) is the
-  full-size way to reach any chunk. A selected satellite is larger and ringed.
-  The expanded node is brought into the part of the view above the panel so a
-  node tapped low on the screen is not hidden by its own panel; dropping a
-  dragged expanded document puts its satellites back around it.
 - **The node panel replaces the modal sheet.** It is not modal, so the graph
   stays live (pan, zoom, tap another node) while it is open. It shows the
   title/type, a count, the selected chunk's text (cut at 6,000 characters with
   "… shortened — N characters in all"), the chunk list (page / region and a
-  preview; "(no text)" for an empty chunk), a Retry on failure, a "sealed —
-  chunks are not shown" / "no chunks" explanation, and the actions (Open in
-  Documents works; Chat about this is still a stub). It never covers more than
-  half the screen. The ask bar and legend step aside while a node is expanded.
+  preview; "(no text)" for an empty chunk; every chunk is listed, however many),
+  a Retry on failure, a "sealed — chunks are not shown" / "no chunks"
+  explanation, and the actions (Open in Documents works; Chat about this is
+  still a stub). It never covers more than half the screen, and the expanded
+  node is brought into the part of the view above it so a node tapped low on
+  the screen is not hidden by its own panel. The ask bar and legend step aside
+  while a node is expanded.
 - **Found by running it, all fixed with regression tests:**
-  1. The panel overflowed by 8 px when a chunk was selected in a short panel.
-     Then, fixing that naively, a selected chunk squeezed the list to nothing
-     on a 360x640 phone; the two now share the space 2:1 (the selected text
-     scrolls).
-  2. A `ListView` padded its top by the status-bar height, leaving a blank gap
-     above the first chunk row (seen live).
-  3. The selected node's label sat on top of its own satellites (seen live); a
+  1. The panel overflowed by 8 px when a chunk was selected in a short panel;
+     fixing that naively squeezed the list to nothing on a 360x640 phone, so
+     the selected text and the list now share the space 1:2 (the text scrolls).
+  2. A `ListView` padded its top by the status-bar height, leaving a blank band
+     above the first chunk (seen live). The test needed a simulated system
+     inset: with none, it could never see this.
+  3. A selected node's label sat on top of its own satellites (seen live); a
      selected node is an expanded one and its title is in the panel, so only a
      search match gets a label now.
-- **Tests:** expansion state + ring layout + chunk model (27), screen and
-  gestures (23) — expand / collapse / switch, loading, failure and retry,
-  not-found, sealed, the 64 cap, selecting from a satellite and from the list,
-  a 37k-character chunk, an empty chunk, bring-into-view, the 50% panel limit,
-  the 360x640 phone, dragging an expanded document, pan (every node moves by
-  the drag), pinch in/out with both zoom limits, and tapping after pan+zoom —
-  plus a gated real-backend test. Mutation-checked: 21 injected faults across
-  the state, layout, model, screen and panel; one survived (a redundant
-  "loading" guard in `selectChunk`, removed) and one needed a new test (the
-  overflow protection, which a 600 px-tall screen never exercised). Suite:
-  636 passing, 29 skipped (gated real-backend).
+- **Tests:** expansion state + chunk model (20) and screen + gestures (23) —
+  expand / collapse / switch, loading, failure and retry, not-found, sealed, a
+  100-chunk list, selecting from the list, a 37k-character chunk, an empty
+  chunk, bring-into-view, the 50% panel limit, a 360x640 phone, a status-bar
+  inset, pan (every node moves by the drag), pinch in/out with both zoom limits,
+  tapping after pan+zoom, and "nothing is drawn on the graph" — plus a gated
+  real-backend test. Mutation-checked: 16 injected faults in the state, model,
+  screen and panel, all caught (two earlier survivors were a redundant guard,
+  removed, and a bug that needed a test with a status-bar inset). Suite: 629
+  passing, 29 skipped (gated real-backend).
 - **Real backend (2026-10-10):** every one of the 18 documents expands through
-  the real endpoint: unique chunk ids, in reading order, a layout for each drawn
-  chunk, the sealed document has 0 chunks, every other has at least 1, and four
-  (97 / 93 / 166 / 130) are capped to 64. A document id that does not exist
-  comes back as `not_found`. **Independent cross-check:** a real chat answer
-  was asked and its cited chunk id was found in the graph's chunk list for that
-  same document. (Read-only apart from the one chat session, which is deleted.)
+  the real endpoint: unique chunk ids, in reading order; the sealed document
+  has 0 chunks, every other has at least 1 (up to 166). A document id that does
+  not exist comes back as `not_found`. **Independent cross-check:** a real chat
+  answer was asked and its cited chunk id was found in the graph's chunk list
+  for that same document. (Read-only apart from the one chat session, which is
+  deleted.)
 - **Emulator (debug build):** expand "Retention Marketing Campaigns" (10
-  chunks: ring of 10 with links, panel list with page numbers); tap a
-  satellite (ringed, its text in the panel); tap the document again (collapses,
-  legend and ask bar return, layout unchanged); expand "IR Misses the Mark"
-  (93 chunks, 64 drawn, the cap note shown). Screenshots:
+  chunks: the panel lists them with page numbers; no dots or lines on the
+  canvas), tap a row (its text appears above the list), tap the document again
+  (collapses; legend and ask bar return; layout unchanged). Screenshots:
   `docs/screenshots/milestone-4.2-*.png`.
 
 **Not done / deviations, stated plainly:**
+- **Chunks are not drawn on the graph** (see above) — a deliberate departure
+  from the milestone text, on the owner's instruction.
 - **The manual "pan and pinch-zoom feel correct on a real touchscreen" check
   was not done.** adb cannot synthesise a two-finger pinch, and no physical
   device was available. Pan and pinch are covered by widget tests with real
@@ -1645,12 +1648,8 @@ with a failing test before fixing it.
 - The real chat cross-check used a single cited chunk.
 
 **Noted, not fixed:**
-- With 64 satellites the outer ring (150 px at 1x) can extend past the top of
-  the visible area and under the panel on a phone; pinching out brings it into
-  view. No automatic fit-to-view for large counts.
-- Dropping a dragged expanded document moves its satellites on release, not
-  continuously during the drag.
-- The selected chunk's row is not scrolled into view in the list.
+- The selected chunk's row is not scrolled into view in the list, and on a
+  small phone the selected text shows only a few lines (it scrolls).
 - The legend can still sit over part of the canvas (dismissable); it absorbs
   touches where it is.
 - "Chat about this" and the Ask bar remain stubs.

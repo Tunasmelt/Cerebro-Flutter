@@ -249,10 +249,7 @@ class _Body extends StatelessWidget {
       children: [
         Text(
           key: const Key('node_chunk_count'),
-          expansion.isTruncated
-              ? '${chunks.length} chunks · the first $maxSatellites are '
-                    'drawn on the graph'
-              : '${chunks.length} ${chunks.length == 1 ? 'chunk' : 'chunks'}',
+          '${chunks.length} ${chunks.length == 1 ? 'chunk' : 'chunks'}',
           style: AppTypography.sm.copyWith(color: AppColors.textSecondary),
         ),
         const SizedBox(height: AppSpacing.s2),
@@ -282,13 +279,13 @@ class _Body extends StatelessWidget {
   }
 }
 
-String _where(ChunkSatellite c) =>
+String _where(DocumentChunk c) =>
     [if (c.page != null) 'Page ${c.page}', ?c.regionType].join(' · ');
 
 class _SelectedChunk extends StatelessWidget {
   const _SelectedChunk({required this.chunk});
 
-  final ChunkSatellite chunk;
+  final DocumentChunk chunk;
 
   @override
   Widget build(BuildContext context) {
@@ -357,7 +354,7 @@ class _ChunkRow extends StatelessWidget {
     required this.onTap,
   });
 
-  final ChunkSatellite chunk;
+  final DocumentChunk chunk;
   final int number;
   final bool selected;
   final VoidCallback onTap;

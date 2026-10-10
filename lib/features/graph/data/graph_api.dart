@@ -20,7 +20,7 @@ abstract interface class GraphApi {
 
   /// A document's chunks, in reading order. A sealed document has none to
   /// show. 404 (gone) is a `RequestRejectedException` with code `not_found`.
-  Future<List<ChunkSatellite>> chunks(String documentId);
+  Future<List<DocumentChunk>> chunks(String documentId);
 }
 
 class ApiGraphApi implements GraphApi {
@@ -65,13 +65,12 @@ class ApiGraphApi implements GraphApi {
   }
 
   @override
-  Future<List<ChunkSatellite>> chunks(String documentId) async {
+  Future<List<DocumentChunk>> chunks(String documentId) async {
     final response = await _run(
       _api.apiV1GraphNodesDocumentIdChunksGet(documentId: documentId),
     );
     final chunks = [
-      for (final row in _rows(response, 'chunks'))
-        ?ChunkSatellite.fromJson(row),
+      for (final row in _rows(response, 'chunks')) ?DocumentChunk.fromJson(row),
     ];
     // Reading order; rows with equal ordinals keep the order they came in.
     final indexed = chunks.indexed.toList()

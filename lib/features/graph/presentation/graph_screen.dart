@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_force_directed_graph/flutter_force_directed_graph.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:vector_math/vector_math.dart' show Vector2;
 
 import '../../../app/app_routes.dart';
 import '../../../core/network/app_exception.dart';
@@ -14,16 +13,11 @@ import '../data/graph_api.dart';
 import '../data/graph_expansion.dart';
 import '../data/graph_layout.dart';
 import '../data/graph_models.dart';
-import 'models/graph_node.dart';
 import 'widgets/graph_ask_bar.dart';
 import 'widgets/graph_legend.dart';
 import 'widgets/graph_node_dot.dart';
 import 'widgets/graph_search_bar.dart';
 import 'widgets/node_info_panel.dart';
-
-/// Prefix on the package-graph id of a chunk satellite, so it can never be
-/// mistaken for a document's id.
-const String _chunkPrefix = 'chunk:';
 
 /// What share of the screen's height the node panel may cover; an expanded
 /// node is brought into the part above it.
@@ -36,8 +30,8 @@ const double _panelShare = 0.5;
 /// Draws the real `/graph/nodes` and `/graph/edges` with
 /// `flutter_force_directed_graph`. The layout is the server's (see
 /// [buildForceGraph]); this screen only renders it. Tapping a node expands it
-/// into its chunks (see [GraphExpansion]); pan and pinch-zoom are the
-/// package's own gestures.
+/// and opens its chunks in a panel (see [GraphExpansion]); pan and pinch-zoom
+/// are the package's own gestures.
 class GraphScreen extends ConsumerStatefulWidget {
   const GraphScreen({super.key, this.openDocument});
 
@@ -60,11 +54,6 @@ class _GraphScreenState extends ConsumerState<GraphScreen> {
   /// arrives, never on every frame.
   ForceDirectedGraphController<String>? _controller;
   GraphSnapshot? _builtFrom;
-
-  /// What is currently drawn as satellites (see [_syncSatellites]), and where
-  /// each sits relative to its document.
-  String? _satelliteSignature;
-  final Map<Node<String>, Vector2> _satelliteOffsets = {};
 
   @override
   void dispose() {
@@ -90,8 +79,6 @@ class _GraphScreenState extends ConsumerState<GraphScreen> {
       );
       _controller = controller;
       _builtFrom = snapshot;
-      _satelliteSignature = null;
-      _satelliteOffsets.clear();
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || !identical(_controller, controller)) return;
         controller.center();
@@ -116,67 +103,11 @@ class _GraphScreenState extends ConsumerState<GraphScreen> {
     }
   }
 
-  /// A dragged document leaves its satellites behind; when it is dropped they
-  /// are put back around it.
-  void _dragEnded(String data) {
-    _keepLayoutStatic();
-    final controller = _controller;
-    final expanded = ref.read(graphExpansionProvider).nodeId;
-    if (controller == null || expanded == null || data != expanded) return;
-    final parent = _nodeFor(controller, expanded);
-    if (parent == null) return;
-    _satelliteOffsets.forEach((node, offset) {
-      node.position = parent.position + offset;
-    });
-    controller.needUpdate();
-  }
-
   Node<String>? _nodeFor(ForceDirectedGraphController<String> c, String id) {
     for (final n in c.graph.nodes) {
       if (n.data == id) return n;
     }
     return null;
-  }
-
-  /// Makes the package's graph show [exp]'s chunks as satellites around the
-  /// expanded document: removes whatever satellites there were, then adds one
-  /// static node per drawn chunk, linked to the document.
-  void _syncSatellites(GraphExpansion exp) {
-    final controller = _controller;
-    if (controller == null) return;
-    final drawn = exp.load == ChunkLoad.loaded
-        ? exp.shown
-        : const <ChunkSatellite>[];
-    final signature = exp.nodeId == null || drawn.isEmpty
-        ? null
-        : '${exp.nodeId}|${drawn.length}|${drawn.first.id}|${drawn.last.id}';
-    if (signature == _satelliteSignature) return;
-    _satelliteSignature = signature;
-
-    final graph = controller.graph;
-    graph.edges.removeWhere(
-      (e) =>
-          e.a.data.startsWith(_chunkPrefix) ||
-          e.b.data.startsWith(_chunkPrefix),
-    );
-    graph.nodes.removeWhere((n) => n.data.startsWith(_chunkPrefix));
-    _satelliteOffsets.clear();
-
-    final parent = signature == null ? null : _nodeFor(controller, exp.nodeId!);
-    if (parent != null) {
-      final offsets = satelliteOffsets(drawn.length);
-      for (var i = 0; i < drawn.length; i++) {
-        final offset = offsets[i];
-        final node = Node<String>(
-          '$_chunkPrefix${drawn[i].id}',
-          parent.position + offset,
-        )..static();
-        graph.addNode(node);
-        graph.addEdge(Edge(parent, node));
-        _satelliteOffsets[node] = offset;
-      }
-    }
-    controller.needUpdate();
   }
 
   /// Brings [id] into the part of the view the panel will not cover, so a
@@ -219,7 +150,6 @@ class _GraphScreenState extends ConsumerState<GraphScreen> {
     final expansion = ref.watch(graphExpansionProvider);
 
     ref.listen<GraphExpansion>(graphExpansionProvider, (previous, next) {
-      _syncSatellites(next);
       final id = next.nodeId;
       if (id != null && id != previous?.nodeId) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -363,27 +293,12 @@ class _GraphScreenState extends ConsumerState<GraphScreen> {
     }
 
     final toggle = ref.read(graphExpansionProvider.notifier).toggle;
-    final selectChunk = ref.read(graphExpansionProvider.notifier).selectChunk;
-    final satelliteColor =
-        (expansion.nodeId == null ? null : byId[expansion.nodeId])
-            ?.type
-            .color ??
-        AppColors.accentPrimary;
     return ForceDirectedGraphWidget<String>(
       key: const Key('graph_canvas'),
       controller: _controllerFor(snapshot),
       onDraggingUpdate: (_) => _keepLayoutStatic(),
-      onDraggingEnd: (data) => _dragEnded(data),
+      onDraggingEnd: (_) => _keepLayoutStatic(),
       nodesBuilder: (context, id) {
-        if (id.startsWith(_chunkPrefix)) {
-          final chunkId = id.substring(_chunkPrefix.length);
-          return GraphSatelliteDot(
-            chunkId: chunkId,
-            color: satelliteColor,
-            selected: chunkId == expansion.selectedChunkId,
-            onTap: () => selectChunk(chunkId),
-          );
-        }
         final node = byId[id];
         if (node == null) return const SizedBox.shrink();
         final matched = _matches(node);
@@ -396,12 +311,8 @@ class _GraphScreenState extends ConsumerState<GraphScreen> {
           onTap: () => toggle(node.id),
         );
       },
-      edgesBuilder: (context, a, b, distance) => GraphEdgeLine(
-        length: distance,
-        color: a.startsWith(_chunkPrefix) || b.startsWith(_chunkPrefix)
-            ? satelliteColor
-            : null,
-      ),
+      edgesBuilder: (context, a, b, distance) =>
+          GraphEdgeLine(length: distance),
     );
   }
 }

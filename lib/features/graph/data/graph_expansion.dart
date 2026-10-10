@@ -1,21 +1,14 @@
-import 'dart:math' as math;
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:vector_math/vector_math.dart' show Vector2;
 
 import '../../../core/network/app_exception.dart';
 import '../../auth/data/current_user_provider.dart';
 import 'graph_api.dart';
 import 'graph_models.dart';
 
-/// How many chunks are drawn around a node. Web caps the same way: a
-/// document can have hundreds, and a ring of hundreds of dots is unreadable.
-/// The rest are still listed in the node's panel.
-const int maxSatellites = 64;
-
 enum ChunkLoad { loading, loaded, failed }
 
-/// Which node is expanded into its chunks, and what has been loaded for it.
+/// Which node is expanded, and the chunks loaded for it (listed in the node's
+/// panel; they are not drawn on the graph).
 ///
 /// **Interaction model (chosen explicitly): one node is expanded at a time.**
 /// Tapping a collapsed node expands it, first collapsing whichever node was
@@ -36,20 +29,13 @@ class GraphExpansion {
   final ChunkLoad load;
 
   /// Every chunk the document has, in reading order.
-  final List<ChunkSatellite> chunks;
+  final List<DocumentChunk> chunks;
   final AppException? error;
   final String? selectedChunkId;
 
   bool get isExpanded => nodeId != null;
 
-  /// The chunks drawn on the graph: the first [maxSatellites].
-  List<ChunkSatellite> get shown => chunks.length <= maxSatellites
-      ? chunks
-      : chunks.sublist(0, maxSatellites);
-
-  bool get isTruncated => chunks.length > maxSatellites;
-
-  ChunkSatellite? get selectedChunk {
+  DocumentChunk? get selectedChunk {
     for (final c in chunks) {
       if (c.id == selectedChunkId) return c;
     }
@@ -131,36 +117,4 @@ class GraphExpansionController extends AutoDisposeNotifier<GraphExpansion> {
       );
     }
   }
-}
-
-/// Ring sizes for laying satellites around a node: how many fit on each ring,
-/// and how far out the ring sits (logical pixels, before zoom).
-const List<({int capacity, double radius})> _rings = [
-  (capacity: 16, radius: 70),
-  (capacity: 20, radius: 110),
-  (capacity: 28, radius: 150),
-];
-
-/// Where [count] satellites sit relative to their node: concentric rings,
-/// filled from the inside, each odd ring staggered half a step so dots do not
-/// line up radially. Deterministic. More than [maxSatellites] are not laid
-/// out.
-List<Vector2> satelliteOffsets(int count) {
-  final n = math.min(count, maxSatellites);
-  final out = <Vector2>[];
-  var remaining = n;
-  for (var ring = 0; ring < _rings.length && remaining > 0; ring++) {
-    final (:capacity, :radius) = _rings[ring];
-    final onRing = math.min(remaining, capacity);
-    // A ring that is not full is spaced as if it had at least six dots, so a
-    // lone satellite is not stranded on top of its node's label.
-    final step = 2 * math.pi / math.max(onRing, math.min(capacity, 6));
-    final start = -math.pi / 2 + (ring.isOdd ? step / 2 : 0);
-    for (var i = 0; i < onRing; i++) {
-      final angle = start + i * step;
-      out.add(Vector2(radius * math.cos(angle), radius * math.sin(angle)));
-    }
-    remaining -= onRing;
-  }
-  return out;
 }

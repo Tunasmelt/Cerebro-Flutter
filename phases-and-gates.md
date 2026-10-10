@@ -646,19 +646,22 @@ satellites, matching the package's built-in gesture support.
   check, but it still needs a real device pass, not just "the package
   supports gestures" taken on faith.
 
-**Status: code complete, tests passing (636, 29 skipped = gated real-backend),
+**Status: code complete, tests passing (629, 29 skipped = gated real-backend),
 verified against the real backend and on the emulator (see CHANGELOG
 "Milestone 4.2").** Interaction model chosen and tested: one node expanded at a
 time. All 18 real documents expand through the real chunks endpoint (sealed: 0
-chunks; four capped to 64 drawn), and a chunk cited by a real chat answer was
-found in the graph's list for that document.
+chunks), and a chunk cited by a real chat answer was found in the graph's list
+for that document.
+**Deviation (owner's instruction):** chunks are listed in the node panel, **not
+drawn on the canvas** as satellites with links as the exit criteria describe;
+that was built first, found unreadable on a phone, and removed.
 **Not done:** the manual real-touchscreen feel check for pan and pinch-zoom
 (adb cannot pinch; no device). The gestures are covered by multi-pointer
 widget tests, which prove they work but not that they feel right — owed to the
 owner on hardware.
 **Found by running it:** a panel overflow and a squeezed chunk list on a small
-phone, a status-bar-sized gap in the list, and a label sitting on the
-satellites — all fixed with regression tests.
+phone, a status-bar-sized gap in the list, and a label sitting on the nodes —
+all fixed with regression tests.
 
 ### Milestone 4.3 — Retrieval-replay animation
 **Exit criteria:** On a chat query's `retrieval` SSE event, the

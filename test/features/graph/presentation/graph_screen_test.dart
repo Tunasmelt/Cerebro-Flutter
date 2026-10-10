@@ -53,13 +53,13 @@ class _FakeGraph implements GraphApi {
     return List.of(edgeRows);
   }
 
-  Map<String, List<ChunkSatellite>> chunkRows = {};
+  Map<String, List<DocumentChunk>> chunkRows = {};
   Map<String, Completer<void>> chunkGates = {};
   Object? chunksError;
   final chunkCalls = <String>[];
 
   @override
-  Future<List<ChunkSatellite>> chunks(String documentId) async {
+  Future<List<DocumentChunk>> chunks(String documentId) async {
     chunkCalls.add(documentId);
     await chunkGates[documentId]?.future;
     if (chunksError != null) throw chunksError!;

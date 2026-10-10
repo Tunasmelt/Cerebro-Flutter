@@ -1,7 +1,6 @@
 // Expanding a node into its chunks: the interaction model, loading and
 // failure, stale answers, and where the satellites are laid out.
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:cerebro_mobile/core/network/app_exception.dart';
 import 'package:cerebro_mobile/features/auth/data/current_user_provider.dart';
@@ -11,21 +10,21 @@ import 'package:cerebro_mobile/features/graph/data/graph_models.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-ChunkSatellite _c(String id, {int ordinal = 0, String content = 'text'}) =>
-    ChunkSatellite(id: id, ordinal: ordinal, content: content);
+DocumentChunk _c(String id, {int ordinal = 0, String content = 'text'}) =>
+    DocumentChunk(id: id, ordinal: ordinal, content: content);
 
-List<ChunkSatellite> _many(String prefix, int n) => [
+List<DocumentChunk> _many(String prefix, int n) => [
   for (var i = 0; i < n; i++) _c('$prefix$i', ordinal: i),
 ];
 
 class _Api implements GraphApi {
-  final rows = <String, List<ChunkSatellite>>{};
+  final rows = <String, List<DocumentChunk>>{};
   final gates = <String, Completer<void>>{};
   final errors = <String, Object>{};
   final calls = <String>[];
 
   @override
-  Future<List<ChunkSatellite>> chunks(String documentId) async {
+  Future<List<DocumentChunk>> chunks(String documentId) async {
     calls.add(documentId);
     await gates[documentId]?.future;
     final e = errors[documentId];
@@ -121,26 +120,6 @@ void main() {
       expect(_s(c).load, ChunkLoad.loaded);
       expect(_s(c).chunks, isEmpty);
       expect(_s(c).error, isNull);
-    });
-
-    test('only the first $maxSatellites are drawn, and the rest are '
-        'reported', () async {
-      final (:c, :api) = _setup();
-      api.rows['big'] = _many('k', 166);
-      await _ctl(c).toggle('big');
-
-      expect(_s(c).chunks, hasLength(166), reason: 'the panel lists all');
-      expect(_s(c).shown, hasLength(maxSatellites));
-      expect(_s(c).shown.first.id, 'k0');
-      expect(_s(c).isTruncated, isTrue);
-    });
-
-    test('exactly the cap is not truncated', () async {
-      final (:c, :api) = _setup();
-      api.rows['d'] = _many('k', maxSatellites);
-      await _ctl(c).toggle('d');
-      expect(_s(c).isTruncated, isFalse);
-      expect(_s(c).shown, hasLength(maxSatellites));
     });
 
     test('selecting a chunk highlights it; again clears it; a stranger is '
@@ -296,57 +275,9 @@ void main() {
     });
   });
 
-  group('satelliteOffsets', () {
-    test('as many as asked for, never more than the cap', () {
-      expect(satelliteOffsets(0), isEmpty);
-      expect(satelliteOffsets(1), hasLength(1));
-      expect(satelliteOffsets(16), hasLength(16));
-      expect(satelliteOffsets(17), hasLength(17));
-      expect(satelliteOffsets(64), hasLength(64));
-      expect(satelliteOffsets(500), hasLength(maxSatellites));
-    });
-
-    test('deterministic', () {
-      final a = satelliteOffsets(40);
-      final b = satelliteOffsets(40);
-      expect([for (final p in a) (p.x, p.y)], [for (final p in b) (p.x, p.y)]);
-    });
-
-    test('no two satellites sit closer than a dot and a half apart, at any '
-        'count', () {
-      for (final n in [1, 2, 5, 16, 17, 36, 37, 64]) {
-        final offs = satelliteOffsets(n);
-        var closest = double.infinity;
-        for (var i = 0; i < offs.length; i++) {
-          for (var j = i + 1; j < offs.length; j++) {
-            closest = math.min(closest, offs[i].distanceTo(offs[j]));
-          }
-        }
-        if (offs.length > 1) {
-          expect(closest, greaterThan(20), reason: '$n satellites overlap');
-        }
-      }
-    });
-
-    test('all clear of the node itself, and inside the outer ring', () {
-      for (final p in satelliteOffsets(64)) {
-        expect(p.length, greaterThan(50), reason: 'on top of the node');
-        expect(p.length, lessThanOrEqualTo(150 + 1e-3));
-      }
-    });
-
-    test('fills from the inside out', () {
-      final offs = satelliteOffsets(30);
-      final inner = offs.take(16).map((p) => p.length);
-      final outer = offs.skip(16).map((p) => p.length);
-      expect(inner.every((r) => (r - 70).abs() < 1e-3), isTrue);
-      expect(outer.every((r) => (r - 110).abs() < 1e-3), isTrue);
-    });
-  });
-
-  group('ChunkSatellite.fromJson', () {
+  group('DocumentChunk.fromJson', () {
     test('a PDF chunk', () {
-      final c = ChunkSatellite.fromJson({
+      final c = DocumentChunk.fromJson({
         'id': 'c1',
         'ordinal': 3,
         'content': 'Hello',
@@ -359,10 +290,10 @@ void main() {
     });
 
     test('odd or missing fields degrade, unusable rows are skipped', () {
-      expect(ChunkSatellite.fromJson('x'), isNull);
-      expect(ChunkSatellite.fromJson({'content': 'no id'}), isNull);
-      expect(ChunkSatellite.fromJson({'id': ''}), isNull);
-      final c = ChunkSatellite.fromJson({
+      expect(DocumentChunk.fromJson('x'), isNull);
+      expect(DocumentChunk.fromJson({'content': 'no id'}), isNull);
+      expect(DocumentChunk.fromJson({'id': ''}), isNull);
+      final c = DocumentChunk.fromJson({
         'id': 'c',
         'content': 5,
         'ordinal': 'x',

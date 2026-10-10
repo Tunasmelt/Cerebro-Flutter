@@ -5,7 +5,6 @@ import 'dart:async';
 import 'package:cerebro_mobile/core/network/app_exception.dart';
 import 'package:cerebro_mobile/features/auth/data/current_user_provider.dart';
 import 'package:cerebro_mobile/features/graph/data/graph_api.dart';
-import 'package:cerebro_mobile/features/graph/data/graph_expansion.dart';
 import 'package:cerebro_mobile/features/graph/data/graph_models.dart';
 import 'package:cerebro_mobile/features/graph/presentation/graph_screen.dart';
 import 'package:cerebro_mobile/shared/theme/app_theme.dart';
@@ -31,8 +30,8 @@ GraphNodeData _n(
   clusterId: 'c',
 );
 
-ChunkSatellite _c(String id, {String? content, int? page, String? region}) =>
-    ChunkSatellite(
+DocumentChunk _c(String id, {String? content, int? page, String? region}) =>
+    DocumentChunk(
       id: id,
       ordinal: 0,
       content: content ?? 'text of $id',
@@ -40,13 +39,13 @@ ChunkSatellite _c(String id, {String? content, int? page, String? region}) =>
       regionType: region,
     );
 
-List<ChunkSatellite> _many(String p, int n) => [
+List<DocumentChunk> _many(String p, int n) => [
   for (var i = 0; i < n; i++) _c('$p$i'),
 ];
 
 class _Api implements GraphApi {
   List<GraphNodeData> nodeRows = [];
-  final chunkRows = <String, List<ChunkSatellite>>{};
+  final chunkRows = <String, List<DocumentChunk>>{};
   final gates = <String, Completer<void>>{};
   Object? chunksError;
   final calls = <String>[];
@@ -56,7 +55,7 @@ class _Api implements GraphApi {
   @override
   Future<List<GraphEdgeData>> edges() async => const [];
   @override
-  Future<List<ChunkSatellite>> chunks(String documentId) async {
+  Future<List<DocumentChunk>> chunks(String documentId) async {
     calls.add(documentId);
     await gates[documentId]?.future;
     if (chunksError != null) throw chunksError!;
@@ -114,14 +113,15 @@ Future<void> _tapNode(WidgetTester tester, String id) async {
   await _frames(tester);
 }
 
-int _satellites(WidgetTester tester) => _controller(
-  tester,
-).graph.nodes.where((n) => n.data.startsWith('chunk:')).length;
-
 Finder get _panel => find.byKey(const Key('node_panel'));
 
 void main() {
   late _Api api;
+
+  /// Nodes on the canvas beyond the documents — chunks are listed in the
+  /// panel, never drawn on the graph, so this is always 0.
+  int extra(WidgetTester t) =>
+      _controller(t).graph.nodes.length - api.nodeRows.length;
 
   setUp(() {
     api = _Api()
@@ -136,8 +136,8 @@ void main() {
   });
 
   group('expanding', () {
-    testWidgets('tapping a node expands it: its panel, and a satellite per '
-        'chunk', (tester) async {
+    testWidgets('tapping a node expands it: its panel and its chunk list — '
+        'nothing is drawn on the graph', (tester) async {
       await _pump(tester, api);
       expect(_panel, findsNothing);
 
@@ -147,10 +147,11 @@ void main() {
       expect(find.text('Alpha'), findsWidgets);
       expect(find.byKey(const Key('node_chunk_count')), findsOneWidget);
       expect(find.text('5 chunks'), findsOneWidget);
-      expect(_satellites(tester), 5);
-      for (var i = 0; i < 5; i++) {
-        expect(find.byKey(Key('graph_chunk_a$i')), findsOneWidget);
-      }
+      // The list builds rows lazily, so only the first few exist.
+      expect(find.byKey(const Key('node_chunk_a0')), findsOneWidget);
+      expect(find.byKey(const Key('node_chunk_a1')), findsOneWidget);
+      expect(extra(tester), 0, reason: 'chunks were drawn on the canvas');
+      expect(_controller(tester).graph.edges, isEmpty);
       expect(api.calls, ['a']);
     });
 
@@ -159,35 +160,37 @@ void main() {
       await _pump(tester, api);
       await _tapNode(tester, 'a');
       expect(find.byKey(const Key('node_loading')), findsOneWidget);
-      expect(_satellites(tester), 0);
+      expect(find.byKey(const Key('node_chunk_a0')), findsNothing);
 
       api.gates['a']!.complete();
       await _frames(tester);
       expect(find.byKey(const Key('node_loading')), findsNothing);
-      expect(_satellites(tester), 5);
+      expect(find.byKey(const Key('node_chunk_a0')), findsOneWidget);
     });
 
     testWidgets('tapping the expanded node collapses it', (tester) async {
       await _pump(tester, api);
       await _tapNode(tester, 'a');
-      expect(_satellites(tester), 5);
+      expect(find.byKey(const Key('node_chunk_a0')), findsOneWidget);
 
       await _tapNode(tester, 'a');
       expect(_panel, findsNothing);
-      expect(_satellites(tester), 0);
-      expect(find.byKey(const Key('graph_chunk_a0')), findsNothing);
+      expect(find.byKey(const Key('node_chunk_a0')), findsNothing);
     });
 
     testWidgets('tapping a different node collapses the first and expands '
         'the second — while the panel is open', (tester) async {
       await _pump(tester, api);
       await _tapNode(tester, 'a');
-      expect(_satellites(tester), 5);
+      expect(find.byKey(const Key('node_chunk_a0')), findsOneWidget);
 
       await _tapNode(tester, 'b');
-      expect(_satellites(tester), 3, reason: "a's satellites are still up");
-      expect(find.byKey(const Key('graph_chunk_a0')), findsNothing);
-      expect(find.byKey(const Key('graph_chunk_b0')), findsOneWidget);
+      expect(
+        find.byKey(const Key('node_chunk_a0')),
+        findsNothing,
+        reason: "a's chunks are still listed",
+      );
+      expect(find.byKey(const Key('node_chunk_b0')), findsOneWidget);
       expect(
         find.descendant(of: _panel, matching: find.text('Beta')),
         findsOneWidget,
@@ -204,7 +207,7 @@ void main() {
       await tester.tap(find.byKey(const Key('node_close')));
       await _frames(tester);
       expect(_panel, findsNothing);
-      expect(_satellites(tester), 0);
+      expect(extra(tester), 0);
     });
 
     testWidgets('a sealed document says its chunks are not shown, and draws '
@@ -214,7 +217,7 @@ void main() {
       await _tapNode(tester, 's');
       expect(find.byKey(const Key('node_no_chunks')), findsOneWidget);
       expect(find.textContaining('Sealed'), findsOneWidget);
-      expect(_satellites(tester), 0);
+      expect(extra(tester), 0);
     });
 
     testWidgets('a document with no chunks says so', (tester) async {
@@ -223,14 +226,13 @@ void main() {
       expect(find.text('This document has no chunks.'), findsOneWidget);
     });
 
-    testWidgets('only the first $maxSatellites chunks are drawn, and the '
-        'panel says how many there are', (tester) async {
+    testWidgets('a document with many chunks lists them all', (tester) async {
       api.chunkRows['a'] = _many('k', 100);
       await _pump(tester, api);
       await _tapNode(tester, 'a');
-      expect(_satellites(tester), maxSatellites);
-      expect(find.textContaining('100 chunks'), findsOneWidget);
-      expect(find.textContaining('first $maxSatellites'), findsOneWidget);
+      expect(find.text('100 chunks'), findsOneWidget);
+      expect(find.byKey(const Key('node_chunk_k0')), findsOneWidget);
+      expect(extra(tester), 0);
     });
 
     testWidgets('a refresh that brings a new graph collapses what was '
@@ -243,7 +245,7 @@ void main() {
       await tester.tap(find.byKey(const Key('graph_refresh')));
       await _frames(tester, 6);
       expect(_panel, findsNothing);
-      expect(_satellites(tester), 0);
+      expect(extra(tester), 0);
     });
   });
 
@@ -255,13 +257,13 @@ void main() {
       await _pump(tester, api);
       await _tapNode(tester, 'a');
       expect(find.byKey(const Key('node_chunks_error')), findsOneWidget);
-      expect(_satellites(tester), 0);
+      expect(extra(tester), 0);
 
       api.chunksError = null;
       await tester.tap(find.byKey(const Key('node_retry')));
       await _frames(tester);
       expect(find.byKey(const Key('node_chunks_error')), findsNothing);
-      expect(_satellites(tester), 5);
+      expect(find.byKey(const Key('node_chunk_a0')), findsOneWidget);
     });
 
     testWidgets('a document that is gone says so, with no pointless retry', (
@@ -276,8 +278,8 @@ void main() {
   });
 
   group('chunks', () {
-    testWidgets('tapping a satellite selects it: its text in the panel, its '
-        'row highlighted; again clears it', (tester) async {
+    testWidgets('tapping a chunk selects it: its text and where it is from in '
+        'the panel; tapping it again clears it', (tester) async {
       api.chunkRows['a'] = [
         _c('a0', content: 'The first passage.', page: 2, region: 'paragraph'),
         _c('a1', content: 'The second passage.'),
@@ -286,13 +288,13 @@ void main() {
       await _tapNode(tester, 'a');
       expect(find.byKey(const Key('node_selected_chunk')), findsNothing);
 
-      await tester.tapAt(_screenOf(tester, 'chunk:a0'));
+      await tester.tap(find.byKey(const Key('node_chunk_a0')));
       await _frames(tester);
       expect(find.byKey(const Key('node_selected_chunk')), findsOneWidget);
       expect(find.text('The first passage.'), findsWidgets);
       expect(find.text('Page 2 · paragraph'), findsWidgets);
 
-      await tester.tapAt(_screenOf(tester, 'chunk:a0'));
+      await tester.tap(find.byKey(const Key('node_chunk_a0')));
       await _frames(tester);
       expect(find.byKey(const Key('node_selected_chunk')), findsNothing);
     });
@@ -395,6 +397,28 @@ void main() {
       );
     });
 
+    testWidgets('a status-bar inset does not leave a gap above the chunk '
+        'list', (tester) async {
+      // A ListView pads its top by the system inset unless told not to; seen
+      // on a real phone as a blank band above the first row.
+      tester.view.padding = const FakeViewPadding(top: 120);
+      addTearDown(tester.view.resetPadding);
+      await _pump(tester, api);
+      await _tapNode(tester, 'b');
+
+      final count = tester.getBottomLeft(
+        find.byKey(const Key('node_chunk_count')),
+      );
+      final firstRow = tester.getTopLeft(
+        find.byKey(const Key('node_chunk_b0')),
+      );
+      expect(
+        firstRow.dy - count.dy,
+        lessThan(24),
+        reason: 'a blank band above the first chunk',
+      );
+    });
+
     testWidgets('the panel never covers more than half the screen', (
       tester,
     ) async {
@@ -407,30 +431,6 @@ void main() {
         tester.getSize(_panel).height,
         lessThanOrEqualTo(height * 0.5 + 1),
       );
-    });
-
-    testWidgets('dragging an expanded document brings its satellites along '
-        'when it is dropped', (tester) async {
-      await _pump(tester, api);
-      await _tapNode(tester, 'a');
-      final parent = _node(tester, 'a');
-
-      final gesture = await tester.startGesture(_screenOf(tester, 'a'));
-      await gesture.moveBy(const Offset(40, 0));
-      await tester.pump();
-      await gesture.moveBy(const Offset(40, 0));
-      await tester.pump();
-      await gesture.up();
-      await _frames(tester);
-
-      for (final n in _controller(tester).graph.nodes) {
-        if (!n.data.startsWith('chunk:')) continue;
-        expect(
-          n.position.distanceTo(parent.position),
-          closeTo(70, 1e-3),
-          reason: 'satellite ${n.data} was left behind',
-        );
-      }
     });
   });
 
@@ -517,7 +517,7 @@ void main() {
 
       await _tapNode(tester, 'b');
       expect(find.byKey(const Key('node_panel')), findsOneWidget);
-      expect(_satellites(tester), 3);
+      expect(find.text('3 chunks'), findsOneWidget);
     });
   });
 }

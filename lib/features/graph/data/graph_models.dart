@@ -121,8 +121,8 @@ class GraphSnapshot {
 
 /// One chunk of a document, from `GET /graph/nodes/{id}/chunks`: a passage
 /// of text (or, for an image, its description) that retrieval can cite.
-class ChunkSatellite {
-  const ChunkSatellite({
+class DocumentChunk {
+  const DocumentChunk({
     required this.id,
     required this.ordinal,
     required this.content,
@@ -151,7 +151,7 @@ class ChunkSatellite {
   }
 
   /// Null when the row has no usable id.
-  static ChunkSatellite? fromJson(Object? json) {
+  static DocumentChunk? fromJson(Object? json) {
     if (json is! Map) return null;
     final id = json['id'];
     if (id is! String || id.isEmpty) return null;
@@ -160,7 +160,7 @@ class ChunkSatellite {
     final meta = json['meta'];
     final page = meta is Map ? meta['page'] : null;
     final region = meta is Map ? meta['region_type'] : null;
-    return ChunkSatellite(
+    return DocumentChunk(
       id: id,
       ordinal: ordinal is num ? ordinal.toInt() : 0,
       content: content is String ? content : '',

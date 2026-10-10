@@ -128,81 +128,25 @@ class GraphNodeDot extends StatelessWidget {
   }
 }
 
-/// One chunk of the expanded document: a small dot in the colour of its
-/// document, with a ring when selected. Smaller than a document dot and with
-/// a tighter touch target (28 px, not 44): up to 64 sit on a few rings, and
-/// 44 px targets would overlap each other. The panel's chunk list is the
-/// full-size way to reach every chunk.
-class GraphSatelliteDot extends StatelessWidget {
-  const GraphSatelliteDot({
-    super.key,
-    required this.chunkId,
-    required this.color,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String chunkId;
-  final Color color;
-  final bool selected;
-  final VoidCallback onTap;
-
-  static const double radius = 5;
-  static const double target = 28;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: SizedBox(
-        width: target,
-        height: target,
-        child: Center(
-          child: Container(
-            key: Key('graph_chunk_$chunkId'),
-            width: (selected ? radius + 2 : radius) * 2,
-            height: (selected ? radius + 2 : radius) * 2,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: color.withValues(alpha: selected ? 1 : 0.75),
-              border: selected
-                  ? Border.all(color: AppColors.textPrimary, width: 1.5)
-                  : null,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// A link between two nodes: a thin line that fades with length. [color] (a
-/// document's colour) makes it a chunk link, fainter than a document link.
+/// A link between two documents: a thin line that fades with length.
 class GraphEdgeLine extends StatelessWidget {
-  const GraphEdgeLine({super.key, required this.length, this.color});
+  const GraphEdgeLine({super.key, required this.length});
 
   final double length;
-  final Color? color;
 
   @override
   Widget build(BuildContext context) {
-    final tint = color;
-    final alpha = tint != null
-        ? 0.35
-        : (0.32 - length / 1400).clamp(0.06, 0.32);
+    final alpha = (0.32 - length / 1400).clamp(0.06, 0.32);
     return SizedBox(
       width: length,
-      height: tint != null ? 1.0 : 1.2,
+      height: 1.2,
       child: DecoratedBox(
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: tint != null
-                ? [tint.withValues(alpha: alpha), tint.withValues(alpha: alpha)]
-                : [
-                    AppColors.accentSecondary.withValues(alpha: alpha),
-                    AppColors.accentPrimary.withValues(alpha: alpha),
-                  ],
+            colors: [
+              AppColors.accentSecondary.withValues(alpha: alpha),
+              AppColors.accentPrimary.withValues(alpha: alpha),
+            ],
           ),
         ),
       ),

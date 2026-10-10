@@ -163,7 +163,7 @@ void main() {
         reason: '${n.title}: ${s.error?.message}',
       );
 
-      // Unique ids, in reading order, and a layout for every drawn chunk.
+      // Unique ids, in reading order.
       final ids = s.chunks.map((x) => x.id).toList();
       expect(ids.toSet(), hasLength(ids.length), reason: n.title);
       for (var i = 1; i < s.chunks.length; i++) {
@@ -173,18 +173,13 @@ void main() {
           reason: '${n.title}: chunks out of reading order',
         );
       }
-      expect(s.shown.length, lessThanOrEqualTo(maxSatellites));
-      expect(satelliteOffsets(s.shown.length), hasLength(s.shown.length));
       if (n.type == GraphNodeType.sealed) {
         expect(s.chunks, isEmpty, reason: 'a sealed document leaks chunks');
       } else {
         expect(s.chunks, isNotEmpty, reason: '${n.title} has no chunks');
       }
       chunksByDoc[n.id] = ids.toSet();
-      lines.add(
-        '${n.type.name} "${n.title}" -> ${s.chunks.length} chunks '
-        '(${s.shown.length} drawn)',
-      );
+      lines.add('${n.type.name} "${n.title}" -> ${s.chunks.length} chunks');
       ctl.collapse();
     }
 
