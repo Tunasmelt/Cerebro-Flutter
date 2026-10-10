@@ -25,6 +25,9 @@ Uint8List generateSealedSalt() {
 /// No persistence or networking. Derivation runs away from the UI isolate.
 /// Passphrase encoding is UTF-8 without trimming/normalization, matching web.
 Future<SecretKey> deriveSealedKey(String passphrase, List<int> salt) async {
+  if (passphrase.isEmpty) {
+    throw ArgumentError('Password must be specified.');
+  }
   if (salt.length != sealedSaltBytes) {
     throw ArgumentError('Salt must be 16 bytes.');
   }

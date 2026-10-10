@@ -5,6 +5,13 @@ and verification claims, compared against actual web source at
 `714fcae25c5cffa9446c31455b2bbdb52adb12a5`.
 No production implementation changed during this audit.
 
+**Follow-up resolution:** both findings were fixed after the owner requested
+remediation. Empty passwords now throw before derivation. The nonzero-salt
+Unicode vector and independent changed-password/changed-salt assertions are
+in the regular suite. Seven crypto tests and the Android parity entrypoint
+pass; the full suite now passes 679 tests with 30 gated skips. Original
+findings below are preserved as audit history.
+
 ## Findings
 
 ### P2 — Empty passphrases are accepted where web rejects them
