@@ -38,7 +38,9 @@ bool _unlockFailed = false;
 
 // Device automation only. Fill the real field/controller exactly, avoiding
 // ADB keyboard event timing corrupting this disposable fixture's password.
-void _fillFixturePassphrase() {
+void fillSyntheticSealedPassphrase({
+  String marker = 'MILESTONE_5_3_SYNTHETIC_INPUT_MATCH',
+}) {
   var filled = false;
   Timer.periodic(const Duration(seconds: 1), (_) {
     TextField? field;
@@ -58,7 +60,7 @@ void _fillFixturePassphrase() {
       field!.controller!.text = _fixturePassphrase;
       field!.onChanged?.call(_fixturePassphrase);
       filled = true;
-      debugPrint('MILESTONE_5_3_SYNTHETIC_INPUT_MATCH');
+      debugPrint(marker);
     }
   });
 }
@@ -120,7 +122,7 @@ Future<void> main() async {
   runApp(
     UncontrolledProviderScope(container: container, child: const CerebroApp()),
   );
-  _fillFixturePassphrase();
+  fillSyntheticSealedPassphrase();
   container.read(routerProvider).go(AppRoutes.documentDetail(_id));
   var started = false;
   container.listen(documentDetailProvider(_id), (_, detail) {
@@ -153,6 +155,18 @@ Future<void> _verify(ProviderContainer container) async {
       throw StateError('Retrieval or answer mismatch');
     }
     debugPrint('MILESTONE_5_3_${stage}_PASS');
+    if (expectContent) {
+      final history = await container
+          .read(chatHistoryApiProvider)
+          .messages(state.sessionId!);
+      final saved = history.messages.last;
+      if (!saved.retrievedDocumentIds.contains(_id) ||
+          !saved.text.contains(_answer) ||
+          !saved.citedDocuments.values.contains(_id)) {
+        throw StateError('Stored sealed retrieval or citation missing');
+      }
+      debugPrint('MILESTONE_5_3_SEALED_CHAT_HISTORY_PASS');
+    }
   }
 
   try {

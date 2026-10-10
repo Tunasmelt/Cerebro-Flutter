@@ -791,17 +791,26 @@ session-scoped 15-minute unlock claim enforced.
   confirm it locks again automatically without requiring the app to be
   restarted.
 
-**Status (2026-10-11): implementation complete; functional checks partial.**
-Production document controls, in-memory claims/countdown, expiry/resume
-cleanup and chat claim payloads are implemented. Unit/widget checks pass.
-Real Android 60-chunk sealing/unlock, locked-chat exclusion and actual
-server claim-expiry rejection passed.
-Unlocked chat retrieves/answers but fails backend UUID persistence.
-No-restart expiry/expired-chat proof remains unverified after the emulator
-shut down before expiry; independent server-expiry results are in the
-[verification record](docs/milestone-5.3-seal-unlock.md). No owner phase gate changed.
+**Status (2026-10-11): required Android functional checks passed; owner gate open.**
+Production seal/unlock/unseal passed against a real 60-chunk fixture.
+Backend PRs #92/#93 repaired UUID persistence and indexed-only graph
+reinforcement; fresh native chat completed and its saved citation/retrieval
+were verified. The original real 15-minute claim expired on unchanged app
+PID 4699: local content/cache disappeared, the server rejected the stale
+claim, and fresh chat excluded the private fact. Earlier failed attempts
+remain recorded; the successful native retry closes the positive case.
+See [verification record](docs/milestone-5.3-seal-unlock.md). iOS device
+execution is unavailable here. No owner phase gate changed.
 
 ### Milestone 5.4 — Adversarial security testing
+**Status:** Required Android checks passed on deployed build 8415003.
+Direct/injection chats/history exclude sealed content; malformed key returns
+401 after backend PR #94, missing body key returns 422, and unknown claim
+returns 404. Five genuine cross-user requests return 404; owner auth is
+preserved. Test chats/fixture deleted. iOS device proof remains unavailable;
+no owner phase gate passed.
+See [verification record](docs/milestone-5.4-adversarial.md).
+
 **Exit criteria:** Sealed content cannot be extracted through this
 client by any query phrasing, malformed request, or cross-user access
 attempt — same adversarial suite discipline as the web project's own

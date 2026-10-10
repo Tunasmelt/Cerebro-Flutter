@@ -1,4 +1,4 @@
-# Milestone 5.3 â€” implemented; functional verification in progress
+# Milestone 5.3 - Required Android checks passed; owner gate open
 
 Started 2026-10-11 after 5.2's real Android/deployed-web checks passed.
 Phase 4 and Phase 5 owner gates remain open. No 5.4 work started.
@@ -11,6 +11,48 @@ document IDs, claims and keys. Sealed content must be excluded before
 unlock, retrievable during the claim, and excluded after automatic expiry
 without restarting the app. The server enforces a fixed 15-minute window;
 its actual source has no shortened-expiry testing option.
+
+## Completion evidence - 2026-10-11
+
+The owner authorized repairing the backend before starting 5.4.
+[Backend PR #92](https://github.com/Tunasmelt/Cerebro-2.0/pull/92) fixes
+sealed UUID persistence/history resolution; [PR #93](https://github.com/Tunasmelt/Cerebro-2.0/pull/93)
+filters graph reinforcement to indexed chunks. Both passed CI and were
+merged/deployed; live `/health` reported final build `f462586`.
+Full backend suite: **545 passed**, Ruff clean. Mobile analysis is clean;
+its existing full suite is **751 passed, 30 gated skips**.
+
+Fresh disposable fixture `db36893c-f24c-4d8e-a167-ed4e5b3240b6` had 60
+chunks. Production sealing passed; locked chat excluded its fact at
+02:41:02 Dubai. Unlock/unseal matched the original content hash at
+02:41:34. The original claim expired at **2026-10-10T22:56:32.909578Z**
+(**02:56:32 Dubai**).
+
+| Required case | Real Android/backend outcome |
+|---|---|
+| Unlocked chat | After both backend fixes, a fresh native turn completed with the unique answer and citation before original expiry. |
+| Persisted retrieval/citation | Scoped API read confirmed the completed native turn retained the fixture ID, citation and UUID chunk IDs. Independent SSE reached `done` and persisted correctly too. |
+| Automatic local expiry | At 02:56:35 the production session map no longer contained the claim; plaintext/countdown disappeared and Unlock document returned. |
+| Server expiry | At 02:56:38 the original claim/key returned HTTP 401/claim_expired. |
+| Expired chat | At 02:56:46 a fresh production turn completed without the fixture or its unique answer. |
+| No app restart | App PID **4699** was unchanged from unlock through all expiry checks. |
+| Cleanup | Test chats deleted; disposable IDs verified GET 404; normal lib/main.dart build restored with exit 0. |
+
+The harness's initial unlocked turn timed out on the intermediate backend
+build, so its raw aggregate marker correctly remains
+`DEVICE_FUNCTIONAL_INCOMPLETE`. It is not relabeled. The successful fresh
+native retry and saved-history check after final deployment supply the
+missing positive evidence; the harness independently passed all expiry
+checks using the original claim and app process. Earlier failures remain
+below as history, not retroactively counted as passes.
+
+Evidence: ignored `dev-logs/m53-completion-markers.log`,
+`m53-native-history-check.log`, `m53-completion-backend-diagnostic.log`,
+and cleanup/restoration logs; [completed chat](screenshots/milestone-5.3-completed-chat.png),
+[unlocked detail](screenshots/milestone-5.3-completion-unlocked.png),
+[automatic relock](screenshots/milestone-5.3-completion-expired.png).
+Owner Phase 4/5 gates remain open. iOS real-device execution is unavailable
+on this Windows host; passing iOS CI builds are not device proof.
 
 ## Implementation
 
@@ -37,7 +79,7 @@ its actual source has no shortened-expiry testing option.
   claim's server validity. Manual lock forgets local access, matching web;
   the API provides no claim-revocation endpoint.
 
-## Evidence so far
+## Earlier attempts before backend repair
 
 - Unit/widget checks cover the 15-minute boundary, removal of expired
   content/keys, user changes, resume, manual lock, generic failure,
@@ -113,8 +155,8 @@ writes them into `uuid[]`. See the [open backend finding](milestone-5.3-audit.md
 This is not a passing unlocked-chat test. The mobile client correctly
 shows the incomplete-answer notice. No backend/schema change was made.
 
-[60-chunk sealed state](screenshots/milestone-5.3-multi-sealed.png) ·
-[Unlocked content/countdown](screenshots/milestone-5.3-multi-unlocked.png) ·
+[60-chunk sealed state](screenshots/milestone-5.3-multi-sealed.png) Â·
+[Unlocked content/countdown](screenshots/milestone-5.3-multi-unlocked.png) Â·
 [Backend-failed chat turn](screenshots/milestone-5.3-unlocked-chat-error.png)
 
 The emulator shut down at **02:09:14 Dubai**, before real expiry. Its log
@@ -160,9 +202,9 @@ any such failure prevents `DEVICE_FUNCTIONAL_PASS`.
 
 Delete only the disposable fixtures, verify GET returns 404, and restore
 `lib/main.dart` after verification. Results are recorded in the
-[coverage plan](milestone-5.3-test-plan.md). This milestone remains **incomplete**
-until the backend chat persistence defect is fixed and the real unlocked
-turn passes. iOS execution and owner gates remain pending.
+[coverage plan](milestone-5.3-test-plan.md). The completion evidence above records the successful backend repairs and
+required Android cases. Future runs must pass against the deployed build;
+iOS execution and owner gates remain pending.
 
 ## Source checks
 

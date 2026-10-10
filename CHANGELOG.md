@@ -1841,3 +1841,36 @@ with a failing test before fixing it.
   to continue independent expiry assertions after unlocked-chat failure.
   Delete all disposable fixtures (verified GET 404), clean up test chats
   and restore the normal app. No owner gate or dependent milestone advanced.
+
+
+## 2026-10-11 - Complete required milestone 5.3 Android verification
+
+- With owner authorization, publish backend PRs #92/#93: real sealed
+  UUIDs for chat persistence/history and indexed-only graph reinforcement.
+  Backend suite 545 passed; CI and Ruff pass.
+- Production 60-chunk seal/unlock matches the original content hash.
+  Fresh native chat completes with the correct fact/citation; saved history
+  and real SSE confirm persistence on deployed build f462586.
+- Original claim expires after actual 15 minutes on unchanged PID 4699:
+  local content/cache cleared, server returns 401/claim_expired, and fresh
+  chat excludes sealed content. Preserve the earlier failed harness marker;
+  the successful native retry is separately evidenced.
+- Remove test chats/fixtures (GET 404 confirmed), restore normal app.
+  Required Android 5.3 cases pass; iOS device proof and Phase 4/5 owner
+  gates remain open. Normalize verification Markdown to valid UTF-8.
+
+## 2026-10-11 - Run milestone 5.4 native adversarial checks
+
+- Add a real-app verification entrypoint and one-use loopback credential
+  handoff; reuse the production seal UI and generated API/auth client.
+- Confirm direct and injection chats/history omit a unique sealed fact.
+  Genuine second-user document, salt, chunks, unlock and unseal all return
+  404; the owner's persisted auth remains unchanged. Test chats deleted.
+- Find a backend malformed-key HTTP 500. Prepare strict decoding/generic
+  error handling in the backend repo with six reproductions and 551 passing
+  tests. With owner authorization, backend PR #94 merged and deployed as
+  8415003; full native rerun passed, including the corrected HTTP 401.
+  Delete the disposable fixture (owner GET 404 verified) and remove the
+  one-use credential bridge; restore the normal app (exit 0). Required
+  Android 5.4 checks pass; owner
+  gates and real iOS coverage remain open.
