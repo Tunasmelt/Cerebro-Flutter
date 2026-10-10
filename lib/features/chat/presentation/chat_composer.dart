@@ -12,9 +12,14 @@ class ChatComposer extends StatefulWidget {
     required this.busy,
     required this.onSend,
     required this.onStop,
+    this.enabled = true,
   });
 
   final bool busy;
+
+  /// False while a past conversation is loading or failed to load: typing
+  /// into it would send a follow-up to history the user cannot see.
+  final bool enabled;
   final ValueChanged<String> onSend;
   final VoidCallback onStop;
 
@@ -37,7 +42,8 @@ class _ChatComposerState extends State<ChatComposer> {
     super.dispose();
   }
 
-  bool get _canSend => !widget.busy && _controller.text.trim().isNotEmpty;
+  bool get _canSend =>
+      widget.enabled && !widget.busy && _controller.text.trim().isNotEmpty;
 
   void _send() {
     if (!_canSend) return;
@@ -70,6 +76,7 @@ class _ChatComposerState extends State<ChatComposer> {
           Expanded(
             child: TextField(
               key: const Key('chat_input'),
+              enabled: widget.enabled,
               controller: _controller,
               minLines: 1,
               maxLines: 5,

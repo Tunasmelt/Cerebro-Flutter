@@ -3,10 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/app_routes.dart';
+import '../../../core/network/app_exception.dart';
 import '../../../shared/tokens/app_colors.dart';
 import '../../../shared/tokens/app_spacing.dart';
 import '../../../shared/tokens/app_typography.dart';
+import '../../../shared/widgets/error_view.dart';
 import '../data/chat_controller.dart';
+import '../data/chat_export_service.dart';
 import '../data/chat_message.dart';
 import 'chat_composer.dart';
 import 'message_bubble.dart';
@@ -31,6 +34,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   /// if the user has scrolled up to re-read something, a streaming answer
   /// must not drag them back down.
   bool _followTail = true;
+
+  bool _exporting = false;
 
   @override
   void initState() {
@@ -65,6 +70,29 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
   }
 
+  void _openHistory() => context.push(AppRoutes.chatHistory);
+
+  Future<void> _export() async {
+    if (_exporting) return;
+    setState(() => _exporting = true);
+    try {
+      await ref.read(chatExportServiceProvider).exportOpenConversation();
+    } on AppException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              key: const Key('chat_export_error'),
+              content: Text(e.message),
+            ),
+          );
+      }
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final chat = ref.watch(chatControllerProvider);
@@ -78,6 +106,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     });
 
     final messages = chat.messages;
+    final hasConversation = messages.isNotEmpty || chat.sessionId != null;
+    final canExport =
+        chat.sessionId != null &&
+        messages.isNotEmpty &&
+        !chat.busy &&
+        !chat.loading;
 
     return Scaffold(
       backgroundColor: AppColors.bgBase,
@@ -104,7 +138,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       ),
                     ),
                   ),
-                  if (messages.isNotEmpty)
+                  if (canExport)
+                    IconButton(
+                      key: const Key('chat_export'),
+                      tooltip: 'Export as Markdown',
+                      onPressed: _exporting ? null : _export,
+                      icon: const Icon(Icons.ios_share_outlined),
+                    ),
+                  IconButton(
+                    key: const Key('chat_history'),
+                    tooltip: 'Conversations',
+                    onPressed: _openHistory,
+                    icon: const Icon(Icons.history),
+                  ),
+                  if (hasConversation)
                     TextButton.icon(
                       key: const Key('chat_new'),
                       onPressed: controller.newChat,
@@ -115,7 +162,21 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               ),
             ),
             Expanded(
-              child: messages.isEmpty
+              child: chat.loading
+                  ? const Center(
+                      key: Key('chat_loading'),
+                      child: CircularProgressIndicator(),
+                    )
+                  : chat.loadError != null
+                  ? ErrorView(
+                      key: const Key('chat_load_error'),
+                      exception: chat.loadError!,
+                      expanded: true,
+                      onRetry: chat.loadError is RequestRejectedException
+                          ? null
+                          : controller.reloadHistory,
+                    )
+                  : messages.isEmpty
                   ? const _EmptyState()
                   : ListView.separated(
                       key: const Key('chat_messages'),
@@ -144,6 +205,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             ),
             ChatComposer(
               busy: chat.busy,
+              enabled: !chat.loading && chat.loadError == null,
               onSend: (text) => controller.send(text),
               onStop: controller.stop,
             ),

@@ -5,11 +5,11 @@ abstract final class AppRoutes {
   static const signUp = '/sign-up';
   static const documents = '/documents';
   static const chat = '/chat';
+  static const chatHistory = '/chat/history';
   static const graph = '/graph';
   static const board = '/board';
   static const playground = '/playground';
   static const settings = '/settings';
 
-  static String documentDetail(String documentId) =>
-      '$documents/$documentId';
+  static String documentDetail(String documentId) => '$documents/$documentId';
 }
