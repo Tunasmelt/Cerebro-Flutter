@@ -32,14 +32,14 @@ part of this task.
 
 | Case | Required evidence | Initial state |
 |---|---|---|
-| F1: native production seal | Real POST seal; sealed detail/list | Passed again with 60 chunks; exact synthetic input verified |
-| F2: locked chat | Fresh real turn excludes fixture and synthetic answer | Passed with isolated multi-chunk fixture at 01:55:56 Dubai |
-| F3: production unlock | Real salt → unlock → unseal; visible content and countdown | Passed 02:00:14 Dubai; full 60-chunk content hash matches |
-| F4: unlocked chat | Fresh turn retrieves fixture and synthetic answer using production claim payload, then completes | Failed: retrieval/answer/citation succeed, backend persistence rejects sealed IDs as invalid UUIDs |
-| F5: live local expiry | Wait actual 15 minutes; content/key disappear and UI allows re-unlock without restart | Unverified: emulator shut down at 02:09:14 Dubai before expiry; VM proved one entry at 02:07:52 only |
-| F6: server expiry | Stale claim/key returns HTTP 401 / claim_expired | Passed: original claim rejected after real expiry at 02:15:16 Dubai; no shortened expiry |
-| F7: expired chat | Another fresh turn excludes fixture and answer without restart | Unverified: original emulator run ended before expiry |
-| F8: cleanup | Delete test chats/fixtures; GET fixtures returns 404; restore normal app | Unused searchable duplicate deleted/404; sealed fixtures retained for F3–F7 |
+| F1: native production seal | Real POST seal; sealed detail/list | Passed again with fresh 60-chunk fixture; exact synthetic input verified |
+| F2: locked chat | Fresh real turn excludes fixture and synthetic answer | Passed again on fresh fixture at 02:41:02 Dubai |
+| F3: production unlock | Real salt → unlock → unseal; visible content and countdown | Passed again 02:41:34 Dubai; full 60-chunk content hash matches |
+| F4: unlocked chat | Fresh turn retrieves fixture and synthetic answer using production claim payload, then completes | Passed on live build f462586: fresh native turn completed, answer/source matched; saved retrieval/citation and UUID IDs verified |
+| F5: live local expiry | Wait actual 15 minutes; content/key disappear and UI allows re-unlock without restart | Passed 02:56:35 Dubai: fixture removed from production map, plaintext/countdown cleared, PID 4699 unchanged |
+| F6: server expiry | Stale claim/key returns HTTP 401 / claim_expired | Passed again 02:56:38 Dubai: original claim/key returned 401/claim_expired after actual 15 minutes |
+| F7: expired chat | Another fresh turn excludes fixture and answer without restart | Passed 02:56:46 Dubai: fresh completed native turn excludes fixture and unique answer, same PID |
+| F8: cleanup | Delete test chats/fixtures; GET fixtures returns 404; restore normal app | Passed: disposable fixtures GET 404; test chats deleted; normal app restored with exit 0 |
 
 The backend shares five/hour across seal/unlock/unseal. No limit was
 bypassed or changed. Fresh-fixture seal/unlock/unseal have now passed;
@@ -47,8 +47,9 @@ the original stale claim was rejected after actual expiry.
 HTTP 429 from earlier attempts is not counted as a functional pass.
 Never manufacture a shortened server expiry.
 
-Use `scripts/sealed_expiry_check.dart` against disposable multi-chunk fixture
-`fbd5dd22-be28-44d0-91fa-4df32f28737f`. The older retained fixture could
+The completion run used `scripts/sealed_expiry_check.dart` against disposable
+multi-chunk fixture `db36893c-f24c-4d8e-a167-ed4e5b3240b6`, now deleted.
+Create a new disposable fixture for future runs. The older fixture could
 not authenticate the documented password and is not used for positive proof.
 Follow the existing
 [verification instructions](milestone-5.3-seal-unlock.md). The harness
@@ -94,9 +95,11 @@ executable lines** covered across the three new production files:
 provider factory, exercised by the real-app harness. Line coverage does
 not establish every branch, input combination or platform behavior.
 
-Root-owned F3–F7 remain pending the real-device/backend run. Update their
-outcomes after that run; local regression results alone do not pass 5.3
-or either owner gate.
+## Earlier functional attempts
+
+At the time of the local coverage run, F3–F7 still required real-device/backend
+verification. The subsequent completion run below closes those Android cases;
+local regression results alone do not pass either owner gate.
 
 The original app PID was 6580. Read-only Dart VM `getInstances/getObject`
 inspection proved the shared unlock map had one entry at 22:07:52 UTC.
@@ -111,6 +114,24 @@ returned 404; the unused duplicate was already 404. Test-chat cleanup
 exited 0. The normal `lib/main.dart` Android build installed and ran with
 exit 0 (new PID 3983); that restart is not counted as F5/F7 evidence.
 Ignored logs: `dev-logs/m53-{fixture-cleanup,chat-cleanup,normal-restored}.log`.
-Next required work: fix backend sealed-chat persistence in its own repo,
-then repeat successful unlocked chat and uninterrupted real 15-minute
-local-expiry/expired-chat checks on a fresh disposable fixture.
+That attempt required a backend persistence repair followed by successful
+unlocked chat and uninterrupted real 15-minute expiry checks. Both were
+completed in the subsequent run below.
+
+
+The owner authorized finishing 5.3 and repairing the backend before 5.4.
+PRs #92 and #93 in the web/backend repo repair real UUID persistence and
+indexed-only graph reinforcement. The fresh same-process completion run
+uses PID 4699 and expiry 2026-10-10T22:56:32.909578Z; its verified outcomes are reflected
+in the table above. Earlier interrupted/failed attempts remain
+historical evidence and are not retroactively counted as passes.
+
+
+Final completion rerun: required Android F1-F8 cases now pass. The
+post-deployment fresh native chat completed and saved its citation, and
+the original full 15-minute expiry passed on unchanged PID 4699. The raw
+harness aggregate remains incomplete because it preserves its earlier
+failed unlocked turn; the scoped successful native retry/history assertion
+separately closes F4. No failed attempt was relabeled. Fresh fixture and
+test chats cleaned up; normal app restored with exit 0. See the
+[completion record](milestone-5.3-seal-unlock.md).

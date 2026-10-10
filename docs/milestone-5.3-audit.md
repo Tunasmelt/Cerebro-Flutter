@@ -65,7 +65,7 @@ expires while unseal is in flight. Regressions cover both boundaries.
 
 ## Other reviewed behavior
 
-### P1 — Backend cannot save a sealed retrieval's chunk IDs (cross-repo; open)
+### P1 — Backend cannot save a sealed retrieval's chunk IDs (cross-repo; fixed and live-verified)
 
 The real Android run unlocked a 60-chunk fixture and returned the exact
 original content hash. A fresh production chat retrieved that fixture,
@@ -105,7 +105,7 @@ shows the answer, source and incomplete-answer notice.
 - Unlock errors remain generic; no passphrase/key/token logging or
   persistence was introduced. No package/backend change was needed.
 
-## Validation and remaining work
+## Earlier validation and remaining work
 
 The follow-up [coverage plan](milestone-5.3-test-plan.md) assigned three
 subagents API, UI and session/chat/deletion work. They added **54 cases**:
@@ -139,3 +139,70 @@ Owner Phase 4 and
 Phase 5 gates remain open. iOS execution is unavailable on this Windows
 host. Milestone 5.3 remains incomplete while real unlocked chat cannot
 finish successfully; no dependent 5.4 work has started.
+
+
+## Backend repair and completion rerun
+
+The owner authorized the cross-repo repair on October 11. Backend
+[PR #92](https://github.com/Tunasmelt/Cerebro-2.0/pull/92) merged as
+`fb60b59284d4d1dd4cb576ac9998d619d4f08582`; the live `/health` reports
+that exact build. Sealed retrieval uses the real sealed row UUID instead
+of `document_id:ordinal`. Chat history resolves missing indexed UUIDs
+against sealed metadata with caller RLS, selecting only `id,document_id`.
+No schema migration, public unseal response change or plaintext lookup
+was added. Regressions failed before the fix and pass afterward; full
+backend suite: 543 passed, Ruff clean, both GitHub CI jobs passed.
+
+A fresh disposable 60-chunk fixture passed production sealing, locked
+chat and exact original-content hash on Android PID 4699. The original
+server-issued expiry is 2026-10-10T22:56:32.909578Z (02:56:32 Dubai).
+The first unlocked chat timed out before retrieval, independently of the
+previous persistence defect. A fresh conversation and API diagnostic
+are running while the same app stays alive for actual expiry. Completion
+is not inferred from the backend unit tests or publication.
+
+
+### P1 - Multi-chunk sealed IDs entered indexed graph reinforcement (fixed)
+
+The first deployment removed the invalid-UUID persistence mismatch, but
+real 60-chunk native chat timed out before retrieval. Actual graph storage
+constructs every pair, awaits GET/POST for each and does not check rejected
+insert responses. Sixty sealed UUIDs therefore attempt 1,770 pairs against
+an edge table whose foreign keys reference indexed chunks. With legacy
+synthetic IDs, the initial lookup had failed early instead.
+
+The new regression reproduces zero eligible indexed chunks with 60 sealed
+UUIDs; it failed before the fix. Reinforcement now performs one caller-RLS
+indexed-ID lookup before constructing pairs. The sealed-only case makes
+one metadata request and zero writes; mixed retrieval preserves indexed
+pairs. Backend [PR #93](https://github.com/Tunasmelt/Cerebro-2.0/pull/93)
+merged as `f4625869b5c858a6e3c14c36166854047102ee60`. Full backend suite:
+545 passed, Ruff clean, both CI jobs passed. The original Android app and
+claim remain active while deployment and native completion are verified.
+
+
+After `/health` reported `f462586`, a fresh production native turn
+completed with the exact synthetic answer and source citation. A scoped
+history check confirmed exactly one completed native test chat after the
+new build, with the fixture's document ID, retained citation and UUID
+chunk IDs. Independent real SSE also reached `done`, saved the assistant
+message and retained its citation; the diagnostic chat was deleted.
+The same Android PID 4699 and original claim remained active. Evidence:
+`dev-logs/m53-native-history-check.log`,
+`dev-logs/m53-completion-backend-diagnostic.log`, and the
+[completed native chat](screenshots/milestone-5.3-completed-chat.png).
+
+
+## Final required Android outcomes
+
+Original PID 4699 survived the full server-issued window without restart.
+At 02:56:35 Dubai the production session map no longer contained the
+fixture and the detail UI removed plaintext/countdown. At 02:56:38 the
+original claim/key returned 401/claim_expired; at 02:56:46 a fresh native
+chat completed without the fixture or synthetic fact. The successful
+post-deployment native chat/history check separately supplies the positive
+unlocked-turn proof missing from the initial timed-out harness attempt.
+Its raw incomplete aggregate marker is preserved, not presented as a pass.
+All required Android cases are verified. Disposable IDs return 404, chats
+were cleaned up, and normal app restoration exited 0. Owner gates remain
+open; iOS device execution is not claimed.
