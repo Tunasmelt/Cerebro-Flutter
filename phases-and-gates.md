@@ -738,6 +738,14 @@ description, including this doc set's own.
   deliberately kept separate so a parameter mismatch is caught by a
   fast, isolated test before it's buried in a larger integration test.
 
+**Status (2026-10-10): implemented and tested.** Exact parameters verified
+against web source; independent web key/ciphertext vectors match Dart.
+Five crypto tests pass, and the Android emulator independently derived,
+encrypted, and decrypted the same vectors. See
+[verification](docs/milestone-5.1-crypto-parity.md). Real stored-document
+interoperability remains Milestone 5.2. The owner explicitly authorized
+5.1 while keeping the Phase 4 owner gate open; no phase gate is changed.
+
 ### Milestone 5.2 — Cross-platform round-trip test
 **Exit criteria:** A document sealed on web can be unlocked on mobile,
 and a document sealed on mobile can be unlocked on web, with byte-
