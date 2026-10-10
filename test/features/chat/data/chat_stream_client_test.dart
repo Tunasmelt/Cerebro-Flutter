@@ -10,6 +10,9 @@ import 'package:cerebro_mobile/core/network/app_exception.dart';
 import 'package:cerebro_mobile/core/network/session_token_provider.dart';
 import 'package:cerebro_mobile/features/chat/data/chat_stream_client.dart';
 import 'package:cerebro_mobile/features/chat/data/chat_stream_event.dart';
+import 'package:cerebro_mobile/features/auth/data/current_user_provider.dart';
+import 'package:cerebro_mobile/features/sealed/data/unlock_session.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -85,13 +88,18 @@ const _wire =
   _Adapter? adapter,
   String? token = 'jwt',
   Duration idleTimeout = const Duration(seconds: 30),
+  List<Map<String, String>> Function()? activeUnlocks,
 }) {
   final a = adapter ?? _Adapter();
   final dio = Dio(BaseOptions(baseUrl: 'https://api.test'))
     ..httpClientAdapter = a;
   final api = ApiClient(tokenProvider: _Token(token), dio: dio);
   return (
-    client: DioChatStreamClient(api.dio, idleTimeout: idleTimeout),
+    client: DioChatStreamClient(
+      api.dio,
+      idleTimeout: idleTimeout,
+      activeUnlocks: activeUnlocks,
+    ),
     adapter: a,
   );
 }
@@ -115,6 +123,90 @@ Future<void> tick([int ms = 20]) =>
     Future<void>.delayed(Duration(milliseconds: ms));
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  test(
+    'real session callback excludes revoked and expired claims at listen time',
+    () async {
+      final container = ProviderContainer(
+        overrides: [currentUserIdProvider.overrideWithValue('one')],
+      );
+      addTearDown(container.dispose);
+      final session = container.read(unlockSessionProvider.notifier);
+      ActiveUnlock unlock(String id, DateTime expiry) => ActiveUnlock(
+        documentId: id,
+        claimId: 'claim-$id',
+        key: 'key-$id',
+        expiresAt: expiry,
+        content: 'never sent plaintext',
+      );
+      session.remember(
+        unlock('expired', DateTime.now().add(const Duration(milliseconds: 10))),
+      );
+      session.remember(
+        unlock('revoked', DateTime.now().add(const Duration(minutes: 15))),
+      );
+      session.remember(
+        unlock('valid', DateTime.now().add(const Duration(minutes: 15))),
+      );
+      final (:client, :adapter) = _setup(activeUnlocks: session.activeForChat);
+      final stream = client.stream(sessionId: 's', query: 'question');
+      session.forget('revoked');
+      await tick(20);
+      final run = _Run(stream);
+      await tick();
+      expect(adapter.seen!.data, {
+        'query': 'question',
+        'unlocked': [
+          {
+            'document_id': 'valid',
+            'claim_id': 'claim-valid',
+            'key': 'key-valid',
+          },
+        ],
+      });
+      expect(container.read(unlockSessionProvider).keys, ['valid']);
+      adapter.send('event: done\ndata: {}\n\n');
+      await run.done.future;
+      expect(run.error, isNull);
+    },
+  );
+
+  test(
+    'claim callback failure is a handled stream error without an HTTP request',
+    () async {
+      final (:client, :adapter) = _setup(
+        activeUnlocks: () => throw StateError('disposed'),
+      );
+      final run = _Run(client.stream(sessionId: 's', query: 'question'));
+      await run.done.future;
+      expect(run.error, isA<UnknownApiException>());
+      expect(adapter.seen, isNull);
+    },
+  );
+  test(
+    'chat reads current unlocks at request time, including manual lock',
+    () async {
+      var unlocked = <Map<String, String>>[
+        {'document_id': 'doc', 'claim_id': 'claim', 'key': 'key'},
+      ];
+      final first = _setup(activeUnlocks: () => unlocked);
+      final run = _Run(first.client.stream(sessionId: 's', query: 'question'));
+      first.adapter.send('event: done\ndata: {}\n\n');
+      await first.adapter.body.close();
+      await run.done.future;
+      expect(first.adapter.seen!.data, {
+        'query': 'question',
+        'unlocked': unlocked,
+      });
+      unlocked = [];
+      final second = _setup(activeUnlocks: () => unlocked);
+      final next = _Run(second.client.stream(sessionId: 's', query: 'again'));
+      second.adapter.send('event: done\ndata: {}\n\n');
+      await second.adapter.body.close();
+      await next.done.future;
+      expect(second.adapter.seen!.data, {'query': 'again', 'unlocked': []});
+    },
+  );
   group('a successful turn', () {
     test(
       'typed events arrive in wire order and the stream then completes',

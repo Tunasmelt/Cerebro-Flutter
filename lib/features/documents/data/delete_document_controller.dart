@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/app_exception.dart';
 import '../../../core/network/generated_api_client_provider.dart';
 import '../../auth/data/current_user_provider.dart';
+import '../../sealed/data/unlock_session.dart';
 import 'delete_document_api.dart';
 import 'documents_list_notifier.dart';
 
@@ -55,6 +56,9 @@ class DeleteDocumentController
     }
 
     if (generation != _generation) return false;
+    if (ref.exists(unlockSessionProvider)) {
+      ref.read(unlockSessionProvider.notifier).forget(documentId);
+    }
     state = const AsyncData(null);
     if (ref.exists(documentsListProvider)) {
       ref.read(documentsListProvider.notifier).removeDocument(documentId);

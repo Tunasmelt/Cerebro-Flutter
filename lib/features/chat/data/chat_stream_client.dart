@@ -31,9 +31,11 @@ class DioChatStreamClient implements ChatStreamApi {
   DioChatStreamClient(
     this._dio, {
     this.idleTimeout = const Duration(seconds: 90),
+    this.activeUnlocks,
   });
 
   final Dio _dio;
+  final List<Map<String, String>> Function()? activeUnlocks;
 
   /// Longest the connection may stay completely silent before the turn is
   /// treated as dropped. The server sends `heartbeat`s while retrieving and
@@ -77,7 +79,10 @@ class DioChatStreamClient implements ChatStreamApi {
         armIdleTimer();
         response = await _dio.post<ResponseBody>(
           '/api/v1/chat/sessions/$sessionId/stream',
-          data: {'query': query},
+          data: {
+            'query': query,
+            if (activeUnlocks != null) 'unlocked': activeUnlocks!(),
+          },
           cancelToken: cancelToken,
           options: Options(
             responseType: ResponseType.stream,
@@ -205,10 +210,9 @@ class DioChatStreamClient implements ChatStreamApi {
 
   Future<(String?, String?)> _errorBody(Response<dynamic> response) async {
     try {
-      return await _readErrorBody(response).timeout(
-        _errorBodyLimit,
-        onTimeout: () => (null, null),
-      );
+      return await _readErrorBody(
+        response,
+      ).timeout(_errorBodyLimit, onTimeout: () => (null, null));
     } catch (_) {
       return (null, null);
     }
