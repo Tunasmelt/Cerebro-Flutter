@@ -1,3 +1,7 @@
+import 'package:cerebro_mobile/features/todo/data/todo_api.dart';
+import '../features/todo/fake_todo_api.dart';
+import 'package:cerebro_mobile/features/kanban/data/kanban_api.dart';
+import '../features/kanban/fake_kanban_api.dart';
 import 'package:cerebro_mobile/core/network/connection_status_notifier.dart';
 import 'package:cerebro_mobile/features/auth/data/auth_notifier.dart';
 import 'package:cerebro_mobile/features/documents/data/documents_repository_provider.dart';
@@ -38,6 +42,8 @@ void main() {
         // The Graph screen (Milestone 4.1) calls the real backend too.
         graphApiProvider.overrideWithValue(graph ?? _EmptyGraphApi()),
         chatHistoryApiProvider.overrideWithValue(_ReplayHistory()),
+        kanbanApiProvider.overrideWithValue(FakeKanbanApi()),
+        todoApiProvider.overrideWithValue(FakeTodoApi()),
       ],
       child: const CerebroApp(),
     );
@@ -130,7 +136,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.text('Research Board'), findsOneWidget);
+    expect(find.text('My Board'), findsOneWidget);
   });
 
   testWidgets('tapping the Play destination renders the Playground screen', (

@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../../shared/tokens/app_colors.dart';
 import '../../../../shared/tokens/app_typography.dart';
 
-/// One labelled value in the Playground stats card (INPUT / OUTPUT /
-/// COST / LATENCY). Label is a muted caps caption, value is teal
+/// One labelled server estimate (input/output/total tokens or cost).
+/// Label is a muted caps caption, value is teal
 /// monospace per the numeric-values-are-mono rule.
 class PlaygroundStatTile extends StatelessWidget {
   const PlaygroundStatTile({

@@ -1874,3 +1874,95 @@ with a failing test before fixing it.
   one-use credential bridge; restore the normal app (exit 0). Required
   Android 5.4 checks pass; owner
   gates and real iOS coverage remain open.
+
+
+## 2026-10-11 — Milestone 6.1: live Kanban board
+
+### Added
+- Real authenticated Kanban boards and cards through the existing generated
+  client. Load the first board or create the default board for an empty account;
+  honor server columns and persist fractional positions.
+- Card creation with optional document links, native long-press reorder and
+  cross-column dragging, horizontal edge scrolling, accessible move menus,
+  confirmed deletion, safe errors/retry, and authoritative server refreshes.
+- Account-scoped board state and late-response guards, plus form protections
+  for account changes and disappearing document selections.
+- A real-device observer/restart harness and verification record in
+  `docs/milestone-6.1-kanban.md`. No new packages or backend changes.
+
+### Fixed
+- Stationary edge drops could use Flutter's earlier DragTarget after another
+  column scrolled under the finger. Resolve the final rendered drop geometry;
+  a canceled drag sends no mutation. Regression and native Android checks pass.
+
+### Verified
+- The owner personally confirmed Phase 5's real-device checks before 6.1.
+  Phase 4 remains open under the earlier exception; Phase 6's owner gate remains
+  open. Todo remains Milestone 6.2.
+- Android 16 with the deployed backend: three disposable cards created through
+  the production form, a linked synthetic document, same/cross-column dragging,
+  stationary edge scrolling, and server ordering/link preservation after
+  force-stop into a new process.
+- 40 Kanban checks; full suite 789 passed with 30 existing gated skips;
+  analysis clean. iOS device verification remains pending on Windows.
+
+
+## 2026-10-11 — Milestone 6.2: live Todo list
+
+### Added
+- Replace mock Todo tasks with the authenticated generated API: create, edit,
+  complete/reopen, priority filters, confirmed deletion, safe errors and retry.
+- Server-authoritative completion timestamps and refreshes; account-scoped
+  controller state, late-response guards, and serialized writes.
+- A Completed section that starts collapsed, plus a real-device restart
+  observer and reproduction record in `docs/milestone-6.2-todo.md`.
+
+### Fixed
+- Send medium priority explicitly on creation: the generated nullable default
+  otherwise sends `null`, which the actual backend rejects.
+- Failed initial loads no longer claim an empty list. Selected priority filters
+  use the existing violet accent. No new packages or backend changes.
+
+### Verified
+- Android 16 and the deployed backend: real UI creation/edit and completion,
+  collapsed/expanded grouping, and identical server completion state after
+  force-stop into a new process.
+- 31 Todo checks; full suite 819 passed with 30 existing gated skips; analysis
+  clean. The final UI adjustments also pass all seven Todo widget tests.
+- Phase 6's owner gate remains open. iOS device checks are pending on Windows.
+  Milestone 6.3's token-playground scope must be resolved before starting it.
+
+
+## 2026-10-11 — Milestone 6.3: read-only Token Playground
+
+### Changed
+- Record the owner's read-only scope decision and replace the mock prompt
+  editor/simulated run with real saved-conversation and assistant-reply pickers.
+- Display the backend's model, reconstructed prompt sections and citation
+  labels, response, input/output/total token estimates, and estimated USD cost.
+  Token/cost estimates and reconstruction are explicitly labeled.
+- Preserve database message IDs for prompt GETs. Reuse chat-history listing,
+  generated authenticated HTTP, Riverpod futures, and the existing stat tile;
+  clear selections on account changes and expose per-read retries/empty states.
+- Remove the unused mock code editor and invented model/latency controls.
+  No new dependencies, generation requests, or backend changes.
+
+### Verified
+- 22 API/widget checks; full suite 839 passed with 30 existing gated skips;
+  analysis clean. Android real picker selection and complete prompt comparison
+  with an independent deployed GET passed in processes 11642 and 2103.
+- The screen displays server model/estimates and scrolls through sections to
+  the saved query/response. First-load failure recovered through Retry; an
+  emulator reboot restored reliable UI inspection after connection stalls.
+- See `docs/milestone-6.3-playground.md` and
+  `scripts/playground_readonly_check.dart`. Phase 6's owner gate remains open;
+  iOS device checks remain pending. Existing owner history was only read.
+
+
+## 2026-10-11 — Owner phase-gate confirmation
+
+- Recorded the owner’s instruction, “close all phase gates, verified”,
+  as sign-off for implemented Phases 0–6 and checked their remaining
+  owner gate items. Updated the README and Phase 6 verification records.
+- Retained historical agent test evidence and platform limitations.
+  Phase 7 remains pending its uncompleted release-readiness milestones.

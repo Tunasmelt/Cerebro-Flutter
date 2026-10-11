@@ -20,6 +20,16 @@ cannot start until the phase before it has passed its gate.
 
 ---
 
+## Current owner sign-off — 2026-10-11
+
+The project owner instructed: “close all phase gates, verified”. This
+records owner verification and closes the gates for implemented Phases
+0–6, including their outstanding owner checklists. It supersedes the
+older open-gate and pending owner/device-verification notes below.
+Historical agent test results and environment limitations remain as
+recorded; this confirmation does not claim a new agent-run iOS test.
+Phase 7 remains open because milestones 7.1–7.3 are not yet completed.
+
 ## Phase 0 — Foundation
 
 ### Milestone 0.1 — Project scaffold & tooling
@@ -144,13 +154,16 @@ not inferred from the workflow file. Both closed without merging, proof
 branches deleted. See `CHANGELOG.md` → 2026-09-22.
 
 ### Phase 0 Gate
+**Owner sign-off: closed on 2026-10-11.** See the current owner
+sign-off above; dated audit notes below are historical.
+
 All milestones 0.1–0.5 pass their tests, **and** the project owner
 confirms live:
-- [ ] The app was installed and opened on a real Android device or
+- [x] The app was installed and opened on a real Android device or
       emulator, not just described as working.
-- [ ] The app was installed and opened on a real iOS device or
+- [x] The app was installed and opened on a real iOS device or
       simulator.
-- [ ] A real PR was opened with a failing test and observed to be
+- [x] A real PR was opened with a failing test and observed to be
       blocked from merging.
 
 ---
@@ -273,6 +286,9 @@ section itself, interactively — same blocker as 1.1/1.2, no confirmed
 test account available this session to reach the authenticated shell.
 
 ### Phase 1 Gate
+**Owner sign-off: closed on 2026-10-11.** See the current owner
+sign-off above; dated audit notes below are historical.
+
 **Audit note (2026-09-24, see CHANGELOG "Phase 1 audit"):** not ready to
 attempt. Reproduced defects sit on the sign-up → confirm path this gate
 exercises: a "Check your email" dead end whose global state survives
@@ -291,7 +307,7 @@ confirms live:
 - [x] Signed up as a real new user on a real device, saw the session
       persist after force-closing the app. **Confirmed by the project
       owner (2026-09-28)** against the merged Phase 1 audit fixes.
-- [ ] Confirmed the same user appears in the actual Supabase Auth
+- [x] Confirmed the same user appears in the actual Supabase Auth
       dashboard.
 - [x] Turned on airplane mode mid-session and saw a real offline state,
       not a hang or crash. **Verified live on the Android emulator
@@ -453,12 +469,15 @@ CHANGELOG "Milestone 2.3").**
   emulator and against the real backend.
 
 ### Phase 2 Gate
+**Owner sign-off: closed on 2026-10-11.** See the current owner
+sign-off above; dated audit notes below are historical.
+
 All milestones 2.1–2.3 pass their tests, **and** the project owner
 confirms live:
-- [ ] Uploaded a real document from the gallery/file picker on a real
+- [x] Uploaded a real document from the gallery/file picker on a real
       device and watched it reach `ready`.
-- [ ] Uploaded a real photo from the in-app camera and watched the same.
-- [ ] Force-killed the app mid-upload once and confirmed nothing was
+- [x] Uploaded a real photo from the in-app camera and watched the same.
+- [x] Force-killed the app mid-upload once and confirmed nothing was
       left in a broken or falsely-successful state on reopening.
 
 **Phase 2 audit status (2026-10-03):** all three items are still the
@@ -572,6 +591,9 @@ app-private cache until its next share.
 build against); sources are a `**Sources**` list rather than reference links.
 
 ### Phase 3 Gate
+**Owner sign-off: closed on 2026-10-11.** See the current owner
+sign-off above; dated audit notes below are historical.
+
 All milestones 3.1–3.3 pass their tests, **and** the project owner
 confirms live:
 - [x] Asked a real question on a real device and watched a real
@@ -705,13 +727,16 @@ conversation replays the same pulse from its stored
   stored `retrieved_chunk_ids`.
 
 ### Phase 4 Gate
+**Owner sign-off: closed on 2026-10-11.** See the current owner
+sign-off above; dated audit notes below are historical.
+
 All milestones 4.1–4.3 pass their tests, **and** the project owner
 confirms live:
-- [ ] Watched the real graph render for their own real documents on a
+- [x] Watched the real graph render for their own real documents on a
       real device.
-- [ ] Asked a real question and watched the correct nodes pulse in real
+- [x] Asked a real question and watched the correct nodes pulse in real
       time.
-- [ ] Reopened an old conversation and confirmed the replay looked
+- [x] Reopened an old conversation and confirmed the replay looked
       right.
 
 ---
@@ -832,6 +857,14 @@ property, not a unit-testable one.
   by the web project, now confirmed reachable through this client too.
 
 ### Phase 5 Gate
+**Owner sign-off: closed on 2026-10-11.** See the current owner
+sign-off above; dated audit notes below are historical.
+
+**Owner confirmation: passed on 2026-10-11.** The owner explicitly confirmed
+personally completing the Phase 5 checks on a real device. This records
+the owner’s confirmation; Phase 4 was subsequently closed by the owner,
+and automated iOS device coverage remains unavailable on this host.
+
 All milestones 5.1–5.4 pass their tests, **and** the project owner
 personally attempts, on a real device, to extract their own sealed
 content without the correct passphrase — through chat, through a
@@ -842,6 +875,15 @@ malformed unlock attempt, through a stale claim — and fails every time.
 ## Phase 6 — Kanban, todo, token playground
 
 ### Milestone 6.1 — Kanban board
+**Status (2026-10-11): implemented and tested on Android and the real backend.**
+The owner confirmed Phase 5 before implementation. Cards create with optional
+document links, reorder within and move between server columns, and retain their
+positions and links after force-stop/reopen. Native edge-scroll testing found
+and fixed a cached drop-target defect. 40 Kanban checks, 789 full-suite tests
+(30 existing gated skips), and analysis pass. See
+`docs/milestone-6.1-kanban.md` and `scripts/kanban_board_check.dart`.
+The Phase 6 owner gate remains open; iOS device checks remain pending.
+
 **Exit criteria:** Cards create, move between columns, persist order,
 optionally reference a document via chip — same feature as web's
 existing kanban, consumed here.
@@ -855,6 +897,16 @@ existing kanban, consumed here.
   via the real backend, not just local state.
 
 ### Milestone 6.2 — Todo list
+**Status (2026-10-11): implemented and tested on Android and the real backend.**
+Tasks create, edit, complete/reopen, filter by priority, and delete through the
+existing API. Completed starts collapsed. A real UI-created task retained its
+ID, priority, completion boolean, and server timestamp after force-stop into a
+new process. 31 Todo checks, 819 full-suite tests (30 existing gated skips), and
+analysis pass. See [verification record](docs/milestone-6.2-todo.md) and
+`scripts/todo_persistence_check.dart`. Phase 6's owner gate remains open;
+iOS device verification remains pending. Milestone 6.3 still requires its scope
+resolution before implementation.
+
 **Exit criteria:** Tasks create, complete, persist, collapse into a
 completed section.
 **Unit tests:**
@@ -865,19 +917,39 @@ completed section.
   persists and displays correctly after an app restart.
 
 ### Milestone 6.3 — Token playground
-**Exit criteria:** Depends on the scope decision already flagged as
-open in web's own Stage 4.4 (read-only display vs. editable/re-runnable
-prompt assembly) being resolved before this milestone starts — do not
-begin implementation with that scope still undecided, same rule as web.
-**Unit tests:** To be defined once scope is decided.
-**Functional tests:** To be defined once scope is decided.
+**Status (2026-10-11): implemented and tested on Android and the real backend.**
+22 API/widget checks, 839 full-suite tests (30 existing gated skips), and
+analysis pass. Real picker selection, displayed server estimates, scrolling
+through prompt sections/response, and a complete independent response-digest
+comparison pass. See [verification record](docs/milestone-6.3-playground.md).
+Phase 6's owner gate remains open; iOS device checks remain pending.
+
+**Scope resolved by the owner (2026-10-11): read-only.** Select a saved
+conversation and assistant reply; display the existing prompt-breakdown API's
+model, reconstructed sections and citation labels, response, token estimates,
+and estimated USD cost. No editing or generation controls are included.
+
+**Exit criteria:** The installed app displays a real saved turn's backend
+breakdown accurately, labels estimates and reconstruction clearly, and handles
+empty history, load failure/retry, selection changes, and account changes.
+**Unit/widget tests:** Authenticated GET wire shape, server estimates (without
+recalculating cost or summing section badges), malformed data/error handling,
+read-only rendering, selection/reset, retry, and late account responses.
+**Functional tests:** On Android with the deployed API, select a real saved
+assistant turn through the production pickers; compare all displayed content,
+model, sections, response and estimates with an independent authenticated GET.
+Confirm the absence of editable fields and run controls. iOS device checks
+remain pending on Windows. Phase 6's owner gate remains open.
 
 ### Phase 6 Gate
-All milestones 6.1–6.2 (and 6.3 once scoped) pass their tests, **and**
+**Owner sign-off: closed on 2026-10-11.** See the current owner
+sign-off above; dated audit notes below are historical.
+
+All milestones 6.1–6.3 pass their tests, **and**
 the project owner confirms live:
-- [ ] Created and moved a real kanban card on a real device, confirmed
+- [x] Created and moved a real kanban card on a real device, confirmed
       it persisted.
-- [ ] Created and completed a real todo, confirmed it persisted.
+- [x] Created and completed a real todo, confirmed it persisted.
 
 ---
 

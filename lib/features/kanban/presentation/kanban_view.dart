@@ -1,464 +1,332 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
-
 import '../../../shared/tokens/app_colors.dart';
-import '../../../shared/tokens/app_radius.dart';
-import '../../../shared/tokens/app_spacing.dart';
 import '../../../shared/tokens/app_typography.dart';
+import '../data/kanban_board.dart';
 
-/// Card priority. Colors intentionally use red/green/gray rather than
-/// the amber the mockup's "Medium" dot suggests — amber is reserved
-/// exclusively for sealed/locked UI per CLAUDE.md, and app_colors.dart
-/// has no separate "orange" token to hardcode instead.
-enum _Priority { high, medium, low }
-
-extension on _Priority {
-  Color get color => switch (this) {
-    _Priority.high => AppColors.danger,
-    _Priority.medium => AppColors.accentSuccess,
-    _Priority.low => AppColors.textDisabled,
-  };
-
-  String get label => switch (this) {
-    _Priority.high => 'High',
-    _Priority.medium => 'Medium',
-    _Priority.low => 'Low',
-  };
-}
-
-class _KanbanCard {
-  const _KanbanCard({
-    required this.title,
-    required this.description,
-    required this.docRef,
-    required this.priority,
-    required this.issueId,
+/// Native dragging and menu alternatives. Indices exclude the moved card.
+class KanbanView extends StatefulWidget {
+  const KanbanView({
+    super.key,
+    required this.board,
+    required this.onMove,
+    required this.onCreate,
+    required this.onDelete,
+    required this.onOpenDocument,
+    this.documentTitles = const {},
+    this.saving = false,
   });
-
-  final String title;
-  final String description;
-  final String docRef;
-  final _Priority priority;
-  final String issueId;
-}
-
-class _KanbanColumn {
-  const _KanbanColumn({
-    required this.name,
-    required this.dotColor,
-    required this.cards,
-    this.showDropPlaceholder = false,
-  });
-
-  final String name;
-  final Color dotColor;
-  final List<_KanbanCard> cards;
-  final bool showDropPlaceholder;
-}
-
-const _mockColumns = <_KanbanColumn>[
-  _KanbanColumn(
-    name: 'Backlog',
-    dotColor: AppColors.grayDim,
-    cards: [
-      _KanbanCard(
-        title: 'Benchmark hybrid retrieval',
-        description: 'Reproduce results from v3 paper on internal dataset.',
-        docRef: 'hybrid-benchmarks.md',
-        priority: _Priority.high,
-        issueId: '#R-102',
-      ),
-      _KanbanCard(
-        title: 'Map citation provenance',
-        description: 'Track source documents and attribution paths.',
-        docRef: 'doc:provenance-v1.2',
-        priority: _Priority.medium,
-        issueId: '#R-103',
-      ),
-      _KanbanCard(
-        title: 'Evaluate long-context QA',
-        description: 'Test 100K+ token documents with real user queries.',
-        docRef: 'long-context-eval.pdf',
-        priority: _Priority.low,
-        issueId: '#R-104',
-      ),
-      _KanbanCard(
-        title: 'Design onboarding flow',
-        description: 'Improve new user activation and docs.',
-        docRef: 'doc:onboarding-flow',
-        priority: _Priority.low,
-        issueId: '#R-105',
-      ),
-    ],
-  ),
-  _KanbanColumn(
-    name: 'In Progress',
-    dotColor: AppColors.accentSecondary,
-    cards: [
-      _KanbanCard(
-        title: 'Tune reranker latency',
-        description: 'Profile and optimize cross-encoder inference.',
-        docRef: 'doc:arch-v3 §4.2',
-        priority: _Priority.high,
-        issueId: '#R-101',
-      ),
-      _KanbanCard(
-        title: 'Implement graph clustering',
-        description: 'Build community detection for research topics.',
-        docRef: 'graph-clustering.md',
-        priority: _Priority.medium,
-        issueId: '#R-106',
-      ),
-      _KanbanCard(
-        title: 'Add evaluation harness',
-        description: 'Automate regression tests on benchmark set.',
-        docRef: 'eval-harness.py',
-        priority: _Priority.low,
-        issueId: '#R-107',
-      ),
-    ],
-  ),
-  _KanbanColumn(
-    name: 'Review',
-    dotColor: AppColors.accentPrimary,
-    cards: [
-      _KanbanCard(
-        title: 'Review graph clusters',
-        description: 'Validate cluster quality and labels.',
-        docRef: 'clusters-review.md',
-        priority: _Priority.high,
-        issueId: '#R-108',
-      ),
-      _KanbanCard(
-        title: 'Finalize system documentation',
-        description: 'Complete architecture diagrams and examples.',
-        docRef: 'system-arch.pdf',
-        priority: _Priority.medium,
-        issueId: '#R-109',
-      ),
-    ],
-    showDropPlaceholder: true,
-  ),
-];
-
-/// The Kanban board content view: horizontally scrolling status columns,
-/// matching `Mockups/7828735d-25f1-4841-b324-b304cd143d00.png`.
-///
-/// Cards are static/mock and non-draggable — `flutter_reorderable_grid`-
-/// style drag-and-drop would need a new package dependency, which this
-/// milestone is not authorized to add. The drag handle icon is rendered
-/// for visual fidelity only.
-class KanbanView extends StatelessWidget {
-  const KanbanView({super.key});
-
+  final KanbanBoard board;
+  final bool saving;
+  final Map<String, String> documentTitles;
+  final void Function(String id, String column, int index) onMove;
+  final ValueChanged<String> onCreate;
+  final ValueChanged<KanbanCard> onDelete;
+  final ValueChanged<String> onOpenDocument;
   @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.s4,
-        AppSpacing.s2,
-        AppSpacing.s4,
-        AppSpacing.s4,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          for (final column in _mockColumns)
-            Padding(
-              padding: const EdgeInsets.only(right: AppSpacing.s4),
-              child: _ColumnView(column: column),
-            ),
-        ],
-      ),
-    );
+  State<KanbanView> createState() => _KanbanViewState();
+}
+
+class _KanbanViewState extends State<KanbanView> {
+  final _scroll = ScrollController();
+  final _dropKeys = <(String, int, bool), GlobalKey>{};
+  Offset? _dragPosition;
+  Timer? _edgeTimer;
+  double _edgeStep = 0;
+  void _stopScroll() {
+    _edgeTimer?.cancel();
+    _edgeTimer = null;
   }
-}
 
-class _ColumnView extends StatelessWidget {
-  const _ColumnView({required this.column});
-
-  final _KanbanColumn column;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 264,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _ColumnHeader(column: column),
-          const SizedBox(height: AppSpacing.s3),
-          Expanded(
-            child: ListView(
-              padding: EdgeInsets.zero,
-              children: [
-                for (final card in column.cards)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: AppSpacing.s3),
-                    child: _CardView(card: card),
-                  ),
-                if (column.showDropPlaceholder) const _DropPlaceholder(),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
+  void _dragUpdate(DragUpdateDetails details) {
+    _dragPosition = details.globalPosition;
+    final box = context.findRenderObject() as RenderBox;
+    final x = box.globalToLocal(details.globalPosition).dx;
+    _edgeStep = x < 56
+        ? -18
+        : x > box.size.width - 56
+        ? 18
+        : 0;
+    if (_edgeStep == 0) {
+      _stopScroll();
+      return;
+    }
+    _edgeTimer ??= Timer.periodic(const Duration(milliseconds: 40), (_) {
+      if (!_scroll.hasClients) return;
+      _scroll.jumpTo(
+        (_scroll.offset + _edgeStep).clamp(
+          _scroll.position.minScrollExtent,
+          _scroll.position.maxScrollExtent,
+        ),
+      );
+    });
   }
-}
 
-class _ColumnHeader extends StatelessWidget {
-  const _ColumnHeader({required this.column});
-
-  final _KanbanColumn column;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(
-            color: column.dotColor,
-            shape: BoxShape.circle,
-          ),
-        ),
-        const SizedBox(width: AppSpacing.s2),
-        Text(
-          column.name.toUpperCase(),
-          style: AppTypography.sm.copyWith(
-            color: AppColors.textPrimary,
-            fontWeight: AppTypography.weightSemibold,
-            letterSpacing: 0.4,
-          ),
-        ),
-        const SizedBox(width: AppSpacing.s2),
-        Text(
-          '${column.cards.length}',
-          style: AppTypography.mono(
-            AppTypography.sm,
-          ).copyWith(color: AppColors.textSecondary),
-        ),
-        const Spacer(),
-        SizedBox(
-          width: AppSpacing.minTouchTarget,
-          height: AppSpacing.minTouchTarget,
-          child: IconButton(
-            padding: EdgeInsets.zero,
-            onPressed: () {},
-            icon: const Icon(
-              Icons.more_vert,
-              size: 18,
-              color: AppColors.textSecondary,
-            ),
-          ),
-        ),
-      ],
-    );
+  Rect? _dropRect(String column, int index, bool header) {
+    final render = _dropKeys[(column, index, header)]?.currentContext
+        ?.findRenderObject();
+    return render is RenderBox && render.hasSize
+        ? render.localToGlobal(Offset.zero) & render.size
+        : null;
   }
-}
 
-class _CardView extends StatelessWidget {
-  const _CardView({required this.card});
-
-  final _KanbanCard card;
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(AppSpacing.s4),
-          decoration: BoxDecoration(
-            color: AppColors.bgElevated,
-            borderRadius: AppRadius.lgRadius,
-            border: Border.all(color: AppColors.borderDefault),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(right: AppSpacing.s5),
-                child: Text(
-                  card.title,
-                  style: AppTypography.base.copyWith(
-                    color: AppColors.textPrimary,
-                    fontWeight: AppTypography.weightSemibold,
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.s1),
-              Text(
-                card.description,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: AppTypography.sm.copyWith(
-                  color: AppColors.textSecondary,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.s3),
-              _DocRefChip(label: card.docRef),
-              const SizedBox(height: AppSpacing.s3),
-              Row(
-                children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: card.priority.color,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.s1),
-                  Text(
-                    card.priority.label,
-                    style: AppTypography.xs.copyWith(
-                      color: card.priority.color,
-                      fontWeight: AppTypography.weightMedium,
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    card.issueId,
-                    style: AppTypography.mono(
-                      AppTypography.xs,
-                    ).copyWith(color: AppColors.textSecondary),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        const Positioned(
-          top: AppSpacing.s2,
-          right: AppSpacing.s2,
-          child: Icon(
-            Icons.drag_indicator,
-            size: 16,
-            color: AppColors.textDisabled,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// Teal-outlined doc-reference pill in mono font — same visual language
-/// as the Todo view's chip.
-class _DocRefChip extends StatelessWidget {
-  const _DocRefChip({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.s2,
-        vertical: 2,
-      ),
-      decoration: BoxDecoration(
-        borderRadius: AppRadius.pillRadius,
-        border: Border.all(color: AppColors.accentSecondary),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(
-            Icons.description_outlined,
-            size: 12,
-            color: AppColors.accentSecondary,
-          ),
-          const SizedBox(width: AppSpacing.s1),
-          Flexible(
-            child: Text(
-              label,
-              overflow: TextOverflow.ellipsis,
-              style: AppTypography.mono(
-                AppTypography.xs,
-              ).copyWith(color: AppColors.accentSecondary),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Dashed "Drop cards here" empty-state placeholder shown at the end of
-/// a column, drawn with a small custom painter since no dashed-border
-/// package is available in this project yet.
-class _DropPlaceholder extends StatelessWidget {
-  const _DropPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return CustomPaint(
-      painter: _DashedBorderPainter(
-        color: AppColors.borderStrong,
-        radius: AppRadius.lg,
-      ),
-      child: Container(
-        width: double.infinity,
-        constraints: const BoxConstraints(minHeight: 120),
-        alignment: Alignment.center,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.add, size: 20, color: AppColors.textDisabled),
-            const SizedBox(height: AppSpacing.s1),
-            Text(
-              'Drop cards here',
-              style: AppTypography.sm.copyWith(
-                color: AppColors.textDisabled,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _DashedBorderPainter extends CustomPainter {
-  const _DashedBorderPainter({required this.color, required this.radius});
-
-  final Color color;
-  final double radius;
-
-  static const _dashWidth = 5.0;
-  static const _dashGap = 4.0;
-  static const _strokeWidth = 1.5;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = _strokeWidth;
-
-    final rrect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(0, 0, size.width, size.height),
-      Radius.circular(radius),
-    );
-    final path = Path()..addRRect(rrect);
-
-    for (final metric in path.computeMetrics()) {
-      var distance = 0.0;
-      while (distance < metric.length) {
-        final next = distance + _dashWidth;
-        canvas.drawPath(
-          metric.extractPath(distance, next.clamp(0, metric.length)),
-          paint,
-        );
-        distance = next + _dashGap;
+  void _finishDrag(KanbanCard card) {
+    _stopScroll();
+    final point = _dragPosition;
+    _dragPosition = null;
+    if (!mounted || point == null || widget.saving) return;
+    final box = context.findRenderObject() as RenderBox;
+    final viewport = box.localToGlobal(Offset.zero) & box.size;
+    if (!viewport.contains(point)) return;
+    // Resolve the final layout, rather than DragTarget's cached hit from the
+    // last pointer event: edge scrolling also moves targets under a still finger.
+    for (final column in widget.board.columns) {
+      final cards = widget.board.inColumn(column);
+      final header = _dropRect(column, cards.length, true);
+      if (header == null ||
+          point.dx < header.left ||
+          point.dx >= header.right) {
+        continue;
       }
+      int? destination;
+      if (header.contains(point)) {
+        destination = cards.length;
+      } else if (point.dy >= header.bottom) {
+        for (var index = 0; index <= cards.length; index++) {
+          if (_dropRect(column, index, false)?.contains(point) == true) {
+            destination = index;
+            break;
+          }
+        }
+      }
+      if (destination != null) {
+        final source = cards.indexWhere((item) => item.id == card.id);
+        widget.onMove(
+          card.id,
+          column,
+          destination - (source >= 0 && source < destination ? 1 : 0),
+        );
+      }
+      return;
     }
   }
 
   @override
-  bool shouldRepaint(covariant _DashedBorderPainter oldDelegate) =>
-      oldDelegate.color != color || oldDelegate.radius != radius;
+  void dispose() {
+    _stopScroll();
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  Widget _drop(String column, int index, Widget child, {bool header = false}) =>
+      DragTarget<KanbanCard>(
+        key: _dropKeys.putIfAbsent((column, index, header), GlobalKey.new),
+        onWillAcceptWithDetails: (_) => !widget.saving,
+        builder: (_, candidates, _) => DecoratedBox(
+          decoration: BoxDecoration(
+            color: candidates.isEmpty
+                ? Colors.transparent
+                : AppColors.accentPrimarySubtle,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: child,
+        ),
+      );
+
+  Widget _card(KanbanCard card, List<KanbanCard> cards) {
+    final index = cards.indexWhere((item) => item.id == card.id);
+    final body = Card(
+      key: ValueKey('kanban_card_${card.id}'),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 6, 8, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(
+                  Icons.drag_indicator,
+                  size: 18,
+                  color: AppColors.textSecondary,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    card.title,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+                PopupMenuButton<(String, String?)>(
+                  tooltip: 'Card actions',
+                  enabled: !widget.saving,
+                  key: ValueKey('kanban_actions_${card.id}'),
+                  onSelected: (action) {
+                    if (action.$1 == 'delete') {
+                      widget.onDelete(card);
+                      return;
+                    }
+                    if (action.$1 == 'up') {
+                      widget.onMove(card.id, card.column, index - 1);
+                      return;
+                    }
+                    if (action.$1 == 'down') {
+                      widget.onMove(card.id, card.column, index + 1);
+                      return;
+                    }
+                    widget.onMove(
+                      card.id,
+                      action.$2!,
+                      widget.board.inColumn(action.$2!).length,
+                    );
+                  },
+                  itemBuilder: (_) => [
+                    if (index > 0)
+                      const PopupMenuItem(
+                        value: ('up', null),
+                        child: Text('Move up'),
+                      ),
+                    if (index < cards.length - 1)
+                      const PopupMenuItem(
+                        value: ('down', null),
+                        child: Text('Move down'),
+                      ),
+                    for (final column in widget.board.columns)
+                      if (column != card.column)
+                        PopupMenuItem(
+                          value: ('column', column),
+                          child: Text('Move to $column'),
+                        ),
+                    const PopupMenuItem(
+                      value: ('delete', null),
+                      child: Text('Delete card'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            if (card.description.isNotEmpty)
+              Text(
+                card.description,
+                maxLines: 4,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: AppColors.textSecondary),
+              ),
+            if (card.documentId case final String id)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: ActionChip(
+                  avatar: const Icon(Icons.description_outlined, size: 18),
+                  label: Text(
+                    widget.documentTitles[id] ?? 'Linked document',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  onPressed: () => widget.onOpenDocument(id),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+    return LongPressDraggable<KanbanCard>(
+      data: card,
+      maxSimultaneousDrags: widget.saving ? 0 : 1,
+      onDragUpdate: _dragUpdate,
+      onDragStarted: () => _dragPosition = null,
+      onDragEnd: (details) {
+        if (details.wasAccepted) {
+          _finishDrag(card);
+        } else {
+          _stopScroll();
+          _dragPosition = null;
+        }
+      },
+      feedback: Material(
+        color: Colors.transparent,
+        child: SizedBox(width: 256, child: body),
+      ),
+      childWhenDragging: Opacity(opacity: 0.3, child: body),
+      child: body,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => SingleChildScrollView(
+    key: const Key('kanban_columns'),
+    scrollDirection: Axis.horizontal,
+    controller: _scroll,
+    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final (column, cards) in widget.board.columns.map(
+          (column) => (column, widget.board.inColumn(column)),
+        ))
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: SizedBox(
+              width: 272,
+              child: Column(
+                children: [
+                  _drop(
+                    column,
+                    cards.length,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            column.toUpperCase(),
+                            style: const TextStyle(
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          '${cards.length}',
+                          style: AppTypography.mono(AppTypography.sm),
+                        ),
+                        IconButton(
+                          tooltip: 'Add card to $column',
+                          onPressed: widget.saving
+                              ? null
+                              : () => widget.onCreate(column),
+                          icon: const Icon(Icons.add),
+                        ),
+                      ],
+                    ),
+                    header: true,
+                  ),
+                  Expanded(
+                    child: ListView(
+                      key: ValueKey('kanban_column_$column'),
+                      padding: const EdgeInsets.only(bottom: 72),
+                      children: [
+                        for (final (index, card) in cards.indexed)
+                          _drop(column, index, _card(card, cards)),
+                        _drop(
+                          column,
+                          cards.length,
+                          SizedBox(
+                            key: ValueKey('kanban_drop_$column'),
+                            height: 64,
+                            child: const Center(
+                              child: Text(
+                                'Drop cards here',
+                                style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    ),
+  );
 }
