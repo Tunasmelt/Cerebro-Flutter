@@ -13,6 +13,10 @@ import 'package:cerebro_mobile/features/chat/data/chat_controller.dart';
 import 'package:cerebro_mobile/features/chat/data/chat_message.dart';
 import 'package:cerebro_mobile/features/graph/data/graph_pulse.dart';
 import 'package:cerebro_mobile/main.dart';
+import 'package:cerebro_mobile/app/router.dart';
+import 'package:cerebro_mobile/features/settings/presentation/settings_screen.dart';
+import 'package:cerebro_mobile/shared/widgets/app_bottom_nav.dart';
+import 'package:flutter/services.dart';
 import 'package:cerebro_mobile/features/settings/data/account_settings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -57,6 +61,76 @@ void main() {
 
   setUp(() => fakeRepository = FakeAuthRepository(initialUserId: 'user-1'));
   tearDown(() => fakeRepository.dispose());
+
+  testWidgets('rail starts at 600px and tab state survives resize', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(599, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    expect(find.byType(AppBottomNav), findsOneWidget);
+    await tester.tap(find.byKey(const Key('app_nav_settings')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Token Inspector'));
+    await tester.pumpAndSettle();
+    await tester.binding.setSurfaceSize(const Size(600, 800));
+    await tester.pumpAndSettle();
+    expect(find.byType(NavigationRail), findsOneWidget);
+    expect(find.byType(AppBottomNav), findsNothing);
+    expect(find.text('Token Playground'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('app_nav_docs')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('app_nav_settings')));
+    await tester.pumpAndSettle();
+    expect(find.text('Token Playground'), findsOneWidget);
+  });
+
+  testWidgets('legacy playground link redirects to Settings child route', (
+    tester,
+  ) async {
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(CerebroApp)),
+    );
+    container.read(routerProvider).go('/playground');
+    await tester.pumpAndSettle();
+    expect(
+      container.read(routerProvider).routeInformationProvider.value.uri.path,
+      AppRoutes.playground,
+    );
+    expect(find.text('Token Playground'), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('Token Inspector'), findsOneWidget);
+  });
+
+  testWidgets('selection haptic fires once for a changed tab', (tester) async {
+    final calls = <String>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'HapticFeedback.vibrate') {
+          calls.add(call.arguments as String);
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('app_nav_settings')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('app_nav_settings')));
+    await tester.pumpAndSettle();
+    expect(calls, ['HapticFeedbackType.selectionClick']);
+  });
 
   testWidgets(
     'history opened before first Graph visit replays visibly on entry',
@@ -145,19 +219,26 @@ void main() {
     expect(find.text('My Board'), findsOneWidget);
   });
 
-  testWidgets('tapping the Play destination renders the Playground screen', (
-    tester,
-  ) async {
-    await tester.pumpWidget(buildApp());
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+  testWidgets(
+    'Token Inspector opens under Settings and back returns to Settings',
+    (tester) async {
+      await tester.pumpWidget(buildApp());
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
-    await tester.tap(find.byKey(const Key('app_nav_play')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(find.byKey(const Key('app_nav_settings')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Token Inspector'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.text('Token Playground'), findsOneWidget);
-  });
+      expect(find.text('Token Playground'), findsOneWidget);
+      expect(find.byKey(const Key('app_nav_play')), findsNothing);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.text('Token Inspector'), findsOneWidget);
+    },
+  );
 
   testWidgets('tapping the Settings destination renders the Settings screen', (
     tester,
@@ -187,7 +268,12 @@ void main() {
     await tester.scrollUntilVisible(
       find.byKey(const Key('settings_sign_out')),
       200,
-      scrollable: find.byType(Scrollable).first,
+      scrollable: find
+          .descendant(
+            of: find.byType(SettingsScreen),
+            matching: find.byType(Scrollable),
+          )
+          .first,
     );
 
     // Invoke the callback directly rather than a pixel-offset tap:

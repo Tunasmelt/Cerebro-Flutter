@@ -119,7 +119,6 @@ class _SealedDocumentScreenState extends State<SealedDocumentScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: const _BottomNavBar(),
     );
   }
 }
@@ -219,9 +218,9 @@ class _TopBar extends StatelessWidget {
                     const _SealedBadge(),
                     Text(
                       '$fileSizeLabel • $dateLabel',
-                      style: AppTypography.mono(AppTypography.sm).copyWith(
-                        color: AppColors.textSecondary,
-                      ),
+                      style: AppTypography.mono(
+                        AppTypography.sm,
+                      ).copyWith(color: AppColors.textSecondary),
                     ),
                   ],
                 ),
@@ -369,97 +368,9 @@ class _SealedLockedCard extends StatelessWidget {
           Text(
             'Enter your passphrase to decrypt and view it on this device.',
             textAlign: TextAlign.center,
-            style:
-                AppTypography.base.copyWith(color: AppColors.textSecondary),
+            style: AppTypography.base.copyWith(color: AppColors.textSecondary),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _BottomNavBar extends StatelessWidget {
-  const _BottomNavBar();
-
-  static const _items = <(_NavIcon, String)>[
-    (_NavIcon(Icons.description_outlined, Icons.description), 'Docs'),
-    (_NavIcon(Icons.chat_bubble_outline, Icons.chat_bubble), 'Chat'),
-    (_NavIcon(Icons.hub_outlined, Icons.hub), 'Graph'),
-    (_NavIcon(Icons.dashboard_outlined, Icons.dashboard), 'Board'),
-    (_NavIcon(Icons.play_circle_outline, Icons.play_circle), 'Play'),
-    (_NavIcon(Icons.settings_outlined, Icons.settings), 'Settings'),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: const BoxDecoration(
-        color: AppColors.bgElevated,
-        border: Border(top: BorderSide(color: AppColors.borderSubtle)),
-      ),
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: 64,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              for (final (index, item) in _items.indexed)
-                _NavBarEntry(
-                  navIcon: item.$1,
-                  label: item.$2,
-                  active: index == 0, // Docs active, per the mockup.
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _NavIcon {
-  const _NavIcon(this.outlined, this.filled);
-  final IconData outlined;
-  final IconData filled;
-}
-
-class _NavBarEntry extends StatelessWidget {
-  const _NavBarEntry({
-    required this.navIcon,
-    required this.label,
-    required this.active,
-  });
-
-  final _NavIcon navIcon;
-  final String label;
-  final bool active;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = active ? AppColors.accentPrimary : AppColors.textSecondary;
-    return Expanded(
-      child: InkWell(
-        // Presentation-only — no real navigation is wired up.
-        onTap: () {},
-        child: SizedBox(
-          height: AppSpacing.minTouchTarget,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                active ? navIcon.filled : navIcon.outlined,
-                color: color,
-                size: 22,
-              ),
-              const SizedBox(height: AppSpacing.s1),
-              Text(
-                label,
-                style: AppTypography.xs.copyWith(color: color),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

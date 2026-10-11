@@ -8,7 +8,7 @@ abstract final class AppRoutes {
   static const chatHistory = '/chat/history';
   static const graph = '/graph';
   static const board = '/board';
-  static const playground = '/playground';
+  static const playground = '/settings/token-inspector';
   static const settings = '/settings';
 
   static String documentDetail(String documentId) => '$documents/$documentId';
