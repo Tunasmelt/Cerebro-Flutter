@@ -1,11 +1,55 @@
 import 'package:cerebro_mobile/shared/widgets/app_bottom_nav.dart';
 import 'package:cerebro_mobile/shared/theme/app_theme.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/semantics.dart';
-import 'dart:ui' show Tristate;
+import 'dart:ui' show Tristate, ImageByteFormat;
+import 'package:flutter/rendering.dart';
+import 'package:cerebro_mobile/shared/tokens/app_colors.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets('pressing a tab does not paint a rectangle over its section', (
+    tester,
+  ) async {
+    const capture = Key('navigation_capture');
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.dark,
+        home: Scaffold(
+          bottomNavigationBar: RepaintBoundary(
+            key: capture,
+            child: AppBottomNav(currentIndex: 0, onTap: (_) {}),
+          ),
+        ),
+      ),
+    );
+    final tab = find.byKey(const Key('app_nav_settings'));
+    final gesture = await tester.startGesture(tester.getCenter(tab));
+    await tester.pump(const Duration(milliseconds: 250));
+    final boundary = tester.renderObject<RenderRepaintBoundary>(
+      find.byKey(capture),
+    );
+    await tester.runAsync(() async {
+      final image = await boundary.toImage(pixelRatio: 1);
+      final bytes = (await image.toByteData(format: ImageByteFormat.rawRgba))!;
+      final relative =
+          tester.getTopLeft(tab) - tester.getTopLeft(find.byKey(capture));
+      final offset = (8 * image.width + relative.dx.toInt() + 3) * 4;
+      final expected = AppColors.bgElevated.toARGB32();
+      expect(bytes.getUint8(offset), (expected >> 16) & 255);
+      expect(bytes.getUint8(offset + 1), (expected >> 8) & 255);
+      expect(bytes.getUint8(offset + 2), expected & 255);
+      image.dispose();
+    });
+    await gesture.up();
+    await tester.pumpAndSettle();
+    final ink = tester.widget<InkWell>(
+      find.descendant(of: tab, matching: find.byType(InkWell)),
+    );
+    expect(
+      ink.overlayColor!.resolve({WidgetState.focused}),
+      AppColors.accentSecondarySubtle,
+    );
+  });
   testWidgets(
     'five semantic destinations keep icon and label positions stable',
     (tester) async {

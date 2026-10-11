@@ -40,3 +40,11 @@ with the deployed backend. No new package or backend change is required.
   recorded; this UI phase does not manufacture a new owner gate confirmation.
 
 Next: Phase C's Markdown/citation/chat work, after reviewing Phase B's PR.
+
+## Pressed-overlay follow-up
+
+A reported pale box covered the tab section on press. The bottom InkWell now
+uses NoSplash and a transparent pointer overlay; only keyboard focus receives
+an explicit token-colored highlight. A pressed-state raster check verifies the
+surrounding pixels stay dark. The Pixel held-press screenshot and repeated
+22-command navigation smoke pass. No owner data or session was cleared.

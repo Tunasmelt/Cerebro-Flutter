@@ -47,6 +47,12 @@ class AppBottomNav extends StatelessWidget {
                     onTap: () => onTap(index),
                     excludeSemantics: true,
                     child: InkWell(
+                      splashFactory: NoSplash.splashFactory,
+                      overlayColor: WidgetStateProperty.resolveWith(
+                        (states) => states.contains(WidgetState.focused)
+                            ? AppColors.accentSecondarySubtle
+                            : Colors.transparent,
+                      ),
                       onTap: () => onTap(index),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
