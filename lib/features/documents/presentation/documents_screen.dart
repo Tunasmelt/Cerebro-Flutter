@@ -9,6 +9,7 @@ import '../../../shared/tokens/app_radius.dart';
 import '../../../shared/tokens/app_spacing.dart';
 import '../../../shared/tokens/app_typography.dart';
 import '../../../shared/widgets/error_view.dart';
+import '../../auth/data/current_user_provider.dart';
 import '../data/document.dart';
 import '../data/documents_list_notifier.dart';
 import '../data/ingest_status.dart';
@@ -22,8 +23,40 @@ import 'upload_source_sheet.dart';
 /// with the upload entry point (Milestone 2.2): the Add button opens a
 /// source sheet (file / photo library / camera), and in-flight uploads
 /// appear above the list.
-class DocumentsScreen extends ConsumerWidget {
+class DocumentsScreen extends ConsumerStatefulWidget {
   const DocumentsScreen({super.key});
+
+  @override
+  ConsumerState<DocumentsScreen> createState() => _DocumentsScreenState();
+}
+
+class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
+  late final AppLifecycleListener _lifecycle;
+  bool _refreshingOnResume = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _lifecycle = AppLifecycleListener(onResume: _refreshOnResume);
+  }
+
+  Future<void> _refreshOnResume() async {
+    if (_refreshingOnResume || ref.read(currentUserIdProvider) == null) return;
+    _refreshingOnResume = true;
+    try {
+      // The upload or ingest may have finished while Android suspended us.
+      // Refresh also restarts an exhausted ingest polling window.
+      await ref.read(documentsListProvider.notifier).refresh();
+    } finally {
+      _refreshingOnResume = false;
+    }
+  }
+
+  @override
+  void dispose() {
+    _lifecycle.dispose();
+    super.dispose();
+  }
 
   Future<void> _onAddPressed(BuildContext context, WidgetRef ref) async {
     final source = await showUploadSourceSheet(context);
@@ -48,7 +81,7 @@ class DocumentsScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final documents = ref.watch(documentsListProvider);
     final notifier = ref.read(documentsListProvider.notifier);
 
@@ -112,7 +145,9 @@ class DocumentsScreen extends ConsumerWidget {
                               key: Key('documents_empty'),
                               child: Text(
                                 'No documents yet.',
-                                style: TextStyle(color: AppColors.textSecondary),
+                                style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                ),
                               ),
                             ),
                           ],
@@ -207,9 +242,9 @@ class _DocumentRow extends StatelessWidget {
                     Text(
                       '${formatDocumentSize(document.sizeBytes)} · '
                       '${formatDocumentDate(document.createdAt)}',
-                      style: AppTypography.mono(AppTypography.xs).copyWith(
-                        color: AppColors.textSecondary,
-                      ),
+                      style: AppTypography.mono(
+                        AppTypography.xs,
+                      ).copyWith(color: AppColors.textSecondary),
                     ),
                   ],
                 ),

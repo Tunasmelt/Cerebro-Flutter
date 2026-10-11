@@ -135,6 +135,30 @@ void main() {
   );
 
   testWidgets(
+    'an account switch during upload-init prevents the old file PUT',
+    (tester) async {
+      final initGate = Completer<void>();
+      uploadApi.initGate = initGate;
+      await tester.pumpWidget(app());
+      await tester.pumpAndSettle();
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(MaterialApp)),
+      );
+      final running = container
+          .read(uploadsProvider.notifier)
+          .upload(fakePickedUpload(name: 'old-owner.txt'));
+      await tester.pump();
+      expect(log.entries, ['init']);
+      await switchUser(tester, 'user-b');
+      initGate.complete();
+      await running;
+      await tester.pumpAndSettle();
+      expect(log.entries, ['init']);
+      expect(find.text('old-owner.txt'), findsNothing);
+    },
+  );
+
+  testWidgets(
     "an upload still in flight when the user changes is abandoned: it never "
     "calls upload-confirm under the next user's session",
     (tester) async {

@@ -7,8 +7,8 @@ app ([`Tunasmelt/Cerebro-2.0`](https://github.com/Tunasmelt/Cerebro-2.0)) is
 the source of truth for what the product does; this repo expresses the same
 product on a phone.
 
-> Status: in active development, built phase by phase. Phases 0 to 3 are the
-> working app today; the rest are still to come (see [Status](#status)).
+> Status: Phases 0–6 are implemented and owner-verified. Phase 7 recovery, file viewer and native branding are implemented;
+> physical/iOS release checks remain pending; see [Status](#status) for the remaining release checks.
 
 ## What works today
 
@@ -16,13 +16,18 @@ product on a phone.
   by deep link (`cerebro://confirm-email`), session handling and route guards.
 - **Documents**: list and detail views, upload from the file picker, gallery
   or camera, live ingest status (processing, ready, failed, incomplete),
-  retry for failed documents, delete.
+  retry for failed documents, delete, and in-app original image/PDF/text viewing.
   Uploads go signed-URL-direct to Supabase Storage (`upload-init`, PUT,
   `upload-confirm`); file bytes never pass through a proxy.
 - **Chat**: streamed answers over SSE with numbered citation chips that open
   the source document, stop and retry.
 - **Conversations**: list past conversations, reopen one with its citations
   intact, delete one, export one to Markdown and share it.
+
+- **Settings**: live profile, display name/avatar updates, email confirmation,
+  password changes, real document storage totals and sealed-document links.
+  Vault-data removal requires explicit confirmation and leaves the sign-in
+  account intact. See [verification](docs/user-settings-verification.md).
 
 ## Stack
 
@@ -37,7 +42,7 @@ product on a phone.
 | Files / sharing | `file_picker`, `image_picker`, `share_plus`, `path_provider` |
 
 Graph rendering uses `flutter_force_directed_graph`; sealed crypto uses
-`cryptography` 2.9.0. Sealed UI and backend integration are still pending.
+`cryptography` 2.9.0. Sealed UI and backend integration are implemented.
 
 ## Project layout
 
@@ -100,12 +105,12 @@ and a gate that the project owner confirms on a real device
 | 4 | 2D brain graph | 4.1–4.3 implemented; 4.3 checked against the real backend and Android emulator (live pulses, Graph replay picker, automatic Chat History replay). Owner gate closed 2026-10-11. |
 | 5 | Sealed tier (Argon2id + AES-256-GCM, parameter-identical to web) | 5.1-5.4 required Android checks passed, including completed sealed chat and uninterrupted real 15-minute expiry after backend repairs. 5.4 direct/injection, malformed-key and genuine cross-user checks pass after backend PR #94; owner gate closed 2026-10-11. |
 | 6 | 6.1 live Kanban, 6.2 live Todo, 6.3 read-only Token Playground | Implemented and verified on Android with the deployed backend: card/task persistence and saved-turn prompt/token/cost display. Owner gate closed 2026-10-11. |
-| 7 | Platform polish and release readiness | Not started |
+| 7 | Platform polish and release readiness | Recovery, viewer and branding implemented; Pixel checks passed. Owner gate closed 2026-10-12 by explicit direction. iOS and additional-device verification remain pending. |
 
 The owner confirmed all implemented phase gates (0–6) on 2026-10-11.
 Historical agent records retain their test/environment limitations; this
-sign-off does not add an agent-run iOS test. Phase 7 still requires its
-implementation and release checks.
+sign-off does not add an agent-run iOS test. Phase 7
+is owner-accepted; outstanding iOS and device-matrix checks remain recorded.
 
 ## Design decisions worth knowing
 
@@ -128,3 +133,6 @@ implementation and release checks.
   conventions and agent rules
 - [`CHANGELOG.md`](CHANGELOG.md): what changed and why
 - [`HANDOFF.md`](HANDOFF.md): decisions carried over from web
+
+Owner update (2026-10-12): all phase gates 0–7 are closed by explicit owner
+direction. Outstanding hardware verification remains listed in Phase 7 records.

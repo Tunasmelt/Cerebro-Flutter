@@ -71,6 +71,7 @@ Future<List<String>> _pump(
   WidgetTester tester,
   _FakeGraph api, {
   List<String>? opened,
+  EdgeInsets padding = EdgeInsets.zero,
 }) async {
   final out = opened ?? <String>[];
   await tester.pumpWidget(
@@ -81,6 +82,10 @@ Future<List<String>> _pump(
       ],
       child: MaterialApp(
         theme: AppTheme.dark,
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(padding: padding),
+          child: child!,
+        ),
         home: GraphScreen(openDocument: (_, id) => out.add(id)),
       ),
     ),
@@ -102,6 +107,26 @@ Color _colorOf(WidgetTester tester, String id) {
 }
 
 void main() {
+  testWidgets('graph controls and node panel avoid notch and system insets', (
+    tester,
+  ) async {
+    const insets = EdgeInsets.fromLTRB(40, 44, 20, 34);
+    final api = _FakeGraph()..nodeRows = [_n('a', x: 0, y: 0)];
+    await _pump(tester, api, padding: insets);
+    final search = tester.getRect(find.byKey(const Key('graph_refresh')));
+    expect(search.top, greaterThanOrEqualTo(insets.top));
+    expect(search.right, lessThanOrEqualTo(800 - insets.right));
+    final middle = tester.getCenter(find.byKey(const Key('graph_canvas')));
+    await tester.tapAt(middle);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    final panel = tester.getRect(find.byKey(const Key('node_panel')));
+    expect(panel.left, greaterThanOrEqualTo(insets.left));
+    expect(panel.right, lessThanOrEqualTo(800 - insets.right));
+    expect(panel.bottom, lessThanOrEqualTo(600 - insets.bottom));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('shows a spinner while loading, then the graph', (tester) async {
     final api = _FakeGraph()
       ..nodeRows = [_n('a', x: 0, y: 0)]

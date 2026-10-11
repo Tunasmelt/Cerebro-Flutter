@@ -1,0 +1,29 @@
+appId: com.cerebro.cerebro_mobile
+name: Platform navigation with a restored owner session
+tags:
+  - platform
+  - smoke
+---
+# Run against a normal lib/main.dart build with an existing signed-in session.
+# Preserve authentication and owner data. No test writes are performed.
+- launchApp:
+    clearState: false
+    stopApp: false
+- tapOn: 'Docs\nDocs'
+- assertVisible: Documents
+- assertVisible: Add a document
+- tapOn: 'Graph\nGraph'
+- assertVisible: Refresh
+- assertVisible: history
+- tapOn: history
+- assertVisible: Replay a conversation
+- back
+- tapOn: 'Board\nBoard'
+- assertVisible: Refresh board
+- assertVisible: Todo
+- tapOn: 'Play\nPlay'
+- assertVisible: Token Playground
+- tapOn: 'Settings\nSettings'
+- assertVisible: Settings
+- tapOn: 'Docs\nDocs'
+- assertVisible: Documents

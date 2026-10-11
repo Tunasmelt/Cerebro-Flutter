@@ -29,6 +29,8 @@ class _StubAdapter implements HttpClientAdapter {
   final int status;
   final String body;
   final DioException Function(RequestOptions)? throwOnFetch;
+  int calls = 0;
+  int failForCalls = 999999;
 
   RequestOptions? seen;
   final List<int> receivedBytes = [];
@@ -39,9 +41,10 @@ class _StubAdapter implements HttpClientAdapter {
     Stream<Uint8List>? requestStream,
     Future<void>? cancelFuture,
   ) async {
+    calls++;
     seen = options;
     final thrower = throwOnFetch;
-    if (thrower != null) throw thrower(options);
+    if (thrower != null && calls <= failForCalls) throw thrower(options);
     if (requestStream != null) {
       await for (final chunk in requestStream) {
         receivedBytes.addAll(chunk);
@@ -72,8 +75,109 @@ void main() {
     );
   }
 
-  Future<void> put(DioStorageUploader u, {int size = 5}) =>
-      u.put(uploadUrl: url, file: fakePickedUpload(sizeBytes: size), mime: 'text/plain');
+  Future<void> put(DioStorageUploader u, {int size = 5}) => u.put(
+    uploadUrl: url,
+    file: fakePickedUpload(sizeBytes: size),
+    mime: 'text/plain',
+  );
+
+  group('one foreground retry after a background socket interruption', () {
+    _StubAdapter dropped({int failures = 1}) => _StubAdapter(
+      throwOnFetch: (options) => DioException(
+        requestOptions: options,
+        type: DioExceptionType.unknown,
+        error: const SocketException('Connection reset'),
+      ),
+    )..failForCalls = failures;
+    DioStorageUploader resumable(
+      _StubAdapter adapter,
+      Future<bool> Function() resume, {
+      bool Function()? canContinue,
+    }) => DioStorageUploader(
+      tokenProvider: _Token('jwt'),
+      apiKey: 'anon-key',
+      dio: Dio()..httpClientAdapter = adapter,
+      retryAfterBackground: resume,
+      canContinue: canContinue,
+    );
+
+    test(
+      'waits for foreground, reopens the file and reuses the same URL',
+      () async {
+        final adapter = dropped();
+        final resume = Completer<bool>();
+        final running = put(resumable(adapter, () => resume.future));
+        await pumpEventQueue();
+        expect(adapter.calls, 1);
+        resume.complete(true);
+        await running;
+        expect(adapter.calls, 2);
+        expect(adapter.seen!.uri, url);
+        expect(adapter.receivedBytes, hasLength(5));
+      },
+    );
+
+    test('a foreground error does not retry', () async {
+      final adapter = dropped();
+      await expectLater(
+        put(resumable(adapter, () async => false)),
+        throwsA(isA<NetworkUnreachableException>()),
+      );
+      expect(adapter.calls, 1);
+    });
+
+    test('a second interruption fails rather than looping', () async {
+      final adapter = dropped(failures: 2);
+      var resumes = 0;
+      await expectLater(
+        put(
+          resumable(adapter, () async {
+            resumes++;
+            return true;
+          }),
+        ),
+        throwsA(isA<NetworkUnreachableException>()),
+      );
+      expect(adapter.calls, 2);
+      expect(resumes, 1);
+    });
+
+    test('account change while waiting prevents another PUT', () async {
+      final adapter = dropped();
+      var allowed = true;
+      await expectLater(
+        put(
+          resumable(adapter, () async {
+            allowed = false;
+            return true;
+          }, canContinue: () => allowed),
+        ),
+        throwsA(isA<UnauthenticatedException>()),
+      );
+      expect(adapter.calls, 1);
+    });
+
+    test(
+      'server or authorization errors never request a resume retry',
+      () async {
+        for (final status in [401, 413, 500]) {
+          final adapter = _StubAdapter(status: status);
+          var resumes = 0;
+          await expectLater(
+            put(
+              resumable(adapter, () async {
+                resumes++;
+                return true;
+              }),
+            ),
+            throwsA(isA<AppException>()),
+          );
+          expect(adapter.calls, 1);
+          expect(resumes, 0);
+        }
+      },
+    );
+  });
 
   test('sends the bytes with length, type, apikey and bearer token', () async {
     final adapter = _StubAdapter();
@@ -87,7 +191,11 @@ void main() {
     expect(headers['content-type'], 'text/plain');
     expect(headers['apikey'], 'anon-key');
     expect(headers['authorization'], 'Bearer jwt');
-    expect(adapter.receivedBytes, hasLength(5), reason: 'the body was streamed');
+    expect(
+      adapter.receivedBytes,
+      hasLength(5),
+      reason: 'the body was streamed',
+    );
   });
 
   test('reports send progress', () async {
@@ -114,51 +222,58 @@ void main() {
   });
 
   group('an oversized object is a clean rejection, however Storage says it', () {
-    test(
-      "real Storage's answer: HTTP 400 with a body saying statusCode 413 / "
-      'EntityTooLarge',
-      () async {
-        final adapter = _StubAdapter(
-          status: 400,
-          body:
-              '{"statusCode":"413","error":"Payload too large","message":"The object exceeded the maximum allowed size","code":"EntityTooLarge"}',
-        );
-
-        await expectLater(
-          put(uploader(adapter)),
-          throwsA(
-            isA<RequestRejectedException>()
-                .having((e) => e.code, 'code', 'file_too_large')
-                .having((e) => e.message, 'message', 'File exceeds the 50MB upload limit'),
-          ),
-        );
-      },
-    );
-
-    test('a genuine HTTP 413 (e.g. from a proxy) is the same rejection', () async {
-      await expectLater(
-        put(uploader(_StubAdapter(status: 413, body: '{}'))),
-        throwsA(isA<RequestRejectedException>()),
-      );
-    });
-
-    test('an HTTP 400 that is NOT EntityTooLarge is not misreported as too large', () async {
+    test("real Storage's answer: HTTP 400 with a body saying statusCode 413 / "
+        'EntityTooLarge', () async {
       final adapter = _StubAdapter(
         status: 400,
-        body: '{"statusCode":"400","error":"Bad Request","message":"nope"}',
+        body:
+            '{"statusCode":"413","error":"Payload too large","message":"The object exceeded the maximum allowed size","code":"EntityTooLarge"}',
       );
 
       await expectLater(
         put(uploader(adapter)),
         throwsA(
-          isA<UnknownApiException>().having(
-            (e) => e,
-            'not a size rejection',
-            isNot(isA<RequestRejectedException>()),
-          ),
+          isA<RequestRejectedException>()
+              .having((e) => e.code, 'code', 'file_too_large')
+              .having(
+                (e) => e.message,
+                'message',
+                'File exceeds the 50MB upload limit',
+              ),
         ),
       );
     });
+
+    test(
+      'a genuine HTTP 413 (e.g. from a proxy) is the same rejection',
+      () async {
+        await expectLater(
+          put(uploader(_StubAdapter(status: 413, body: '{}'))),
+          throwsA(isA<RequestRejectedException>()),
+        );
+      },
+    );
+
+    test(
+      'an HTTP 400 that is NOT EntityTooLarge is not misreported as too large',
+      () async {
+        final adapter = _StubAdapter(
+          status: 400,
+          body: '{"statusCode":"400","error":"Bad Request","message":"nope"}',
+        );
+
+        await expectLater(
+          put(uploader(adapter)),
+          throwsA(
+            isA<UnknownApiException>().having(
+              (e) => e,
+              'not a size rejection',
+              isNot(isA<RequestRejectedException>()),
+            ),
+          ),
+        );
+      },
+    );
   });
 
   group('other failures map onto the shared AppException hierarchy', () {
@@ -169,12 +284,15 @@ void main() {
       );
     });
 
-    test('a 401 (expired token or signed URL) is UnauthorizedException', () async {
-      await expectLater(
-        put(uploader(_StubAdapter(status: 401, body: '{}'))),
-        throwsA(isA<UnauthorizedException>()),
-      );
-    });
+    test(
+      'a 401 (expired token or signed URL) is UnauthorizedException',
+      () async {
+        await expectLater(
+          put(uploader(_StubAdapter(status: 401, body: '{}'))),
+          throwsA(isA<UnauthorizedException>()),
+        );
+      },
+    );
 
     test('a dropped connection is NetworkUnreachableException', () async {
       final adapter = _StubAdapter(

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:cerebro_mobile/core/network/app_exception.dart';
 import 'package:cerebro_mobile/core/network/error_mapper.dart';
 import 'package:dio/dio.dart';
@@ -5,6 +7,18 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('ErrorMapper', () {
+    test('a socket reset wrapped as unknown is a safe network error', () {
+      final mapped = ErrorMapper.map(
+        DioException(
+          requestOptions: RequestOptions(path: '/storage?token=private'),
+          type: DioExceptionType.unknown,
+          error: const SocketException('Connection reset: private URL'),
+        ),
+      );
+      expect(mapped, isA<NetworkUnreachableException>());
+      expect(mapped.message, isNot(contains('private')));
+    });
+
     test('a connection timeout maps to NetworkUnreachableException', () {
       final options = RequestOptions(path: '/health');
       final error = DioException(
@@ -49,38 +63,32 @@ void main() {
       expect(ErrorMapper.map(error), isA<UnauthorizedException>());
     });
 
-    test(
-      'the three mapped types are distinct, not one generic exception',
-      () {
-        final options = RequestOptions(path: '/x');
-        final timeout = ErrorMapper.map(
-          DioException(
-            requestOptions: options,
-            type: DioExceptionType.connectionTimeout,
-          ),
-        );
-        final serverError = ErrorMapper.map(
-          DioException(
-            requestOptions: options,
-            type: DioExceptionType.badResponse,
-            response: Response(requestOptions: options, statusCode: 503),
-          ),
-        );
-        final unauthorized = ErrorMapper.map(
-          DioException(
-            requestOptions: options,
-            type: DioExceptionType.badResponse,
-            response: Response(requestOptions: options, statusCode: 401),
-          ),
-        );
+    test('the three mapped types are distinct, not one generic exception', () {
+      final options = RequestOptions(path: '/x');
+      final timeout = ErrorMapper.map(
+        DioException(
+          requestOptions: options,
+          type: DioExceptionType.connectionTimeout,
+        ),
+      );
+      final serverError = ErrorMapper.map(
+        DioException(
+          requestOptions: options,
+          type: DioExceptionType.badResponse,
+          response: Response(requestOptions: options, statusCode: 503),
+        ),
+      );
+      final unauthorized = ErrorMapper.map(
+        DioException(
+          requestOptions: options,
+          type: DioExceptionType.badResponse,
+          response: Response(requestOptions: options, statusCode: 401),
+        ),
+      );
 
-        expect(timeout.runtimeType, isNot(equals(serverError.runtimeType)));
-        expect(
-          serverError.runtimeType,
-          isNot(equals(unauthorized.runtimeType)),
-        );
-        expect(timeout.runtimeType, isNot(equals(unauthorized.runtimeType)));
-      },
-    );
+      expect(timeout.runtimeType, isNot(equals(serverError.runtimeType)));
+      expect(serverError.runtimeType, isNot(equals(unauthorized.runtimeType)));
+      expect(timeout.runtimeType, isNot(equals(unauthorized.runtimeType)));
+    });
   });
 }

@@ -1966,3 +1966,69 @@ with a failing test before fixing it.
   owner gate items. Updated the README and Phase 6 verification records.
 - Retained historical agent test evidence and platform limitations.
   Phase 7 remains pending its uncompleted release-readiness milestones.
+
+
+## 2026-10-11 — Milestone 7.1 implementation and Android checks
+
+- Protected Graph node actions against side/bottom insets and refreshed
+  Documents on foreground return. Pixel controls and physical retrieval haptics
+  passed; the owner confirmed feeling the vibration.
+- Fixed background SocketException mapping and bounded foreground retry. A real
+  Pixel PUT interrupted in the background recovered, reached Ready and cleaned
+  up its synthetic fixture against the deployed backend.
+- Added owner-scoped private-cache upload journals and startup recovery. Bytes
+  and document IDs survive process death; credentials and signed URLs are not
+  persisted. Failures retain a visible queue; dismissal/sign-out clears copies.
+- Prepared backend renewal for the same document and idempotent confirmation on
+  `feature/mobile-upload-resume`; generated the new client from actual source.
+  Publication is pending separate approval. Emulator process-death recovery
+  passed against the local prepared API and real Supabase; fixture deleted.
+- Added a read-only Maestro navigation flow: 20 commands passed on both Pixel
+  and emulator. 863 Flutter tests pass (30 existing opt-in skips); analysis and
+  Android builds pass. Backend lint, 569 tests, web lint and web build pass.
+- Kept 7.1 open for deployed renewal and physical process-death verification;
+  the Pixel disconnected before that check. No Mac/iPhone is available.
+  Cache eviction and the upload-init response-loss window are documented in
+  `docs/milestone-7.1-platform-handling.md`. Milestones 7.2–7.3 have not started.
+
+## 2026-10-12 — Phase 7 recovery, viewer and branding
+
+- Published owner-scoped upload renewal, idempotent confirmation and guarded
+  expiry transitions in Cerebro-2.0 PR #95; 572 backend tests pass.
+- Verified same-document process-death recovery against the deployed service.
+- Added in-app image/PDF/text originals, bounded signed-URL downloads and
+  temporary viewer-cache cleanup; sealed originals follow server restrictions.
+- Added Android/iOS native branding and draft store artwork/metadata.
+- Final Flutter suite: 873 passing, 30 existing opt-in skips; analysis clean.
+  Android camera cancel, PDF page navigation/exit and navigation smoke pass.
+- Physical/iOS release checks and additional-device matrix remain pending.
+  Phase 7 owner gate stays open; mobile changes are not yet published.
+
+## 2026-10-12 — Physical Pixel verification
+
+- Deployed same-document process-death recovery passed on Pixel 9 Pro XL,
+  including Ready status and deletion of the synthetic fixture.
+- Fresh isolated-install splash/login, launcher icon, camera cancel, PDF
+  page navigation/exit, image viewing and navigation smoke passed physically.
+- Restored the normal app and removed the isolated verification package;
+  owner authentication and existing documents remain intact.
+- iOS and additional-device matrix checks remain pending; Phase 7 gate open.
+
+## 2026-10-12 — Owner closes all gates
+
+- Recorded explicit owner instruction “close all gates”: phase gates 0–7 closed.
+- Retained pending iOS and additional-device verification; no missing test
+  was marked passed and milestone 7.3 remains unverified.
+
+## 2026-10-12 - Complete supported user settings
+
+- Replaced mock identity, storage totals and inactive controls with actual
+  Supabase account metadata and document records.
+- Added profile/avatar, email and password forms with validation, persistent
+  feedback, account-switch guards and mobile confirmation redirects.
+- Added accurately named vault-data removal through the existing backend,
+  exact-text/second confirmation, pending-upload guards and post-success sign-out.
+- Pixel profile save/restart persistence and Documents navigation passed.
+  Full Flutter suite: 883 passing, 30 existing skips. Destructive/account-security
+  mutations were tested with doubles, not executed on the owner's live account.
+- Phase 7 owner gate remains closed by the owner's explicit direction.

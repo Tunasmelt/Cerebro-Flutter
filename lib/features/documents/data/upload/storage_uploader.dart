@@ -25,6 +25,8 @@ class DioStorageUploader implements StorageUploader {
     required SessionTokenProvider tokenProvider,
     required String apiKey,
     Dio? dio,
+    this.retryAfterBackground,
+    this.canContinue,
   }) : _tokenProvider = tokenProvider,
        _apiKey = apiKey,
        _dio =
@@ -43,6 +45,11 @@ class DioStorageUploader implements StorageUploader {
   final String _apiKey;
   final Dio _dio;
 
+  /// Allows one retry only after a background interruption and foreground
+  /// return. The same authorization and file are reused; no new document.
+  final Future<bool> Function()? retryAfterBackground;
+  final bool Function()? canContinue;
+
   @override
   Future<void> put({
     required Uri uploadUrl,
@@ -50,34 +57,45 @@ class DioStorageUploader implements StorageUploader {
     required String mime,
     void Function(int sent, int total)? onProgress,
   }) async {
-    final token = _tokenProvider.currentAccessToken;
-    if (token == null) throw const UnauthenticatedException();
+    for (var attempt = 0; attempt < 2; attempt++) {
+      if (canContinue?.call() == false) throw const UnauthenticatedException();
+      final token = _tokenProvider.currentAccessToken;
+      if (token == null) throw const UnauthenticatedException();
 
-    try {
-      await _dio.putUri<void>(
-        uploadUrl,
-        // Streamed, never buffered: the file can be 50 MiB.
-        data: file.openRead().map((chunk) => Uint8List.fromList(chunk)),
-        onSendProgress: onProgress,
-        options: Options(
-          headers: {
-            // Dio needs the length up front to stream a body.
-            Headers.contentLengthHeader: file.sizeBytes,
-            Headers.contentTypeHeader: mime,
-            // Same headers the web upload page sends with this PUT.
-            'apikey': _apiKey,
-            'authorization': 'Bearer $token',
-          },
-        ),
-      );
-    } on DioException catch (e) {
-      if (_isTooLarge(e.response)) {
-        throw const RequestRejectedException(
-          'File exceeds the 50MB upload limit',
-          code: 'file_too_large',
+      try {
+        await _dio.putUri<void>(
+          uploadUrl,
+          // Streamed, never buffered: the file can be 50 MiB.
+          data: file.openRead().map((chunk) => Uint8List.fromList(chunk)),
+          onSendProgress: onProgress,
+          options: Options(
+            headers: {
+              // Dio needs the length up front to stream a body.
+              Headers.contentLengthHeader: file.sizeBytes,
+              Headers.contentTypeHeader: mime,
+              // Same headers the web upload page sends with this PUT.
+              'apikey': _apiKey,
+              'authorization': 'Bearer $token',
+            },
+          ),
         );
+        return;
+      } on DioException catch (e) {
+        if (_isTooLarge(e.response)) {
+          throw const RequestRejectedException(
+            'File exceeds the 50MB upload limit',
+            code: 'file_too_large',
+          );
+        }
+        final mapped = ErrorMapper.map(e);
+        if (attempt == 0 &&
+            mapped is NetworkUnreachableException &&
+            retryAfterBackground != null &&
+            await retryAfterBackground!()) {
+          continue;
+        }
+        throw mapped;
       }
-      throw ErrorMapper.map(e);
     }
   }
 

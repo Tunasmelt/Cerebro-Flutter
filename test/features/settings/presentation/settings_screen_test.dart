@@ -39,17 +39,17 @@ void main() {
     await tester.pump();
 
     expect(find.text('Settings'), findsOneWidget);
-    expect(find.text('Alex Stone'), findsOneWidget);
+    expect(find.text('Alex Stone'), findsNothing);
     expect(find.text('Data sources'), findsOneWidget);
-    expect(find.text('Encryption & sealed docs'), findsOneWidget);
+    expect(find.text('SEALED DOCUMENTS'), findsOneWidget);
 
     await tester.scrollUntilVisible(
-      find.text('Cerebro 2.0.0'),
+      find.text('Sign out'),
       200,
       scrollable: find.byType(Scrollable).first,
     );
     expect(find.text('Sign out'), findsOneWidget);
-    expect(find.text('Cerebro 2.0.0'), findsOneWidget);
+    expect(find.text('284 MB'), findsNothing);
   });
 
   testWidgets('tapping sign out calls the auth repository', (
@@ -83,7 +83,8 @@ void main() {
         buildApp(
           extraOverrides: [
             connectionStatusProvider.overrideWith(
-              () => FakeConnectionStatusNotifier(() => Completer<void>().future),
+              () =>
+                  FakeConnectionStatusNotifier(() => Completer<void>().future),
             ),
           ],
         ),
@@ -115,40 +116,34 @@ void main() {
       expect(find.text('Connected to Cerebro'), findsOneWidget);
     });
 
-    testWidgets(
-      'shows the offline ErrorView on NetworkUnreachableException, '
-      'visually distinct from a server error',
-      (tester) async {
-        await tester.binding.setSurfaceSize(const Size(400, 1400));
-        addTearDown(() => tester.binding.setSurfaceSize(null));
+    testWidgets('shows the offline ErrorView on NetworkUnreachableException, '
+        'visually distinct from a server error', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(400, 1400));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
 
-        await tester.pumpWidget(
-          buildApp(
-            extraOverrides: [
-              connectionStatusProvider.overrideWith(
-                () => FakeConnectionStatusNotifier(
-                  () async => throw const NetworkUnreachableException(),
-                ),
+      await tester.pumpWidget(
+        buildApp(
+          extraOverrides: [
+            connectionStatusProvider.overrideWith(
+              () => FakeConnectionStatusNotifier(
+                () async => throw const NetworkUnreachableException(),
               ),
-            ],
-          ),
-        );
-        await tester.pump();
+            ),
+          ],
+        ),
+      );
+      await tester.pump();
 
-        expect(
-          find.byKey(const Key('error_view_offline')),
-          findsOneWidget,
-        );
-        expect(
-          find.text("Can't reach Cerebro. Check your connection."),
-          findsOneWidget,
-        );
-        // A NetworkUnreachableException never renders as the
-        // server-error treatment — that would collapse the two
-        // distinct states this milestone requires stay distinct.
-        expect(find.byKey(const Key('error_view_serverError')), findsNothing);
-      },
-    );
+      expect(find.byKey(const Key('error_view_offline')), findsOneWidget);
+      expect(
+        find.text("Can't reach Cerebro. Check your connection."),
+        findsOneWidget,
+      );
+      // A NetworkUnreachableException never renders as the
+      // server-error treatment — that would collapse the two
+      // distinct states this milestone requires stay distinct.
+      expect(find.byKey(const Key('error_view_serverError')), findsNothing);
+    });
 
     testWidgets(
       'shows the server-error ErrorView on ServerErrorException, distinct '
@@ -189,9 +184,7 @@ void main() {
 
       await tester.pumpWidget(
         buildApp(
-          extraOverrides: [
-            connectionStatusProvider.overrideWith(() => fake),
-          ],
+          extraOverrides: [connectionStatusProvider.overrideWith(() => fake)],
         ),
       );
       await tester.pump();

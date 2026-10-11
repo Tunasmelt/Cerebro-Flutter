@@ -14,6 +14,7 @@ import '../data/ingest_retry_controller.dart';
 import '../data/ingest_status.dart';
 import '../../sealed/presentation/sealed_document_controls.dart';
 import 'document_presentation.dart';
+import 'document_file_screen.dart';
 
 class DocumentDetailScreen extends ConsumerWidget {
   const DocumentDetailScreen({super.key, required this.documentId});
@@ -155,6 +156,17 @@ class _DocumentDetailBody extends ConsumerWidget {
             abandoned: abandoned,
           ),
           SealedDocumentControls(documentId: documentId, status: status),
+          if (!abandoned && status != DocumentStatus.sealed)
+            OutlinedButton.icon(
+              key: const Key('document_view_file'),
+              icon: const Icon(Icons.visibility_outlined),
+              label: const Text('View file'),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => DocumentFileScreen(documentId: documentId),
+                ),
+              ),
+            ),
           if (abandoned) ...[
             Container(
               key: const Key('document_detail_abandoned'),

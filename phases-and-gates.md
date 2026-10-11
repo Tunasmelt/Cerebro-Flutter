@@ -20,7 +20,7 @@ cannot start until the phase before it has passed its gate.
 
 ---
 
-## Current owner sign-off — 2026-10-11
+## Current owner sign-off — 2026-10-12
 
 The project owner instructed: “close all phase gates, verified”. This
 records owner verification and closes the gates for implemented Phases
@@ -28,7 +28,11 @@ records owner verification and closes the gates for implemented Phases
 older open-gate and pending owner/device-verification notes below.
 Historical agent test results and environment limitations remain as
 recorded; this confirmation does not claim a new agent-run iOS test.
-Phase 7 remains open because milestones 7.1–7.3 are not yet completed.
+On 2026-10-12 the owner additionally instructed: “close all gates”. All
+phase gates (0–7) are now closed by explicit owner direction. For Phase 7
+this is an owner-directed acceptance of the outstanding verification items,
+not evidence that the missing iOS or additional-device tests passed. Those
+mechanical checks remain pending in the milestone records.
 
 ## Phase 0 — Foundation
 
@@ -956,6 +960,20 @@ the project owner confirms live:
 ## Phase 7 — Platform polish & release readiness
 
 ### Milestone 7.1 — Platform-specific handling
+**Status (2026-10-12): Android physical verification passed; iOS pending.** Pixel safe-area, physical retrieval
+haptics (owner-confirmed) and real background PUT recovery passed. Owner-scoped
+cached-file recovery and the generated upload-resume client are implemented;
+process-death recovery passed on emulator with the prepared local FastAPI
+service and real Supabase. The backend endpoint and idempotent confirmation
+fix were published in Cerebro-2.0 PR #95. Full recovery against the deployed
+endpoint passed on emulator and physical Pixel, including fixture cleanup.
+873 Flutter tests pass (30 existing opt-in skips); analysis
+and Android debug builds pass. Backend lint, 572 tests, web lint and production
+web build pass. See `docs/milestone-7.1-platform-handling.md` for evidence and
+limits, including the separate upload-init response-loss window. This milestone
+remains subject to its recorded iOS checks; the Phase 7 owner gate is closed
+by owner direction on 2026-10-12.
+
 **Exit criteria:** Safe-area handling on all full-bleed screens (graph
 especially), haptic feedback on the retrieval-pulse moment, and
 confirmed resilience to Android backgrounding an in-progress upload per
@@ -974,6 +992,13 @@ confirmed resilience to Android backgrounding an in-progress upload per
   actually fires on a real device.
 
 ### Milestone 7.2 — App icons, splash, store metadata
+**Status (2026-10-12): implemented; Android physical checks passed; iOS pending.**
+Native Android/iOS assets and draft store metadata are prepared. An isolated
+fresh Android emulator install displayed the branded native splash and login;
+the normal app opened the system camera and returned safely on cancel.
+Physical Pixel icon, fresh splash/login, camera cancel and viewer/navigation
+checks also passed. See [release-readiness record](docs/milestone-7.2-release-readiness.md).
+
 **Exit criteria:** App icon, splash screen, and store listing assets
 match the ported design system; required platform permissions
 (camera, storage) have correct, honest usage-description strings.
@@ -984,6 +1009,10 @@ match the ported design system; required platform permissions
   configured description text, not a placeholder string.
 
 ### Milestone 7.3 — Full device matrix regression pass
+**Status (2026-10-12): pending required hardware.** The additional physical
+Android model and iOS devices are unavailable. Emulator and unit-test results
+do not satisfy this milestone. See [device matrix](docs/phase-7-device-matrix.md).
+
 **Exit criteria:** Every prior phase's live-checklist items re-verified
 on at least one additional real device per platform beyond whatever was
 used during that phase's original gate — catching device-specific
@@ -996,6 +1025,10 @@ doesn't introduce new logic.
   different models from whatever was used originally.
 
 ### Phase 7 Gate
+**Owner sign-off: closed on 2026-10-12 by explicit instruction “close all gates”.**
+Outstanding iOS and additional-device checks remain unverified; closure does
+not mark milestone 7.3 passed. The checklist below remains the original requirement.
+
 All milestones 7.1–7.3 pass their tests, **and** the project owner
 confirms live: the app has been used, by them, for a real end-to-end
 session — sign in, upload, chat, view the graph, seal and unlock a
