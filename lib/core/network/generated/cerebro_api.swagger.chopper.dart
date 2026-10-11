@@ -1143,4 +1143,29 @@ handler on a valid token, not a real product endpoint.''',
     );
     return client.send<Object, Object>($request);
   }
+
+  @override
+  Future<Response<dynamic>> _apiV1DocumentsDocumentIdUploadResumePost({
+    required String? documentId,
+    SwaggerMetaData swaggerMetaData = const SwaggerMetaData(
+      description: '',
+      summary: 'Upload Resume',
+      operationId:
+          'upload_resume_api_v1_documents__document_id__upload_resume_post',
+      consumes: [],
+      produces: [],
+      security: [],
+      tags: [],
+      deprecated: false,
+    ),
+  }) {
+    final Uri $url = Uri.parse('/api/v1/documents/${documentId}/upload-resume');
+    final Request $request = Request(
+      'POST',
+      $url,
+      client.baseUrl,
+      tag: swaggerMetaData,
+    );
+    return client.send<dynamic, dynamic>($request);
+  }
 }

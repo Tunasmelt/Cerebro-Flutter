@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 
 import 'app_exception.dart';
@@ -11,6 +13,10 @@ abstract final class ErrorMapper {
     // attached — pass it straight through instead of re-mapping it.
     final carried = error.error;
     if (carried is AppException) return carried;
+    // Dart's HTTP adapter can wrap a mid-stream socket reset as `unknown`.
+    if (error.type == DioExceptionType.unknown && carried is SocketException) {
+      return const NetworkUnreachableException();
+    }
 
     switch (error.type) {
       case DioExceptionType.connectionTimeout:

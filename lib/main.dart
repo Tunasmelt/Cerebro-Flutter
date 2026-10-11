@@ -4,6 +4,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app/router.dart';
 import 'core/config/supabase_config.dart';
+import 'features/documents/data/upload/pending_upload_store.dart';
+import 'features/documents/data/upload/upload_controller.dart';
 import 'shared/theme/app_theme.dart';
 
 Future<void> main() async {
@@ -15,7 +17,16 @@ Future<void> main() async {
     url: SupabaseConfig.url,
     publishableKey: SupabaseConfig.anonKey,
   );
-  runApp(const ProviderScope(child: CerebroApp()));
+  runApp(
+    ProviderScope(
+      overrides: [
+        pendingUploadStoreProvider.overrideWithValue(
+          devicePendingUploadStore(),
+        ),
+      ],
+      child: const CerebroApp(),
+    ),
+  );
 }
 
 class CerebroApp extends ConsumerWidget {
@@ -23,6 +34,7 @@ class CerebroApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(uploadsProvider);
     final router = ref.watch(routerProvider);
     return MaterialApp.router(
       title: 'Cerebro',

@@ -351,19 +351,22 @@ class _GraphScreenState extends ConsumerState<GraphScreen>
               left: 0,
               right: 0,
               bottom: 0,
-              child: NodeInfoPanel(
-                node: expanded,
-                expansion: expansion,
-                onClose: ref.read(graphExpansionProvider.notifier).collapse,
-                onRetry: ref.read(graphExpansionProvider.notifier).retry,
-                onSelectChunk: ref
-                    .read(graphExpansionProvider.notifier)
-                    .selectChunk,
-                // Routing a node to Chat is a later milestone.
-                onChatAboutThis: ref
-                    .read(graphExpansionProvider.notifier)
-                    .collapse,
-                onOpenInDocuments: () => _openDocument(expanded.id),
+              child: SafeArea(
+                top: false,
+                child: NodeInfoPanel(
+                  node: expanded,
+                  expansion: expansion,
+                  onClose: ref.read(graphExpansionProvider.notifier).collapse,
+                  onRetry: ref.read(graphExpansionProvider.notifier).retry,
+                  onSelectChunk: ref
+                      .read(graphExpansionProvider.notifier)
+                      .selectChunk,
+                  // Routing a node to Chat is a later milestone.
+                  onChatAboutThis: ref
+                      .read(graphExpansionProvider.notifier)
+                      .collapse,
+                  onOpenInDocuments: () => _openDocument(expanded.id),
+                ),
               ),
             ),
         ],

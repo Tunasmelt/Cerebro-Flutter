@@ -20,11 +20,23 @@ class FakeUploadApi implements UploadApi {
 
   Object? initError;
   Object? confirmError;
+  Object? resumeError;
+  Completer<void>? initGate;
 
   /// Set to hold `confirm` open until the test completes it.
   Completer<void>? confirmGate;
 
   String documentId = 'doc-1';
+
+  @override
+  Future<UploadInit> resume(String documentId) async {
+    log.add('resume');
+    if (resumeError != null) throw resumeError!;
+    return UploadInit(
+      documentId: documentId,
+      uploadUrl: Uri.parse('https://storage.example/upload?token=t'),
+    );
+  }
 
   @override
   Future<UploadInit> init({
@@ -33,6 +45,7 @@ class FakeUploadApi implements UploadApi {
     required int sizeBytes,
   }) async {
     log.add('init');
+    await initGate?.future;
     final error = initError;
     if (error != null) throw error;
     return UploadInit(

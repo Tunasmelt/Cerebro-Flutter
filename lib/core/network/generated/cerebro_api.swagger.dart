@@ -1212,6 +1212,36 @@ handler on a valid token, not a real product endpoint.''',
       deprecated: false,
     ),
   });
+
+  ///Upload Resume
+  ///@param document_id
+  Future<chopper.Response> apiV1DocumentsDocumentIdUploadResumePost({
+    required String? documentId,
+  }) {
+    return _apiV1DocumentsDocumentIdUploadResumePost(documentId: documentId);
+  }
+
+  ///Upload Resume
+  ///@param document_id
+  @POST(
+    path: '/api/v1/documents/{document_id}/upload-resume',
+    optionalBody: true,
+  )
+  Future<chopper.Response> _apiV1DocumentsDocumentIdUploadResumePost({
+    @Path('document_id') required String? documentId,
+    @chopper.Tag()
+    SwaggerMetaData swaggerMetaData = const SwaggerMetaData(
+      description: '',
+      summary: 'Upload Resume',
+      operationId:
+          'upload_resume_api_v1_documents__document_id__upload_resume_post',
+      consumes: [],
+      produces: [],
+      security: [],
+      tags: [],
+      deprecated: false,
+    ),
+  });
 }
 
 @JsonSerializable(explicitToJson: true)

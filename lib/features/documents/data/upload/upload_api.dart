@@ -5,7 +5,8 @@ import '../../../../core/network/generated/cerebro_api.swagger.dart';
 import '../documents_error_mapper.dart';
 
 /// `upload-init`'s `201` body: the new document's id and a short-lived
-/// (60s, per the backend) Supabase signed upload URL.
+/// Supabase signed upload URL. The backend uses Storage's upload-sign
+/// defaults; its explicit 60-second TTL is for download URLs, not uploads.
 class UploadInit {
   const UploadInit({required this.documentId, required this.uploadUrl});
 
@@ -38,12 +39,25 @@ abstract interface class UploadApi {
   });
 
   Future<UploadConfirmation> confirm(String documentId);
+  Future<UploadInit> resume(String documentId);
 }
 
 class ApiUploadApi implements UploadApi {
   ApiUploadApi(this._api);
 
   final CerebroApi _api;
+
+  @override
+  Future<UploadInit> resume(String documentId) async {
+    final response = await _run(
+      _api.apiV1DocumentsDocumentIdUploadResumePost(documentId: documentId),
+    );
+    final body = _asMap(response);
+    return UploadInit(
+      documentId: body['id'] as String,
+      uploadUrl: Uri.parse(body['upload_url'] as String),
+    );
+  }
 
   @override
   Future<UploadInit> init({

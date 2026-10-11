@@ -21,6 +21,55 @@ void main() {
     );
   }
 
+  testWidgets('resuming fetches completed ingest after backgrounding', (
+    tester,
+  ) async {
+    final documents = <DocumentSummary>[
+      DocumentSummary(
+        id: 'background-doc',
+        title: 'background.txt',
+        mime: 'text/plain',
+        sizeBytes: 10,
+        originalSizeBytes: 10,
+        status: DocumentStatus.processing,
+        createdAt: DateTime.now(),
+      ),
+    ];
+    final repo = FakeDocumentsRepository(documents: documents);
+    await tester.pumpWidget(buildApp(repo));
+    await tester.pump();
+    expect(repo.listCalls, 1);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    documents[0] = documents[0].copyWith(status: DocumentStatus.ready);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    expect(repo.listCalls, 2);
+    expect(find.text('Ready'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('disposed Documents does not fetch when app resumes', (
+    tester,
+  ) async {
+    final repo = FakeDocumentsRepository();
+    await tester.pumpWidget(buildApp(repo));
+    await tester.pumpAndSettle();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    await tester.pumpWidget(const SizedBox());
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    expect(repo.listCalls, 1);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('shows the empty state when the user has no documents', (
     tester,
   ) async {
@@ -43,7 +92,9 @@ void main() {
       status: DocumentStatus.ready,
       createdAt: DateTime.utc(2026, 1, 1),
     );
-    await tester.pumpWidget(buildApp(FakeDocumentsRepository(documents: [doc])));
+    await tester.pumpWidget(
+      buildApp(FakeDocumentsRepository(documents: [doc])),
+    );
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('document_row_doc-1')), findsOneWidget);
