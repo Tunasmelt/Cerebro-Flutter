@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="24" android:viewportHeight="24">
+    <!-- Geometry mirrors Cerebro-2.0/apps/web/src/app/icon.svg; inset for system masks. -->
+    <group android:scaleX="0.66" android:scaleY="0.66" android:pivotX="12" android:pivotY="12">
+        <path android:pathData="M12,12 L5,6 M12,12 L19,6" android:strokeColor="#2dd4bf" android:strokeWidth="1.4" android:strokeLineCap="round" />
+        <path android:pathData="M12,12 L6,19" android:strokeColor="#992dd4bf" android:strokeWidth="1.4" android:strokeLineCap="round" />
+        <path android:pathData="M2.8,6 a2.2,2.2 0,1 0,4.4,0 a2.2,2.2 0,1 0,-4.4,0" android:fillColor="#d92dd4bf" />
+        <path android:pathData="M16.8,6 a2.2,2.2 0,1 0,4.4,0 a2.2,2.2 0,1 0,-4.4,0" android:fillColor="#d92dd4bf" />
+        <path android:pathData="M4.2,19 a1.8,1.8 0,1 0,3.6,0 a1.8,1.8 0,1 0,-3.6,0" android:fillColor="#8c2dd4bf" />
+        <path android:pathData="M8.6,12 a3.4,3.4 0,1 0,6.8,0 a3.4,3.4 0,1 0,-6.8,0" android:fillColor="#8b5cf6" />
+    </group>
+</vector>

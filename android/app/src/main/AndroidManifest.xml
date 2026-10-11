@@ -6,7 +6,7 @@
          test/platform/platform_config_test.dart. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <application
-        android:label="cerebro_mobile"
+        android:label="Cerebro"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

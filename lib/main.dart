@@ -40,6 +40,7 @@ class CerebroApp extends ConsumerWidget {
     final router = ref.watch(routerProvider);
     return MaterialApp.router(
       title: 'Cerebro',
+      debugShowCheckedModeBanner: false,
       theme: AppTheme.dark,
       routerConfig: router,
     );
