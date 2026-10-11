@@ -93,14 +93,19 @@ and a gate that the project owner confirms on a real device
 
 | Phase | Scope | State |
 | --- | --- | --- |
-| 0 | Foundation: scaffold, tokens/theme, networking, typed client, CI | Done |
-| 1 | Auth and app shell, error handling | Done |
-| 2 | Documents and upload | Done (device gate checks pending with the owner) |
-| 3 | Chat and retrieval: SSE client, chat screen, session management | Done (device gate checks pending with the owner) |
-| 4 | 2D brain graph | 4.1–4.3 implemented; 4.3 checked against the real backend and Android emulator (live pulses, Graph replay picker, automatic Chat History replay). Phase 4 owner gate open; physical-device feel and iOS checks remain. |
-| 5 | Sealed tier (Argon2id + AES-256-GCM, parameter-identical to web) | 5.1-5.4 required Android checks passed, including completed sealed chat and uninterrupted real 15-minute expiry after backend repairs. 5.4 direct/injection, malformed-key and genuine cross-user checks pass after backend PR #94; iOS device checks pending; owner gate open. |
-| 6 | Kanban, todo, token playground | Not started (screen shells only) |
+| 0 | Foundation: scaffold, tokens/theme, networking, typed client, CI | Done; owner gate closed 2026-10-11 |
+| 1 | Auth and app shell, error handling | Done; owner gate closed 2026-10-11 |
+| 2 | Documents and upload | Done; owner gate closed 2026-10-11 |
+| 3 | Chat and retrieval: SSE client, chat screen, session management | Done; owner gate closed 2026-10-11 |
+| 4 | 2D brain graph | 4.1–4.3 implemented; 4.3 checked against the real backend and Android emulator (live pulses, Graph replay picker, automatic Chat History replay). Owner gate closed 2026-10-11. |
+| 5 | Sealed tier (Argon2id + AES-256-GCM, parameter-identical to web) | 5.1-5.4 required Android checks passed, including completed sealed chat and uninterrupted real 15-minute expiry after backend repairs. 5.4 direct/injection, malformed-key and genuine cross-user checks pass after backend PR #94; owner gate closed 2026-10-11. |
+| 6 | 6.1 live Kanban, 6.2 live Todo, 6.3 read-only Token Playground | Implemented and verified on Android with the deployed backend: card/task persistence and saved-turn prompt/token/cost display. Owner gate closed 2026-10-11. |
 | 7 | Platform polish and release readiness | Not started |
+
+The owner confirmed all implemented phase gates (0–6) on 2026-10-11.
+Historical agent records retain their test/environment limitations; this
+sign-off does not add an agent-run iOS test. Phase 7 still requires its
+implementation and release checks.
 
 ## Design decisions worth knowing
 
