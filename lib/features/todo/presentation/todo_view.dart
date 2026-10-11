@@ -9,6 +9,7 @@ import '../../auth/data/current_user_provider.dart';
 import '../../documents/data/documents_list_notifier.dart';
 import '../data/todo_api.dart';
 import '../data/todo_controller.dart';
+import '../../../shared/widgets/app_confirm_dialog.dart';
 
 class TodoView extends ConsumerStatefulWidget {
   const TodoView({super.key});
@@ -26,24 +27,14 @@ class _TodoViewState extends ConsumerState<TodoView> {
   );
   Future<void> _delete(TodoTask task) async {
     final owner = ref.read(currentUserIdProvider);
-    final accepted = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete task?'),
-        content: Text(task.title),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+    final accepted = await showAppConfirmDialog(
+      context,
+      title: 'Delete task?',
+      message: task.title,
+      confirmLabel: 'Delete',
+      destructive: true,
     );
-    if (accepted == true &&
+    if (accepted &&
         mounted &&
         ref.read(currentUserIdProvider) == owner) {
       await ref.read(todoControllerProvider.notifier).delete(task.id);

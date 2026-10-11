@@ -9,6 +9,7 @@ import '../../../shared/tokens/app_spacing.dart';
 import '../../../shared/tokens/app_typography.dart';
 import '../data/auth_notifier.dart';
 import '../data/auth_state.dart';
+import '../../../shared/widgets/app_text_field.dart';
 
 /// Adapted from `Mockups 2.0/src/components/SignIn.tsx` — same layout
 /// (centered card, violet radial glow), real app tokens instead of the
@@ -47,10 +48,9 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     final email = _emailController.text.trim();
     final password = _passwordController.text;
     if (email.isEmpty || password.isEmpty) return;
-    ref.read(authNotifierProvider.notifier).signIn(
-      email: email,
-      password: password,
-    );
+    ref
+        .read(authNotifierProvider.notifier)
+        .signIn(email: email, password: password);
   }
 
   @override
@@ -99,7 +99,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                       ),
                     ),
                     const SizedBox(height: AppSpacing.s5),
-                    _Field(
+                    AppTextField(
                       key: const Key('sign_in_email'),
                       label: 'Email',
                       controller: _emailController,
@@ -107,7 +107,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                       autofillHints: const [AutofillHints.email],
                     ),
                     const SizedBox(height: AppSpacing.s4),
-                    _Field(
+                    AppTextField(
                       key: const Key('sign_in_password'),
                       label: 'Password',
                       controller: _passwordController,
@@ -190,47 +190,6 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _Field extends StatelessWidget {
-  const _Field({
-    super.key,
-    required this.label,
-    required this.controller,
-    this.obscureText = false,
-    this.keyboardType,
-    this.autofillHints,
-    this.onSubmitted,
-  });
-
-  final String label;
-  final TextEditingController controller;
-  final bool obscureText;
-  final TextInputType? keyboardType;
-  final List<String>? autofillHints;
-  final ValueChanged<String>? onSubmitted;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: AppTypography.xs.copyWith(color: AppColors.textSecondary),
-        ),
-        const SizedBox(height: AppSpacing.s1),
-        TextField(
-          controller: controller,
-          obscureText: obscureText,
-          keyboardType: keyboardType,
-          autofillHints: autofillHints,
-          onSubmitted: onSubmitted,
-          style: AppTypography.sm.copyWith(color: AppColors.textPrimary),
-        ),
-      ],
     );
   }
 }

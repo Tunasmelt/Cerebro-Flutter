@@ -2032,3 +2032,71 @@ with a failing test before fixing it.
   Full Flutter suite: 883 passing, 30 existing skips. Destructive/account-security
   mutations were tested with doubles, not executed on the owner's live account.
 - Phase 7 owner gate remains closed by the owner's explicit direction.
+
+
+## UI/UX pass (cross-cutting, after Phase 7)
+
+Direction chosen by the owner: **modernize within the tokens** — keep the web
+palette, fonts, radii (6/8/12) and the amber-only-for-sealed rule; do not
+pixel-match the web mockups. Decisions: 5 bottom tabs with Playground moved
+under Settings; a maintained Markdown package for chat; one `POST
+/graph/recluster` on the test account for graph verification. Mobbin's MCP
+needs a paid plan and was unavailable; references were established
+iOS/Android patterns, the repo's `Mockups/` and the installed design skills.
+Delivered one PR per phase (A foundation, B navigation, C chat, D documents,
+E remaining screens, F graph, G QA). The plan is in the PR descriptions.
+
+### UI/UX pass - A: foundation (theme, tokens, shared widgets)
+- **Audit findings that drove it (current code, 2026-10-12):** only buttons
+  and inputs were themed, so dialogs, chips, cards, snackbars, menus, selection
+  handles and list tiles fell back to Material defaults (the Android text
+  selection toolbar was light); Outfit was never wired into the text theme;
+  six different screen-header styles; five hand-written delete dialogs, four
+  copies of a status-pill container, two identical auth field classes;
+  `ErrorView`'s Retry had zero padding; no motion or elevation tokens.
+- **Theme (`app_theme.dart`):** a full component layer — AppBar, Card, Chip,
+  Dialog, BottomSheet, SnackBar, ListTile, PopupMenu, Progress, Tooltip, text
+  selection (violet), FAB, Checkbox, Switch, SegmentedButton, and
+  Filled/Elevated/Outlined/Text/Icon buttons all at a 44 px minimum — plus
+  input focus and error borders, a complete `ColorScheme` (no Material 3
+  surface tint, outlines from the border tokens), and Outfit in the headline
+  and title styles with text colours set. Text buttons use the lighter violet.
+- **Tokens:** `AppMotion` (ease-soft, 120/220/360 ms, ease-pulse 480 ms) and
+  `AppShadows` (sm/md/lg and the violet/teal glows), ported from the web
+  `motion.css` / `shadows.css`. **The `*Subtle` colour RGBs were deliberately
+  left as they are:** the audit flagged them as drifting from their bases
+  (violet subtle is 8B5CF6, not 7C5AF6), but that is how the web CSS defines
+  them (`rgba(139,92,246,.12)`), and the repo's rule is that the web source is
+  the truth. Noted, not changed.
+- **Shared widgets (`lib/shared/widgets/`):** `showAppConfirmDialog`
+  (destructive confirms are red; replaces five dialogs, keys preserved so
+  their tests still hold; dismissing is a "no", never null), `AppEmptyState`,
+  `AppScreenHeader`, `AppSectionHeader`, `StatusPill`, `AppTextField`
+  (replaces the two identical private auth fields; optional show/hide
+  password), `AppSkeletonList` (shimmer that stands still under reduced
+  motion). `ErrorView` Retry is a full-size target and both variants are live
+  regions. Screens adopt the headers, pills and skeletons in their own phases.
+- **Contrast, measured (not estimated)** — new `app_contrast_test.dart`:
+  primary text 13-17:1 and secondary text 6-7.5:1 on every surface; teal,
+  green, amber, danger and the lighter violet all >= 4.5:1 on the page and
+  card surfaces. **Confirms one audit finding:** the base violet is only
+  4.11:1 on the card surface, so it must not carry body text (it is for fills,
+  rings and icons, >= 3:1); text uses `accentPrimaryHover` (5.49:1). The dark
+  label on a violet button is 4.36:1 (fine for 14 px medium labels). `grayDim`
+  is 4.30:1 on cards (placeholders/disabled only).
+- **Found by testing:** `AppEmptyState` overflowed by 121 px on a 320x480 phone
+  at 1.6x text (it centred but could not scroll) — now it centres when it fits
+  and scrolls when it does not.
+- **Tests:** theme (15), contrast (20), shared widgets (22); mutation-checked
+  with 15 injected faults (dismiss counted as yes, destructive not red, keys
+  ignored, eye toggle, password visible by default, empty state not scrolling,
+  skeleton ignoring reduced motion, error not announced, headings not
+  headings, touch targets, unthemed dialogs, text violet, Outfit unwired), all
+  caught. Suite: 940 passing, 30 skipped (gated).
+- **Emulator:** Account settings now shows themed inputs, outlined buttons and
+  the violet filled button. (No screenshot is committed: the screen shows the
+  account's real email address.) The vault-wipe dialog was not triggered (it
+  needs the typed DELETE gate); its styling is covered by widget tests.
+
+**Noted, not done here:** the nav still has six tabs and the account screen
+still needs its own layout work — phases B and E.

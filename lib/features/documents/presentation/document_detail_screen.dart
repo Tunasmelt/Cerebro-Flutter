@@ -15,6 +15,7 @@ import '../data/ingest_status.dart';
 import '../../sealed/presentation/sealed_document_controls.dart';
 import 'document_presentation.dart';
 import 'document_file_screen.dart';
+import '../../../shared/widgets/app_confirm_dialog.dart';
 
 class DocumentDetailScreen extends ConsumerWidget {
   const DocumentDetailScreen({super.key, required this.documentId});
@@ -260,31 +261,18 @@ class _DeleteButton extends ConsumerWidget {
   final String documentId;
 
   Future<void> _onPressed(BuildContext context, WidgetRef ref) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.bgElevated,
-        title: const Text('Delete this document?'),
-        content: const Text(
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: 'Delete this document?',
+      message:
           "The file and everything made from it will be removed. This can't "
           'be undone.',
-        ),
-        actions: [
-          TextButton(
-            key: const Key('document_detail_delete_cancel'),
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            key: const Key('document_detail_delete_confirm'),
-            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Delete',
+      destructive: true,
+      confirmKey: const Key('document_detail_delete_confirm'),
+      cancelKey: const Key('document_detail_delete_cancel'),
     );
-    if (confirmed != true || !context.mounted) return;
+    if (!confirmed || !context.mounted) return;
 
     final deleted = await ref
         .read(deleteDocumentProvider(documentId).notifier)
