@@ -12,6 +12,7 @@ import '../data/chat_export_service.dart';
 import '../data/chat_history_api.dart';
 import '../data/chat_sessions_list.dart';
 import 'conversation_date.dart';
+import '../../../shared/widgets/app_confirm_dialog.dart';
 
 enum _SessionAction { export, delete }
 
@@ -57,31 +58,18 @@ class _ChatHistoryScreenState extends ConsumerState<ChatHistoryScreen> {
 
   Future<void> _delete(ChatSessionSummary session) async {
     if (_working.contains(session.id)) return;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.bgElevated,
-        title: const Text('Delete this conversation?'),
-        content: const Text(
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: 'Delete this conversation?',
+      message:
           "The conversation and its messages will be removed. This can't be "
           'undone.',
-        ),
-        actions: [
-          TextButton(
-            key: const Key('chat_delete_cancel'),
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            key: const Key('chat_delete_confirm'),
-            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Delete',
+      destructive: true,
+      confirmKey: const Key('chat_delete_confirm'),
+      cancelKey: const Key('chat_delete_cancel'),
     );
-    if (confirmed != true || !mounted) return;
+    if (!confirmed || !mounted) return;
 
     setState(() => _working.add(session.id));
     final error = await ref

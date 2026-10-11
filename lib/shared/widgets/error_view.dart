@@ -31,55 +31,63 @@ class ErrorView extends StatelessWidget {
     final presentation = ErrorPresentation.of(exception);
 
     if (!expanded) {
-      return Container(
-        key: Key('error_view_${presentation.kind.name}'),
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.s3,
-          vertical: AppSpacing.s2,
-        ),
-        decoration: BoxDecoration(
-          color: presentation.color.withValues(alpha: 0.12),
-          borderRadius: AppRadius.mdRadius,
-        ),
-        child: Row(
-          children: [
-            Icon(presentation.icon, size: 16, color: presentation.color),
-            const SizedBox(width: AppSpacing.s2),
-            Expanded(
-              child: Text(
-                presentation.message,
-                style: AppTypography.xs.copyWith(color: presentation.color),
-              ),
-            ),
-            if (onRetry != null) ...[
+      return Semantics(
+        liveRegion: true,
+        container: true,
+        child: Container(
+          key: Key('error_view_${presentation.kind.name}'),
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.s3,
+            vertical: AppSpacing.s2,
+          ),
+          decoration: BoxDecoration(
+            color: presentation.color.withValues(alpha: 0.12),
+            borderRadius: AppRadius.mdRadius,
+          ),
+          child: Row(
+            children: [
+              Icon(presentation.icon, size: 16, color: presentation.color),
               const SizedBox(width: AppSpacing.s2),
-              _RetryButton(color: presentation.color, onRetry: onRetry!),
+              Expanded(
+                child: Text(
+                  presentation.message,
+                  style: AppTypography.xs.copyWith(color: presentation.color),
+                ),
+              ),
+              if (onRetry != null) ...[
+                const SizedBox(width: AppSpacing.s2),
+                _RetryButton(color: presentation.color, onRetry: onRetry!),
+              ],
             ],
-          ],
+          ),
         ),
       );
     }
 
-    return Center(
-      key: Key('error_view_${presentation.kind.name}'),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.s6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(presentation.icon, size: 40, color: presentation.color),
-            const SizedBox(height: AppSpacing.s3),
-            Text(
-              presentation.message,
-              textAlign: TextAlign.center,
-              style: AppTypography.sm.copyWith(color: presentation.color),
-            ),
-            if (onRetry != null) ...[
-              const SizedBox(height: AppSpacing.s4),
-              _RetryButton(color: presentation.color, onRetry: onRetry!),
+    return Semantics(
+      liveRegion: true,
+      container: true,
+      child: Center(
+        key: Key('error_view_${presentation.kind.name}'),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.s6),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(presentation.icon, size: 40, color: presentation.color),
+              const SizedBox(height: AppSpacing.s3),
+              Text(
+                presentation.message,
+                textAlign: TextAlign.center,
+                style: AppTypography.sm.copyWith(color: presentation.color),
+              ),
+              if (onRetry != null) ...[
+                const SizedBox(height: AppSpacing.s4),
+                _RetryButton(color: presentation.color, onRetry: onRetry!),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -97,7 +105,12 @@ class _RetryButton extends StatelessWidget {
     return TextButton(
       key: const Key('error_view_retry'),
       onPressed: onRetry,
-      style: TextButton.styleFrom(foregroundColor: color, padding: EdgeInsets.zero),
+      // Full-size target (the theme's 44px minimum) — a bare 'Retry' with no
+      // padding was a few pixels tall.
+      style: TextButton.styleFrom(
+        foregroundColor: color,
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s3),
+      ),
       child: const Text('Retry'),
     );
   }

@@ -9,6 +9,7 @@ import '../../../shared/tokens/app_spacing.dart';
 import '../../../shared/tokens/app_typography.dart';
 import '../data/auth_notifier.dart';
 import '../data/auth_state.dart';
+import '../../../shared/widgets/app_text_field.dart';
 
 /// No sign-up mockup exists yet (only `SignIn.tsx` was reviewed) — this
 /// mirrors web's real, working pattern instead
@@ -56,10 +57,9 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
       return;
     }
     setState(() => _localError = null);
-    ref.read(authNotifierProvider.notifier).signUp(
-      email: email,
-      password: password,
-    );
+    ref
+        .read(authNotifierProvider.notifier)
+        .signUp(email: email, password: password);
   }
 
   @override
@@ -101,7 +101,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                _LabeledField(
+                AppTextField(
                   key: const Key('sign_up_email'),
                   label: 'Email',
                   controller: _emailController,
@@ -109,7 +109,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                   autofillHints: const [AutofillHints.email],
                 ),
                 const SizedBox(height: AppSpacing.s4),
-                _LabeledField(
+                AppTextField(
                   key: const Key('sign_up_password'),
                   label: 'Password',
                   controller: _passwordController,
@@ -117,7 +117,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                   autofillHints: const [AutofillHints.newPassword],
                 ),
                 const SizedBox(height: AppSpacing.s4),
-                _LabeledField(
+                AppTextField(
                   key: const Key('sign_up_confirm_password'),
                   label: 'Confirm password',
                   controller: _confirmPasswordController,
@@ -300,47 +300,6 @@ class _CheckEmailScreenState extends ConsumerState<_CheckEmailScreen> {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _LabeledField extends StatelessWidget {
-  const _LabeledField({
-    super.key,
-    required this.label,
-    required this.controller,
-    this.obscureText = false,
-    this.keyboardType,
-    this.autofillHints,
-    this.onSubmitted,
-  });
-
-  final String label;
-  final TextEditingController controller;
-  final bool obscureText;
-  final TextInputType? keyboardType;
-  final List<String>? autofillHints;
-  final ValueChanged<String>? onSubmitted;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: AppTypography.xs.copyWith(color: AppColors.textSecondary),
-        ),
-        const SizedBox(height: AppSpacing.s1),
-        TextField(
-          controller: controller,
-          obscureText: obscureText,
-          keyboardType: keyboardType,
-          autofillHints: autofillHints,
-          onSubmitted: onSubmitted,
-          style: AppTypography.sm.copyWith(color: AppColors.textPrimary),
-        ),
-      ],
     );
   }
 }

@@ -11,6 +11,7 @@ import '../data/kanban_board.dart';
 import '../data/kanban_controller.dart';
 import 'create_card_dialog.dart';
 import 'kanban_view.dart';
+import '../../../shared/widgets/app_confirm_dialog.dart';
 
 class BoardScreen extends ConsumerStatefulWidget {
   const BoardScreen({super.key});
@@ -26,24 +27,14 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
   );
   Future<void> _delete(KanbanCard card) async {
     final controller = ref.read(kanbanControllerProvider.notifier);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete card?'),
-        content: Text(card.title),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: 'Delete card?',
+      message: card.title,
+      confirmLabel: 'Delete',
+      destructive: true,
     );
-    if (confirmed == true && mounted) await controller.delete(card.id);
+    if (confirmed && mounted) await controller.delete(card.id);
   }
 
   @override

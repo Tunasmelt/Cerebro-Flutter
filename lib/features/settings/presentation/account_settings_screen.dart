@@ -11,6 +11,7 @@ import '../../documents/data/documents_error_mapper.dart';
 import '../../documents/data/upload/upload_controller.dart';
 import '../../documents/data/upload/upload_state.dart';
 import '../data/account_settings.dart';
+import '../../../shared/widgets/app_confirm_dialog.dart';
 
 final wipeVaultProvider = Provider<Future<void> Function()>(
   (ref) => () async {
@@ -149,26 +150,16 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
       );
       return;
     }
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Permanently delete vault data?'),
-        content: const Text(
-          'Documents, sealed content, chats, boards and tasks will be deleted. This cannot be undone. Your sign-in account will remain.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete vault data'),
-          ),
-        ],
-      ),
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: 'Permanently delete vault data?',
+      message:
+          'Documents, sealed content, chats, boards and tasks will be '
+          'deleted. This cannot be undone. Your sign-in account will remain.',
+      confirmLabel: 'Delete vault data',
+      destructive: true,
     );
-    if (confirmed != true || !_sameOwner) return;
+    if (!confirmed || !_sameOwner) return;
     await _run(() async {
       await ref.read(uploadsProvider.notifier).restoration;
       if (!_sameOwner) return;
