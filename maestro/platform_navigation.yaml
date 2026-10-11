@@ -9,21 +9,23 @@ tags:
 - launchApp:
     clearState: false
     stopApp: false
-- tapOn: 'Docs\nDocs'
+- tapOn: Docs
 - assertVisible: Documents
 - assertVisible: Add a document
-- tapOn: 'Graph\nGraph'
+- tapOn: Graph
 - assertVisible: Refresh
 - assertVisible: history
 - tapOn: history
 - assertVisible: Replay a conversation
 - back
-- tapOn: 'Board\nBoard'
+- tapOn: Board
 - assertVisible: Refresh board
 - assertVisible: Todo
-- tapOn: 'Play\nPlay'
+- tapOn: Settings
+- tapOn: "Token Inspector.*"
 - assertVisible: Token Playground
-- tapOn: 'Settings\nSettings'
+- back
+- tapOn: Settings
 - assertVisible: Settings
-- tapOn: 'Docs\nDocs'
+- tapOn: Docs
 - assertVisible: Documents

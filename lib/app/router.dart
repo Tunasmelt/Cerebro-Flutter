@@ -60,6 +60,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       matchedLocation: state.matchedLocation,
     ),
     routes: [
+      GoRoute(path: '/playground', redirect: (_, _) => AppRoutes.playground),
       GoRoute(
         path: AppRoutes.signIn,
         builder: (context, state) => const SignInScreen(),
@@ -121,16 +122,14 @@ final routerProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: AppRoutes.playground,
-                builder: (context, state) => const PlaygroundScreen(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
                 path: AppRoutes.settings,
                 builder: (context, state) => const SettingsScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'token-inspector',
+                    builder: (context, state) => const PlaygroundScreen(),
+                  ),
+                ],
               ),
             ],
           ),

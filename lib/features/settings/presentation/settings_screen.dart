@@ -67,6 +67,14 @@ class SettingsScreen extends ConsumerWidget {
                       ),
                     ),
             ),
+            ListTile(
+              leading: const Icon(Icons.analytics_outlined),
+              title: const Text('Token Inspector'),
+              subtitle: const Text(
+                'Inspect a saved reply and its token estimates',
+              ),
+              onTap: () => context.push(AppRoutes.playground),
+            ),
             const Divider(),
             ListTile(
               leading: const Icon(Icons.description_outlined),
@@ -143,7 +151,7 @@ class SettingsScreen extends ConsumerWidget {
                         ListTile(
                           title: Text(row.title),
                           subtitle: Text(
-                            'Original: ${row.originalSizeBytes == null ? "Unknown" : formatDocumentSize(row.originalSizeBytes!)} � Indexed: ${row.status == DocumentStatus.sealed ? "Unavailable while sealed" : formatDocumentSize(row.sizeBytes)}',
+                            'Original: ${row.originalSizeBytes == null ? "Unknown" : formatDocumentSize(row.originalSizeBytes!)} | Indexed: ${row.status == DocumentStatus.sealed ? "Unavailable while sealed" : formatDocumentSize(row.sizeBytes)}',
                           ),
                         ),
                     ],

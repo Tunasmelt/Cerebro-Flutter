@@ -1,52 +1,96 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
-
 import '../tokens/app_colors.dart';
+import '../tokens/app_motion.dart';
+import '../tokens/app_radius.dart';
 import '../tokens/app_spacing.dart';
 import '../tokens/app_typography.dart';
 
-/// The app's single real bottom navigation bar — Docs/Chat/Graph/Board/
-/// Play/Settings, per the mockups. Promoted from the per-screen
-/// decorative bars built during the wireframe milestone (0.2) now that
-/// Milestone 1.2 gives it real taps via [onTap].
+const _items = <(String, IconData)>[
+  ('Docs', Icons.description_outlined),
+  ('Chat', Icons.chat_bubble_outline),
+  ('Graph', Icons.hub_outlined),
+  ('Board', Icons.dashboard_outlined),
+  ('Settings', Icons.settings_outlined),
+];
+
 class AppBottomNav extends StatelessWidget {
   const AppBottomNav({
     super.key,
     required this.currentIndex,
     required this.onTap,
   });
-
   final int currentIndex;
   final ValueChanged<int> onTap;
 
-  static const _items = <_NavItemData>[
-    _NavItemData('Docs', Icons.description_outlined),
-    _NavItemData('Chat', Icons.chat_bubble_outline),
-    _NavItemData('Graph', Icons.hub_outlined),
-    _NavItemData('Board', Icons.dashboard_outlined),
-    _NavItemData('Play', Icons.play_circle_fill),
-    _NavItemData('Settings', Icons.settings_outlined),
-  ];
-
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: const BoxDecoration(
-        color: AppColors.bgElevated,
-        border: Border(top: BorderSide(color: AppColors.borderSubtle)),
-      ),
+    final labelHeight = MediaQuery.textScalerOf(context).scale(12) * 8 / 3;
+    return Material(
+      color: AppColors.bgElevated,
       child: SafeArea(
         top: false,
-        child: SizedBox(
-          height: 68,
+        child: Container(
+          decoration: const BoxDecoration(
+            border: Border(top: BorderSide(color: AppColors.borderSubtle)),
+          ),
+          height: math.max(68, labelHeight + 40),
           child: Row(
             children: [
-              for (var i = 0; i < _items.length; i++)
+              for (final (index, item) in _items.indexed)
                 Expanded(
-                  child: _NavItem(
-                    key: Key('app_nav_${_items[i].label.toLowerCase()}'),
-                    data: _items[i],
-                    active: i == currentIndex,
-                    onTap: () => onTap(i),
+                  child: Semantics(
+                    key: Key('app_nav_${item.$1.toLowerCase()}'),
+                    button: true,
+                    selected: index == currentIndex,
+                    label: item.$1,
+                    onTap: () => onTap(index),
+                    excludeSemantics: true,
+                    child: InkWell(
+                      onTap: () => onTap(index),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          AnimatedContainer(
+                            duration: MediaQuery.disableAnimationsOf(context)
+                                ? Duration.zero
+                                : AppMotion.base,
+                            curve: AppMotion.soft,
+                            width: 48,
+                            height: 28,
+                            decoration: BoxDecoration(
+                              color: index == currentIndex
+                                  ? AppColors.accentPrimarySubtle
+                                  : Colors.transparent,
+                              borderRadius: AppRadius.mdRadius,
+                            ),
+                            child: Icon(
+                              item.$2,
+                              size: 22,
+                              color: index == currentIndex
+                                  ? AppColors.accentSecondary
+                                  : AppColors.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.s1),
+                          SizedBox(
+                            height: labelHeight,
+                            child: Center(
+                              child: Text(
+                                item.$1,
+                                maxLines: 2,
+                                textAlign: TextAlign.center,
+                                style: AppTypography.xs.copyWith(
+                                  color: index == currentIndex
+                                      ? AppColors.accentSecondary
+                                      : AppColors.textSecondary,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
             ],
@@ -57,61 +101,47 @@ class AppBottomNav extends StatelessWidget {
   }
 }
 
-class _NavItemData {
-  const _NavItemData(this.label, this.icon);
-  final String label;
-  final IconData icon;
-}
-
-class _NavItem extends StatelessWidget {
-  const _NavItem({
+class AppNavigationRail extends StatelessWidget {
+  const AppNavigationRail({
     super.key,
-    required this.data,
-    required this.active,
+    required this.currentIndex,
     required this.onTap,
   });
-
-  final _NavItemData data;
-  final bool active;
-  final VoidCallback onTap;
+  final int currentIndex;
+  final ValueChanged<int> onTap;
 
   @override
-  Widget build(BuildContext context) {
-    final color = active ? AppColors.accentPrimary : AppColors.textSecondary;
-    return Semantics(
-      button: true,
-      selected: active,
-      label: data.label,
-      child: InkWell(
-        onTap: onTap,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(
-            minHeight: AppSpacing.minTouchTarget,
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              active
-                  ? Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: const BoxDecoration(
-                        color: AppColors.accentPrimary,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        data.icon,
-                        color: AppColors.textOnAccent,
-                        size: 18,
-                      ),
-                    )
-                  : Icon(data.icon, color: color, size: 22),
-              const SizedBox(height: 4),
-              Text(data.label, style: AppTypography.xs.copyWith(color: color)),
-            ],
-          ),
-        ),
+  Widget build(BuildContext context) => SafeArea(
+    right: false,
+    child: NavigationRail(
+      scrollable: true,
+      backgroundColor: AppColors.bgElevated,
+      selectedIndex: currentIndex,
+      onDestinationSelected: onTap,
+      labelType: NavigationRailLabelType.all,
+      useIndicator: true,
+      indicatorColor: AppColors.accentPrimarySubtle,
+      selectedIconTheme: const IconThemeData(
+        color: AppColors.accentSecondary,
+        size: 22,
       ),
-    );
-  }
+      unselectedIconTheme: const IconThemeData(
+        color: AppColors.textSecondary,
+        size: 22,
+      ),
+      selectedLabelTextStyle: AppTypography.xs.copyWith(
+        color: AppColors.accentSecondary,
+      ),
+      unselectedLabelTextStyle: AppTypography.xs.copyWith(
+        color: AppColors.textSecondary,
+      ),
+      destinations: [
+        for (final item in _items)
+          NavigationRailDestination(
+            icon: Icon(item.$2, key: Key('app_nav_${item.$1.toLowerCase()}')),
+            label: Text(item.$1),
+          ),
+      ],
+    ),
+  );
 }

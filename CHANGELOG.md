@@ -2100,3 +2100,14 @@ E remaining screens, F graph, G QA). The plan is in the PR descriptions.
 
 **Noted, not done here:** the nav still has six tabs and the account screen
 still needs its own layout work — phases B and E.
+
+## 2026-10-12 - UI/UX Phase B navigation
+
+- Merged Phase A PR #38 before implementation.
+- Five persistent tabs, Settings Token Inspector child route and legacy
+  Playground redirect; adaptive scrollable rail at >=600px.
+- Fixed outlined icons, animated selection, semantic targets, selection haptics
+  and text-scale/reduced-motion handling. Removed orphan decorative navigation.
+- 946 Flutter tests pass (30 existing opt-in skips); analysis and Android build
+  pass. Pixel 22-command navigation smoke passes; wide rail manually checked.
+- See docs/ui-ux-phase-b-navigation.md for evidence and limitations.
