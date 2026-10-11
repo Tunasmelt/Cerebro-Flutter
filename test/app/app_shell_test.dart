@@ -13,6 +13,7 @@ import 'package:cerebro_mobile/features/chat/data/chat_controller.dart';
 import 'package:cerebro_mobile/features/chat/data/chat_message.dart';
 import 'package:cerebro_mobile/features/graph/data/graph_pulse.dart';
 import 'package:cerebro_mobile/main.dart';
+import 'package:cerebro_mobile/features/settings/data/account_settings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -28,6 +29,11 @@ void main() {
     return ProviderScope(
       overrides: [
         authRepositoryProvider.overrideWithValue(fakeRepository),
+        settingsAccountProvider.overrideWith(
+          (ref) => Stream.value(
+            const SettingsAccount(id: 'user-1', email: 'owner@example.com'),
+          ),
+        ),
         // Settings' "Connection" section (Milestone 1.3) calls the real
         // backend by default — faked here so nav tests unrelated to it
         // stay fast and network-free.
@@ -164,7 +170,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.text('Alex Stone'), findsOneWidget);
+    expect(find.text('owner@example.com'), findsWidgets);
   });
 
   testWidgets('signing out from Settings redirects to Sign in', (tester) async {
