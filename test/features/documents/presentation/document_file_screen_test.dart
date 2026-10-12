@@ -9,6 +9,9 @@ import 'package:cerebro_mobile/features/documents/presentation/document_file_scr
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:cerebro_mobile/core/network/app_exception.dart';
+import 'package:cerebro_mobile/features/documents/presentation/extracted_text_preview.dart';
+import 'package:cerebro_mobile/shared/widgets/app_markdown.dart';
 
 void main() {
   DocumentDetail detail(DocumentStatus status) => DocumentDetail(
@@ -20,6 +23,53 @@ void main() {
     createdAt: DateTime(2026),
     ingestState: 'ready',
     lastError: null,
+  );
+
+  testWidgets(
+    'captured thoughts without an original use authenticated text preview',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            currentUserIdProvider.overrideWithValue('owner'),
+            documentDetailProvider(
+              'doc',
+            ).overrideWith((ref) => Stream.value(detail(DocumentStatus.ready))),
+            documentFileProvider('doc').overrideWith(
+              (ref) async => throw const RequestRejectedException(
+                'No original',
+                code: 'not_available',
+              ),
+            ),
+            extractedTextPreviewProvider(
+              'doc',
+            ).overrideWith((ref) async => '**Captured thought**'),
+          ],
+          child: const MaterialApp(home: DocumentFileScreen(documentId: 'doc')),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Extracted text'), findsOneWidget);
+      expect(find.byType(AppMarkdown), findsOneWidget);
+      expect(find.byTooltip('Document details'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'unsupported types offer an external-app action without opening it automatically',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: DocumentFileContent(
+            bytes: Uint8List.fromList([1, 2, 3]),
+            mime: 'application/octet-stream',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Open with another app'), findsOneWidget);
+      expect(find.textContaining('no in-app preview'), findsOneWidget);
+    },
   );
 
   testWidgets('renders selectable original text inside the app', (
@@ -66,7 +116,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(reads, 0);
     expect(
-      find.text('Original files cannot be viewed while sealed.'),
+      find.textContaining('Original files cannot be viewed while sealed.'),
       findsOneWidget,
     );
   });

@@ -1,9 +1,12 @@
 # In-app original-file viewer
 
-Open a document and choose **View file**. Supported upload formats are PDF,
+Tap a document to open its preview. The info action opens Document details;
+details also retain **View file**. Supported in-app formats are PDF,
 JPEG, PNG, WebP, plain text and Markdown. Images support pan/zoom; PDFs support
 page navigation and zoom with a page counter. Text/Markdown display as
-selectable source text. The viewer stays inside Cerebro.
+selectable text and rendered Markdown respectively. Captures without original
+bytes show extracted text. Other originals offer **Open with another app**
+through the platform share sheet; opening another app requires that action.
 
 The actual backend contract is `GET /api/v1/documents/{id}/original`, returning
 `{url}`. The generated client supplies normal SDK authentication only to the
@@ -22,7 +25,8 @@ cache file descriptor: the app removes its temporary copy immediately after
 opening. Startup removes viewer-only folders left by a crash while preserving
 pending uploads. Image cache entries are evicted on exit; PDF exit clears
 rendered-page image caches and closes its document. No download is shared or
-saved to the user's filesystem by this action.
+saved to the user's filesystem merely by previewing. Explicit sharing hands
+unsupported original bytes to the platform share sheet.
 
 PDF renderer: [pdfx](https://pub.dev/packages/pdfx) 2.11.0, published 52 days
 before review, maintained publisher, Android/iOS support, MIT license verified

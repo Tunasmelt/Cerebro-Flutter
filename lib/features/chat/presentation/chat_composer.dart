@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../shared/tokens/app_colors.dart';
 import '../../../shared/tokens/app_radius.dart';
@@ -49,6 +50,7 @@ class _ChatComposerState extends State<ChatComposer> {
     if (!_canSend) return;
     final text = _controller.text;
     _controller.clear();
+    HapticFeedback.lightImpact();
     widget.onSend(text);
   }
 
@@ -82,6 +84,7 @@ class _ChatComposerState extends State<ChatComposer> {
               maxLines: 5,
               textCapitalization: TextCapitalization.sentences,
               keyboardType: TextInputType.multiline,
+              textInputAction: TextInputAction.newline,
               style: AppTypography.base.copyWith(color: AppColors.textPrimary),
               decoration: InputDecoration(
                 hintText: 'Ask your documents…',

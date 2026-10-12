@@ -4,6 +4,20 @@ Format: date, what changed, why. Append, don't rewrite history — if a
 decision gets reversed later, the reversal is a new entry, not an edit
 to the old one.
 
+## 2026-10-12 — UI/UX Phase C and direct previews
+
+- Render chat Markdown with trusted inline citations, code/answer copy,
+  accessible targets, typing feedback, respectful tail scrolling and Latest.
+- Group conversation history by date and add delayed swipe deletion with Undo,
+  account-change cancellation and failure recovery.
+- Open document previews directly from Docs, Chat and Graph, with a details
+  action. Render uploaded Markdown and captured extracted text; offer explicit
+  external opening for unsupported originals while preserving sealed guards.
+- Verified 958 tests (30 existing opt-in skips), Android debug build, real
+  backend Markdown/citations/history/export and Pixel image/PDF navigation.
+  Further native clipboard/source-opening checks await a connected device.
+  Evidence and scope: docs/ui-ux-phase-c-chat-and-previews.md.
+
 ## Unreleased
 
 ### Added

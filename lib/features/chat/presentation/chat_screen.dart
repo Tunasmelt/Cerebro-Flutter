@@ -1,3 +1,4 @@
+import 'package:flutter/rendering.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -8,6 +9,9 @@ import '../../../shared/tokens/app_colors.dart';
 import '../../../shared/tokens/app_spacing.dart';
 import '../../../shared/tokens/app_typography.dart';
 import '../../../shared/widgets/error_view.dart';
+import '../../../shared/widgets/app_screen_header.dart';
+import '../../../shared/tokens/app_motion.dart';
+import '../data/document_titles_provider.dart';
 import '../data/chat_controller.dart';
 import '../data/chat_export_service.dart';
 import '../data/chat_message.dart';
@@ -34,6 +38,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   /// if the user has scrolled up to re-read something, a streaming answer
   /// must not drag them back down.
   bool _followTail = true;
+  bool _autoScrolling = false;
+  bool _scrollScheduled = false;
 
   bool _exporting = false;
 
@@ -43,7 +49,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _scroll.addListener(() {
       if (!_scroll.hasClients) return;
       final position = _scroll.position;
-      _followTail = position.maxScrollExtent - position.pixels < 80;
+      if (_autoScrolling) return;
+      final follow = position.maxScrollExtent - position.pixels < 80;
+      if (follow != _followTail) setState(() => _followTail = follow);
     });
   }
 
@@ -54,10 +62,30 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   void _scrollToEnd({required bool force}) {
-    if (!force && !_followTail) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_scroll.hasClients) return;
-      _scroll.jumpTo(_scroll.position.maxScrollExtent);
+    if (!mounted || (!force && !_followTail)) return;
+    if (force) _followTail = true;
+    if (_scrollScheduled || _autoScrolling) return;
+    _scrollScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      _scrollScheduled = false;
+      if (!mounted || !_scroll.hasClients || !_followTail) return;
+      final end = _scroll.position.maxScrollExtent;
+      if ((end - _scroll.offset).abs() < 1) return;
+      if (MediaQuery.disableAnimationsOf(context)) {
+        _scroll.jumpTo(end);
+        return;
+      }
+      _autoScrolling = true;
+      try {
+        await _scroll.animateTo(
+          end,
+          duration: AppMotion.base,
+          curve: AppMotion.soft,
+        );
+      } finally {
+        _autoScrolling = false;
+        if (mounted && _followTail) _scrollToEnd(force: false);
+      }
     });
   }
 
@@ -66,7 +94,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (open != null) {
       open(context, documentId);
     } else {
-      context.push(AppRoutes.documentDetail(documentId));
+      context.push(AppRoutes.documentPreview(documentId));
     }
   }
 
@@ -119,89 +147,107 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         bottom: false,
         child: Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.s4,
-                AppSpacing.s6,
-                AppSpacing.s2,
-                AppSpacing.s2,
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Chat',
-                      style: AppTypography.xxxl.copyWith(
-                        fontFamily: AppTypography.fontFamilyDisplay,
-                        fontWeight: AppTypography.weightBold,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                  ),
-                  if (canExport)
-                    IconButton(
-                      key: const Key('chat_export'),
-                      tooltip: 'Export as Markdown',
-                      onPressed: _exporting ? null : _export,
-                      icon: const Icon(Icons.ios_share_outlined),
-                    ),
+            AppScreenHeader(
+              title: 'Chat',
+              actions: [
+                if (canExport)
                   IconButton(
-                    key: const Key('chat_history'),
-                    tooltip: 'Conversations',
-                    onPressed: _openHistory,
-                    icon: const Icon(Icons.history),
+                    key: const Key('chat_export'),
+                    tooltip: 'Export as Markdown',
+                    onPressed: _exporting ? null : _export,
+                    icon: const Icon(Icons.ios_share_outlined),
                   ),
-                  if (hasConversation)
-                    TextButton.icon(
-                      key: const Key('chat_new'),
-                      onPressed: controller.newChat,
-                      icon: const Icon(Icons.add_comment_outlined, size: 18),
-                      label: const Text('New chat'),
+                IconButton(
+                  key: const Key('chat_history'),
+                  tooltip: 'Conversations',
+                  onPressed: _openHistory,
+                  icon: const Icon(Icons.history),
+                ),
+                if (hasConversation)
+                  IconButton(
+                    key: const Key('chat_new'),
+                    tooltip: 'New chat',
+                    onPressed: controller.newChat,
+                    icon: const Icon(Icons.add_comment_outlined),
+                  ),
+              ],
+            ),
+            Expanded(
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  chat.loading
+                      ? const Center(
+                          key: Key('chat_loading'),
+                          child: CircularProgressIndicator(),
+                        )
+                      : chat.loadError != null
+                      ? ErrorView(
+                          key: const Key('chat_load_error'),
+                          exception: chat.loadError!,
+                          expanded: true,
+                          onRetry: chat.loadError is RequestRejectedException
+                              ? null
+                              : controller.reloadHistory,
+                        )
+                      : messages.isEmpty
+                      ? _EmptyState(onPrompt: controller.send)
+                      : NotificationListener<UserScrollNotification>(
+                          onNotification: (notification) {
+                            if (notification.direction !=
+                                ScrollDirection.idle) {
+                              _autoScrolling = false;
+                              final follow =
+                                  _scroll.position.maxScrollExtent -
+                                      _scroll.offset <
+                                  80;
+                              if (_followTail != follow) {
+                                setState(() => _followTail = follow);
+                              }
+                            }
+                            return false;
+                          },
+                          child: ListView.separated(
+                            key: const Key('chat_messages'),
+                            controller: _scroll,
+                            padding: const EdgeInsets.fromLTRB(
+                              AppSpacing.s4,
+                              AppSpacing.s2,
+                              AppSpacing.s4,
+                              AppSpacing.s4,
+                            ),
+                            itemCount: messages.length,
+                            separatorBuilder: (_, _) =>
+                                const SizedBox(height: AppSpacing.s3),
+                            itemBuilder: (context, index) {
+                              final message = messages[index];
+                              return ChatBubble(
+                                message: message,
+                                canRetry:
+                                    index == messages.length - 1 &&
+                                    message.status == ChatMessageStatus.failed,
+                                onRetry: controller.retry,
+                                onOpenDocument: _open,
+                              );
+                            },
+                          ),
+                        ),
+                  if (!_followTail && messages.isNotEmpty)
+                    Positioned(
+                      bottom: 12,
+                      right: 16,
+                      child: FilledButton.icon(
+                        key: const Key('chat_jump_latest'),
+                        onPressed: () {
+                          setState(() => _followTail = true);
+                          _scrollToEnd(force: true);
+                        },
+                        icon: const Icon(Icons.arrow_downward),
+                        label: const Text('Latest'),
+                      ),
                     ),
                 ],
               ),
-            ),
-            Expanded(
-              child: chat.loading
-                  ? const Center(
-                      key: Key('chat_loading'),
-                      child: CircularProgressIndicator(),
-                    )
-                  : chat.loadError != null
-                  ? ErrorView(
-                      key: const Key('chat_load_error'),
-                      exception: chat.loadError!,
-                      expanded: true,
-                      onRetry: chat.loadError is RequestRejectedException
-                          ? null
-                          : controller.reloadHistory,
-                    )
-                  : messages.isEmpty
-                  ? const _EmptyState()
-                  : ListView.separated(
-                      key: const Key('chat_messages'),
-                      controller: _scroll,
-                      padding: const EdgeInsets.fromLTRB(
-                        AppSpacing.s4,
-                        AppSpacing.s2,
-                        AppSpacing.s4,
-                        AppSpacing.s4,
-                      ),
-                      itemCount: messages.length,
-                      separatorBuilder: (_, _) =>
-                          const SizedBox(height: AppSpacing.s3),
-                      itemBuilder: (context, index) {
-                        final message = messages[index];
-                        return ChatBubble(
-                          message: message,
-                          canRetry:
-                              index == messages.length - 1 &&
-                              message.status == ChatMessageStatus.failed,
-                          onRetry: controller.retry,
-                          onOpenDocument: _open,
-                        );
-                      },
-                    ),
             ),
             ChatComposer(
               busy: chat.busy,
@@ -216,36 +262,55 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 }
 
-class _EmptyState extends StatelessWidget {
-  const _EmptyState();
+class _EmptyState extends ConsumerWidget {
+  const _EmptyState({required this.onPrompt});
+  final ValueChanged<String> onPrompt;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final titles =
+        ref.watch(documentTitlesProvider)?.values.take(3).toList() ??
+        <String>[];
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.s8),
-        child: Column(
-          key: const Key('chat_empty'),
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(
-              Icons.chat_bubble_outline,
-              size: 40,
-              color: AppColors.textSecondary,
-            ),
-            const SizedBox(height: AppSpacing.s3),
-            Text(
-              'Ask your documents',
-              style: AppTypography.lg.copyWith(color: AppColors.textPrimary),
-            ),
-            const SizedBox(height: AppSpacing.s1),
-            Text(
-              'Answers are drawn from what you have uploaded, with sources '
-              'you can open.',
-              textAlign: TextAlign.center,
-              style: AppTypography.sm.copyWith(color: AppColors.textSecondary),
-            ),
-          ],
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.s8),
+          child: Column(
+            key: const Key('chat_empty'),
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.chat_bubble_outline,
+                size: 40,
+                color: AppColors.textSecondary,
+              ),
+              const SizedBox(height: AppSpacing.s3),
+              Text(
+                'Ask your documents',
+                style: AppTypography.lg.copyWith(color: AppColors.textPrimary),
+              ),
+              const SizedBox(height: AppSpacing.s1),
+              Text(
+                'Answers are drawn from what you have uploaded, with sources '
+                'you can open.',
+                textAlign: TextAlign.center,
+                style: AppTypography.sm.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              for (final title in titles)
+                TextButton.icon(
+                  onPressed: () =>
+                      onPrompt('Summarize the key points in "$title".'),
+                  icon: const Icon(Icons.auto_awesome_outlined),
+                  label: Text(
+                    'Summarize $title',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );

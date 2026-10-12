@@ -6,6 +6,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pdfx/pdfx.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:go_router/go_router.dart';
+import 'package:share_plus/share_plus.dart';
+import '../../../app/app_routes.dart';
+import '../../../shared/widgets/app_markdown.dart';
+import '../../../shared/tokens/app_typography.dart';
 
 import '../../../core/network/app_exception.dart';
 import '../../../shared/widgets/error_view.dart';
@@ -13,6 +18,7 @@ import '../../auth/data/current_user_provider.dart';
 import '../data/document.dart';
 import '../data/document_detail_provider.dart';
 import '../data/document_file_provider.dart';
+import 'extracted_text_preview.dart';
 
 class DocumentFileScreen extends ConsumerWidget {
   const DocumentFileScreen({super.key, required this.documentId});
@@ -28,35 +34,61 @@ class DocumentFileScreen extends ConsumerWidget {
     final detail = ref.watch(documentDetailProvider(documentId));
     final document = detail.asData?.value;
     return Scaffold(
-      appBar: AppBar(title: Text(document?.title ?? 'View file')),
+      appBar: AppBar(
+        title: Text(
+          document?.title ?? 'View file',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        actions: [
+          IconButton(
+            tooltip: 'Document details',
+            icon: const Icon(Icons.info_outline),
+            onPressed: () => context.push(AppRoutes.documentDetail(documentId)),
+          ),
+        ],
+      ),
       body: SafeArea(
         top: false,
         child: detail.when(
           skipLoadingOnReload: false,
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (_, _) =>
-              const Center(child: Text('Could not load this document.')),
+          error: (error, _) => ErrorView(
+            exception: error is AppException
+                ? error
+                : const UnknownApiException(),
+            expanded: true,
+            onRetry: () => ref.invalidate(documentDetailProvider(documentId)),
+          ),
           data: (document) {
             if (document.status == DocumentStatus.sealed) {
               return const Center(
-                child: Text('Original files cannot be viewed while sealed.'),
+                child: Text(
+                  'Original files cannot be viewed while sealed. Open Document details to unlock content.',
+                ),
               );
             }
             final file = ref.watch(documentFileProvider(documentId));
             return file.when(
               skipLoadingOnReload: false,
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, _) => ErrorView(
-                exception: error is AppException
-                    ? error
-                    : const UnknownApiException(),
-                expanded: true,
-                onRetry: () => ref.invalidate(documentFileProvider(documentId)),
-              ),
+              error: (error, _) =>
+                  error is RequestRejectedException &&
+                      error.code == 'not_available'
+                  ? ExtractedTextPreview(documentId: documentId)
+                  : ErrorView(
+                      exception: error is AppException
+                          ? error
+                          : const UnknownApiException(),
+                      expanded: true,
+                      onRetry: () =>
+                          ref.invalidate(documentFileProvider(documentId)),
+                    ),
               data: (bytes) => DocumentFileContent(
                 key: ObjectKey(bytes),
                 bytes: bytes,
                 mime: document.mime,
+                filename: document.title,
               ),
             );
           },
@@ -71,9 +103,11 @@ class DocumentFileContent extends StatefulWidget {
     super.key,
     required this.bytes,
     required this.mime,
+    this.filename = 'document',
   });
   final Uint8List bytes;
   final String mime;
+  final String filename;
 
   @override
   State<DocumentFileContent> createState() => _DocumentFileContentState();
@@ -163,9 +197,62 @@ class _DocumentFileContentState extends State<DocumentFileContent> {
     if (widget.mime == 'text/plain' || widget.mime == 'text/markdown') {
       return SingleChildScrollView(
         padding: const EdgeInsets.all(16),
-        child: SelectableText(utf8.decode(widget.bytes, allowMalformed: true)),
+        child: widget.mime == 'text/markdown'
+            ? AppMarkdown(data: utf8.decode(widget.bytes, allowMalformed: true))
+            : SelectableText(
+                utf8.decode(widget.bytes, allowMalformed: true),
+                style: AppTypography.mono(AppTypography.base),
+              ),
       );
     }
-    return const Center(child: Text('This file type cannot be displayed.'));
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.insert_drive_file_outlined, size: 40),
+            const SizedBox(height: 16),
+            const Text(
+              'This format has no in-app preview. You can share it to an app that supports it.',
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.open_in_new),
+              label: const Text('Open with another app'),
+              onPressed: () async {
+                final box = context.findRenderObject() as RenderBox?;
+                try {
+                  await SharePlus.instance.share(
+                    ShareParams(
+                      files: [
+                        XFile.fromData(widget.bytes, mimeType: widget.mime),
+                      ],
+                      fileNameOverrides: [
+                        widget.filename.replaceAll(
+                          RegExp(r'[\\/\x00-\x1F]'),
+                          '_',
+                        ),
+                      ],
+                      sharePositionOrigin: box == null
+                          ? null
+                          : box.localToGlobal(Offset.zero) & box.size,
+                    ),
+                  );
+                } catch (_) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Could not open this file. Try again.'),
+                      ),
+                    );
+                  }
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

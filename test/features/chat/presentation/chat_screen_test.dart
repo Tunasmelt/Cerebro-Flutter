@@ -90,9 +90,11 @@ Future<_Harness> _pump(
   return h;
 }
 
-Future<void> _pumpFor(WidgetTester tester, [int ms = 60]) async {
+Future<void> _pumpFor(WidgetTester tester, [int ms = 500]) async {
   await tester.pump();
-  await tester.pump(Duration(milliseconds: ms));
+  for (var elapsed = 0; elapsed < ms; elapsed += 16) {
+    await tester.pump(const Duration(milliseconds: 16));
+  }
 }
 
 Future<void> _ask(WidgetTester tester, String question) async {
@@ -203,7 +205,7 @@ void main() {
     await _pumpFor(tester);
 
     expect(find.textContaining('ideas'), findsNothing);
-    expect(find.text('Half '), findsOneWidget);
+    expect(find.text('Half'), findsOneWidget);
   });
 
   group('citations', () {
@@ -278,7 +280,7 @@ void main() {
 
       final chip = tester.getSize(find.byKey(const Key('citation_chip_1')));
       expect(chip.width, lessThan(60), reason: 'chip is ${chip.width}px wide');
-      expect(chip.height, lessThan(40));
+      expect(chip.height, greaterThanOrEqualTo(44));
       // The full stop after the chip stays on the same line as the text.
       final answer = tester.getRect(find.byKey(const Key('chat_answer_1')));
       expect(
@@ -495,6 +497,21 @@ void main() {
       expect(p.maxScrollExtent, greaterThan(0));
       expect(p.pixels, closeTo(p.maxScrollExtent, 2));
     });
+
+    testWidgets(
+      'Latest appears while reading earlier messages and restores the tail',
+      (tester) async {
+        await longConversation(tester);
+        final p = position(tester);
+        p.jumpTo(0);
+        await tester.pump();
+        expect(find.byKey(const Key('chat_jump_latest')), findsOneWidget);
+        await tester.tap(find.byKey(const Key('chat_jump_latest')));
+        await _pumpFor(tester, 1500);
+        expect(p.pixels, closeTo(p.maxScrollExtent, 2));
+        expect(find.byKey(const Key('chat_jump_latest')), findsNothing);
+      },
+    );
 
     testWidgets('a streaming answer follows the bottom while you are there '
         'but never drags you back down once you have scrolled up', (

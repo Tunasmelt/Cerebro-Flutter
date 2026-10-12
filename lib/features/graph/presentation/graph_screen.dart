@@ -174,7 +174,7 @@ class _GraphScreenState extends ConsumerState<GraphScreen>
     if (open != null) {
       open(context, id);
     } else {
-      context.push(AppRoutes.documentDetail(id));
+      context.push(AppRoutes.documentPreview(id));
     }
   }
 
