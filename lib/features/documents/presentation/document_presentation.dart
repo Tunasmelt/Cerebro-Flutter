@@ -92,21 +92,18 @@ String formatDocumentDate(DateTime date) {
   return '${local.month}/${local.day}/${local.year}';
 }
 
-/// The status chips above the Documents list.
+/// The filters above the Documents list. [all] is "no filter" (no chip is
+/// selected); only [ready] and [sealed] have chips.
 enum DocumentFilter {
   all('All'),
   ready('Ready'),
-  processing('Processing'),
-  failed('Failed'),
   sealed('Sealed');
 
   const DocumentFilter(this.label);
   final String label;
 }
 
-/// The documents matching a title search and a status chip. An upload that
-/// never finished reads "Incomplete", so it belongs under Failed, not
-/// Processing.
+/// The documents matching a title search and a filter chip.
 List<DocumentSummary> filterDocuments(
   List<DocumentSummary> docs, {
   String query = '',
@@ -123,17 +120,13 @@ List<DocumentSummary> filterDocuments(
 }
 
 bool _matchesFilter(DocumentSummary d, DocumentFilter f, DateTime now) {
-  if (f == DocumentFilter.all) return true;
-  final abandoned = summaryIsAbandonedUpload(d, now);
   switch (f) {
     case DocumentFilter.all:
       return true;
     case DocumentFilter.ready:
-      return !abandoned && d.status == DocumentStatus.ready;
-    case DocumentFilter.processing:
-      return !abandoned && d.status == DocumentStatus.processing;
-    case DocumentFilter.failed:
-      return abandoned || d.status == DocumentStatus.failed;
+      // An upload that never finished reads "Incomplete", so it is not Ready.
+      return !summaryIsAbandonedUpload(d, now) &&
+          d.status == DocumentStatus.ready;
     case DocumentFilter.sealed:
       return d.status == DocumentStatus.sealed;
   }

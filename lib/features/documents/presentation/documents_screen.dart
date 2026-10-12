@@ -40,6 +40,7 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
   bool _refreshingOnResume = false;
   final _search = TextEditingController();
   DocumentFilter _filter = DocumentFilter.all;
+  bool _searching = false;
 
   @override
   void initState() {
@@ -115,10 +116,25 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
                   ? null
                   : '${loaded.length} '
                         '${loaded.length == 1 ? 'document' : 'documents'}',
+              actions: [
+                if (loaded != null && loaded.isNotEmpty)
+                  IconButton(
+                    key: const Key('documents_search_toggle'),
+                    tooltip: _searching ? 'Close search' : 'Search documents',
+                    icon: Icon(
+                      _searching ? Icons.close_rounded : Icons.search_rounded,
+                    ),
+                    onPressed: () => setState(() {
+                      if (_searching) _search.clear();
+                      _searching = !_searching;
+                    }),
+                  ),
+              ],
             ),
             const UploadList(),
             if (loaded != null && loaded.isNotEmpty)
               _SearchAndFilters(
+                searching: _searching,
                 controller: _search,
                 filter: _filter,
                 onQuery: (_) => setState(() {}),
@@ -200,71 +216,68 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
 
 class _SearchAndFilters extends StatelessWidget {
   const _SearchAndFilters({
+    required this.searching,
     required this.controller,
     required this.filter,
     required this.onQuery,
     required this.onFilter,
   });
 
+  final bool searching;
   final TextEditingController controller;
   final DocumentFilter filter;
   final ValueChanged<String> onQuery;
   final ValueChanged<DocumentFilter> onFilter;
+
+  static const _chips = [DocumentFilter.ready, DocumentFilter.sealed];
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.s4,
-            0,
-            AppSpacing.s4,
-            AppSpacing.s2,
-          ),
-          child: TextField(
-            key: const Key('documents_search'),
-            controller: controller,
-            onChanged: onQuery,
-            textInputAction: TextInputAction.search,
-            style: AppTypography.sm.copyWith(color: AppColors.textPrimary),
-            decoration: InputDecoration(
-              hintText: 'Search documents',
-              prefixIcon: const Icon(Icons.search_rounded, size: 20),
-              suffixIcon: controller.text.isEmpty
-                  ? null
-                  : IconButton(
-                      key: const Key('documents_search_clear'),
-                      tooltip: 'Clear search',
-                      icon: const Icon(Icons.close_rounded, size: 20),
-                      onPressed: () {
-                        controller.clear();
-                        onQuery('');
-                      },
-                    ),
+        if (searching)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.s4,
+              0,
+              AppSpacing.s4,
+              AppSpacing.s2,
+            ),
+            child: TextField(
+              key: const Key('documents_search'),
+              controller: controller,
+              autofocus: true,
+              onChanged: onQuery,
+              textInputAction: TextInputAction.search,
+              style: AppTypography.sm.copyWith(color: AppColors.textPrimary),
+              decoration: const InputDecoration(
+                hintText: 'Search documents',
+                prefixIcon: Icon(Icons.search_rounded, size: 20),
+              ),
             ),
           ),
-        ),
         SizedBox(
           height: AppSpacing.minTouchTarget,
-          child: ListView.separated(
+          child: ListView(
             key: const Key('documents_filters'),
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s4),
-            itemCount: DocumentFilter.values.length,
-            separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.s2),
-            itemBuilder: (context, i) {
-              final f = DocumentFilter.values[i];
-              return Center(
-                child: ChoiceChip(
-                  key: Key('documents_filter_${f.name}'),
-                  label: Text(f.label),
-                  selected: f == filter,
-                  onSelected: (_) => onFilter(f),
+            children: [
+              for (final f in _chips)
+                Padding(
+                  padding: const EdgeInsets.only(right: AppSpacing.s2),
+                  child: Center(
+                    child: ChoiceChip(
+                      key: Key('documents_filter_${f.name}'),
+                      label: Text(f.label),
+                      selected: f == filter,
+                      // Tapping the selected chip again shows everything.
+                      onSelected: (on) => onFilter(on ? f : DocumentFilter.all),
+                    ),
+                  ),
                 ),
-              );
-            },
+            ],
           ),
         ),
         const SizedBox(height: AppSpacing.s2),

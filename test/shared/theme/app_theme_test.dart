@@ -1,3 +1,5 @@
+import 'dart:io';
+
 // The theme layer: every component the app uses is themed, so a stock widget
 // already looks like Cerebro.
 import 'package:cerebro_mobile/shared/theme/app_theme.dart';
@@ -40,8 +42,33 @@ void main() {
       );
       expect(
         theme.textTheme.bodyMedium!.fontFamily,
-        isNot(AppTypography.fontFamilyDisplay),
+        AppTypography.fontFamilyUi,
       );
+    });
+
+    test('the faces the theme names are really bundled', () {
+      final pubspec = File('pubspec.yaml').readAsStringSync();
+      for (final family in [
+        AppTypography.fontFamilyUi,
+        AppTypography.fontFamilyDisplay,
+        AppTypography.fontFamilyMono,
+      ]) {
+        expect(
+          RegExp(
+            r'^\s*- family: ' + RegExp.escape(family) + r'\s*$',
+            multiLine: true,
+          ).hasMatch(pubspec),
+          isTrue,
+          reason: '$family is used by the theme but not declared in pubspec',
+        );
+      }
+      // Every declared font file exists, so a typo cannot silently fall back
+      // to the system font.
+      for (final m in RegExp(
+        r'asset: (assets/fonts/\S+)',
+      ).allMatches(pubspec)) {
+        expect(File(m.group(1)!).existsSync(), isTrue, reason: m.group(1));
+      }
     });
 
     test('text colours are set, not left to Material defaults', () {
