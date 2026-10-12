@@ -19,11 +19,13 @@ class ErrorView extends StatelessWidget {
     super.key,
     required this.exception,
     this.onRetry,
+    this.retryKey = const Key('error_view_retry'),
     this.expanded = false,
   });
 
   final AppException exception;
   final VoidCallback? onRetry;
+  final Key retryKey;
   final bool expanded;
 
   @override
@@ -57,7 +59,11 @@ class ErrorView extends StatelessWidget {
               ),
               if (onRetry != null) ...[
                 const SizedBox(width: AppSpacing.s2),
-                _RetryButton(color: presentation.color, onRetry: onRetry!),
+                _RetryButton(
+                  key: retryKey,
+                  color: presentation.color,
+                  onRetry: onRetry!,
+                ),
               ],
             ],
           ),
@@ -84,7 +90,11 @@ class ErrorView extends StatelessWidget {
               ),
               if (onRetry != null) ...[
                 const SizedBox(height: AppSpacing.s4),
-                _RetryButton(color: presentation.color, onRetry: onRetry!),
+                _RetryButton(
+                  key: retryKey,
+                  color: presentation.color,
+                  onRetry: onRetry!,
+                ),
               ],
             ],
           ),
@@ -95,7 +105,7 @@ class ErrorView extends StatelessWidget {
 }
 
 class _RetryButton extends StatelessWidget {
-  const _RetryButton({required this.color, required this.onRetry});
+  const _RetryButton({super.key, required this.color, required this.onRetry});
 
   final Color color;
   final VoidCallback onRetry;
@@ -103,7 +113,6 @@ class _RetryButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return TextButton(
-      key: const Key('error_view_retry'),
       onPressed: onRetry,
       // Full-size target (the theme's 44px minimum) — a bare 'Retry' with no
       // padding was a few pixels tall.

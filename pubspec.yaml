@@ -48,6 +48,8 @@ dependencies:
   vector_math: ^2.2.0
   cryptography: 2.9.0
   pdfx: ^2.11.0
+  flutter_markdown_plus: 1.0.12
+  markdown: 7.3.1
 
 dev_dependencies:
   flutter_test:

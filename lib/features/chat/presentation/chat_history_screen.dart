@@ -8,6 +8,10 @@ import '../../../shared/tokens/app_spacing.dart';
 import '../../../shared/tokens/app_typography.dart';
 import '../../../shared/widgets/error_view.dart';
 import '../data/chat_controller.dart';
+import '../data/pending_session_deletes.dart';
+import '../../auth/data/current_user_provider.dart';
+import '../../../shared/widgets/app_empty_state.dart';
+import '../../../shared/widgets/app_section_header.dart';
 import '../data/chat_export_service.dart';
 import '../data/chat_history_api.dart';
 import '../data/chat_sessions_list.dart';
@@ -80,9 +84,23 @@ class _ChatHistoryScreenState extends ConsumerState<ChatHistoryScreen> {
     if (error != null) _say(error.message);
   }
 
+  String _dateGroup(DateTime value) {
+    final now = DateTime.now();
+    final local = value.toLocal();
+    final date = DateTime(local.year, local.month, local.day);
+    final today = DateTime(now.year, now.month, now.day);
+    if (date == today) return 'Today';
+    if (date == DateTime(now.year, now.month, now.day - 1)) return 'Yesterday';
+    return 'Earlier';
+  }
+
   @override
   Widget build(BuildContext context) {
     final sessions = ref.watch(chatSessionsListProvider);
+    final pending = ref.watch(pendingSessionDeletesProvider);
+    ref.listen(pendingSessionDeletesProvider, (_, next) {
+      if (next.error != null && mounted) _say(next.error!.message);
+    });
     final notifier = ref.read(chatSessionsListProvider.notifier);
 
     return Scaffold(
@@ -95,6 +113,7 @@ class _ChatHistoryScreenState extends ConsumerState<ChatHistoryScreen> {
       body: SafeArea(
         top: false,
         child: sessions.when(
+          skipLoadingOnReload: false,
           loading: () => const Center(
             key: Key('chat_history_loading'),
             child: CircularProgressIndicator(),
@@ -107,48 +126,102 @@ class _ChatHistoryScreenState extends ConsumerState<ChatHistoryScreen> {
             expanded: true,
             onRetry: notifier.refresh,
           ),
-          data: (list) => RefreshIndicator(
-            onRefresh: notifier.refresh,
-            child: list.isEmpty
-                ? ListView(
-                    children: const [
-                      SizedBox(height: AppSpacing.s16),
-                      Center(
-                        key: Key('chat_history_empty'),
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: AppSpacing.s8,
+          data: (all) {
+            final list =
+                all
+                    .where((session) => !pending.ids.contains(session.id))
+                    .toList()
+                  ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+            return RefreshIndicator(
+              onRefresh: notifier.refresh,
+              child: list.isEmpty
+                  ? const AppEmptyState(
+                      key: Key('chat_history_empty'),
+                      icon: Icons.history,
+                      title: 'No conversations yet',
+                      message:
+                          'Ask a question in Chat and it will appear here.',
+                    )
+                  : ListView.separated(
+                      key: const Key('chat_history_list'),
+                      padding: const EdgeInsets.all(AppSpacing.s4),
+                      itemCount: list.length,
+                      separatorBuilder: (_, _) =>
+                          const SizedBox(height: AppSpacing.s2),
+                      itemBuilder: (context, index) {
+                        final session = list[index];
+                        final group = _dateGroup(session.createdAt);
+                        return Dismissible(
+                          key: Key('chat_swipe_${session.id}'),
+                          direction: _working.contains(session.id)
+                              ? DismissDirection.none
+                              : DismissDirection.endToStart,
+                          background: Container(
+                            alignment: Alignment.centerRight,
+                            padding: const EdgeInsets.all(16),
+                            color: AppColors.dangerSubtle,
+                            child: const Icon(
+                              Icons.delete_outline,
+                              color: AppColors.danger,
+                            ),
                           ),
-                          child: Text(
-                            'No conversations yet. Ask a question in Chat and '
-                            'it will appear here.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: AppColors.textSecondary),
+                          onDismissed: (_) {
+                            final owner = ref.read(currentUserIdProvider);
+                            ref
+                                .read(pendingSessionDeletesProvider.notifier)
+                                .queue(session.id);
+                            ScaffoldMessenger.of(context)
+                              ..hideCurrentSnackBar()
+                              ..showSnackBar(
+                                SnackBar(
+                                  content: const Text('Conversation removed'),
+                                  duration: const Duration(seconds: 5),
+                                  action: SnackBarAction(
+                                    label: 'Undo',
+                                    onPressed: () {
+                                      if (mounted &&
+                                          ref.read(currentUserIdProvider) ==
+                                              owner) {
+                                        ref
+                                            .read(
+                                              pendingSessionDeletesProvider
+                                                  .notifier,
+                                            )
+                                            .undo(session.id);
+                                      }
+                                    },
+                                  ),
+                                ),
+                              );
+                          },
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (index == 0 ||
+                                  _dateGroup(list[index - 1].createdAt) !=
+                                      group)
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 8,
+                                  ),
+                                  child: AppSectionHeader(group),
+                                ),
+                              _SessionTile(
+                                session: session,
+                                working: _working.contains(session.id),
+                                onOpen: () => _open(session),
+                                onAction: (action) => switch (action) {
+                                  _SessionAction.export => _export(session),
+                                  _SessionAction.delete => _delete(session),
+                                },
+                              ),
+                            ],
                           ),
-                        ),
-                      ),
-                    ],
-                  )
-                : ListView.separated(
-                    key: const Key('chat_history_list'),
-                    padding: const EdgeInsets.all(AppSpacing.s4),
-                    itemCount: list.length,
-                    separatorBuilder: (_, _) =>
-                        const SizedBox(height: AppSpacing.s2),
-                    itemBuilder: (context, index) {
-                      final session = list[index];
-                      return _SessionTile(
-                        session: session,
-                        working: _working.contains(session.id),
-                        onOpen: () => _open(session),
-                        onAction: (action) => switch (action) {
-                          _SessionAction.export => _export(session),
-                          _SessionAction.delete => _delete(session),
-                        },
-                      );
-                    },
-                  ),
-          ),
+                        );
+                      },
+                    ),
+            );
+          },
         ),
       ),
     );

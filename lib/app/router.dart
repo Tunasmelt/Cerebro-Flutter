@@ -9,6 +9,7 @@ import '../features/auth/presentation/sign_up_screen.dart';
 import '../features/chat/presentation/chat_history_screen.dart';
 import '../features/chat/presentation/chat_screen.dart';
 import '../features/documents/presentation/document_detail_screen.dart';
+import '../features/documents/presentation/document_file_screen.dart';
 import '../features/documents/presentation/documents_screen.dart';
 import '../features/graph/presentation/graph_screen.dart';
 import '../features/kanban/presentation/board_screen.dart';
@@ -80,8 +81,14 @@ final routerProvider = Provider<GoRouter>((ref) {
                 builder: (context, state) => const DocumentsScreen(),
                 routes: [
                   GoRoute(
-                    path: ':id',
+                    path: ':id/details',
                     builder: (context, state) => DocumentDetailScreen(
+                      documentId: state.pathParameters['id']!,
+                    ),
+                  ),
+                  GoRoute(
+                    path: ':id',
+                    builder: (context, state) => DocumentFileScreen(
                       documentId: state.pathParameters['id']!,
                     ),
                   ),

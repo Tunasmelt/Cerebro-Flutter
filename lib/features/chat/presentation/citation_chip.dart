@@ -26,47 +26,44 @@ class CitationChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = enabled ? AppColors.accentPrimary : AppColors.textDisabled;
+    final color = enabled ? AppColors.accentSecondary : AppColors.textDisabled;
     return Semantics(
       button: enabled,
       label: enabled
           ? 'Source $number: $title'
           : 'Source $number: no longer available',
       excludeSemantics: true,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: enabled ? onTap : null,
-        // The chip is small to sit in a line of text; the padding around it
-        // widens the tappable area without moving the text.
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-          // No `alignment:` on this Container: a Container with an alignment
-          // expands to fill the width it is offered, and inside a line of text
-          // that is the whole line — the chip became a full-width bar. The
-          // Center below (widthFactor: 1) centres the number without growing.
-          child: Container(
-            constraints: const BoxConstraints(minWidth: 20),
-            height: 20,
-            padding: const EdgeInsets.symmetric(horizontal: 5),
-            decoration: BoxDecoration(
-              color: enabled
-                  ? AppColors.accentPrimarySubtle
-                  : AppColors.bgRaised,
-              borderRadius: AppRadius.pillRadius,
-              border: Border.all(
-                color: enabled
-                    ? AppColors.accentPrimaryBorder
-                    : AppColors.borderDefault,
-              ),
-            ),
+      onTap: enabled ? onTap : null,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: AppRadius.pillRadius,
+          onTap: enabled ? onTap : null,
+          child: SizedBox(
+            width: 44,
+            height: 44,
             child: Center(
-              widthFactor: 1,
-              child: Text(
-                '$number',
-                style: AppTypography.xs.copyWith(
-                  color: color,
-                  fontWeight: AppTypography.weightSemibold,
-                  height: 1,
+              child: Container(
+                height: 20,
+                constraints: const BoxConstraints(minWidth: 20),
+                padding: const EdgeInsets.symmetric(horizontal: 5),
+                decoration: BoxDecoration(
+                  color: enabled
+                      ? AppColors.accentPrimarySubtle
+                      : AppColors.bgRaised,
+                  borderRadius: AppRadius.pillRadius,
+                  border: Border.all(
+                    color: enabled
+                        ? AppColors.accentPrimaryBorder
+                        : AppColors.borderDefault,
+                  ),
+                ),
+                child: Center(
+                  widthFactor: 1,
+                  child: Text(
+                    '$number',
+                    style: AppTypography.xs.copyWith(color: color, height: 1),
+                  ),
                 ),
               ),
             ),
@@ -103,6 +100,7 @@ class SourceChip extends StatelessWidget {
           ? 'Open source: $title'
           : 'Source no longer available: $title',
       excludeSemantics: true,
+      onTap: enabled ? onTap : null,
       child: Material(
         color: enabled ? AppColors.bgRaised : AppColors.bgElevated,
         borderRadius: AppRadius.mdRadius,
@@ -129,7 +127,7 @@ class SourceChip extends StatelessWidget {
                   enabled ? Icons.description_outlined : Icons.link_off_rounded,
                   size: 16,
                   color: enabled
-                      ? AppColors.accentPrimary
+                      ? AppColors.accentSecondary
                       : AppColors.textDisabled,
                 ),
                 const SizedBox(width: AppSpacing.s2),
@@ -137,7 +135,7 @@ class SourceChip extends StatelessWidget {
                   label,
                   style: AppTypography.xs.copyWith(
                     color: enabled
-                        ? AppColors.accentPrimary
+                        ? AppColors.accentSecondary
                         : AppColors.textDisabled,
                     fontWeight: AppTypography.weightSemibold,
                   ),

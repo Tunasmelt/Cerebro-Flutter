@@ -112,13 +112,14 @@ Future<_H> _pump(
   WidgetTester tester, {
   Widget home = const ChatHistoryScreen(),
   void Function(_H h)? configure,
+  Override? ownerOverride,
 }) async {
   final h = _H();
   configure?.call(h);
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
-        currentUserIdProvider.overrideWithValue('user-1'),
+        ownerOverride ?? currentUserIdProvider.overrideWithValue('user-1'),
         chatHistoryApiProvider.overrideWithValue(h.history),
         chatStreamApiProvider.overrideWithValue(_NoStream()),
         chatSessionsApiProvider.overrideWithValue(_NoSessions()),
@@ -167,6 +168,82 @@ void _open(WidgetTester tester, String id) {
 }
 
 void main() {
+  testWidgets('swipe Undo restores history without a server deletion', (
+    tester,
+  ) async {
+    final h = await _pump(
+      tester,
+      home: const ChatHistoryScreen(),
+      configure: (h) =>
+          h.history.sessions = [_session('swipe', preview: 'Swipe me')],
+    );
+    await tester.drag(
+      find.byKey(const Key('chat_swipe_swipe')),
+      const Offset(-600, 0),
+    );
+    await tester.pumpAndSettle();
+    expect(h.history.deleted, isEmpty);
+    expect(find.text('Swipe me'), findsNothing);
+    await tester.tap(find.text('Undo'));
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 6));
+    await tester.pumpAndSettle();
+    expect(h.history.deleted, isEmpty);
+    expect(find.text('Swipe me'), findsOneWidget);
+  });
+
+  testWidgets(
+    'swipe deletes only after the Undo window and failures restore the row',
+    (tester) async {
+      final h = await _pump(
+        tester,
+        home: const ChatHistoryScreen(),
+        configure: (h) {
+          h.history.sessions = [_session('swipe', preview: 'Swipe me')];
+          h.history.deleteError = const NetworkUnreachableException();
+        },
+      );
+      await tester.drag(
+        find.byKey(const Key('chat_swipe_swipe')),
+        const Offset(-600, 0),
+      );
+      await tester.pumpAndSettle();
+      expect(h.history.deleted, isEmpty);
+      await tester.pump(const Duration(seconds: 6));
+      await tester.pumpAndSettle();
+      expect(h.history.deleted, ['swipe']);
+      expect(find.text('Swipe me'), findsOneWidget);
+    },
+  );
+
+  testWidgets('account change cancels a pending swipe deletion', (
+    tester,
+  ) async {
+    final owner = StateProvider<String?>((ref) => 'user-1');
+    final h = await _pump(
+      tester,
+      home: const ChatHistoryScreen(),
+      ownerOverride: currentUserIdProvider.overrideWith(
+        (ref) => ref.watch(owner),
+      ),
+      configure: (h) =>
+          h.history.sessions = [_session('swipe', preview: 'Swipe me')],
+    );
+    await tester.drag(
+      find.byKey(const Key('chat_swipe_swipe')),
+      const Offset(-600, 0),
+    );
+    await tester.pumpAndSettle();
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(ChatHistoryScreen)),
+    );
+    container.read(owner.notifier).state = 'second';
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 6));
+    await tester.pumpAndSettle();
+    expect(h.history.deleted, isEmpty);
+  });
+
   group('formatConversationWhen', () {
     final now = DateTime(2026, 10, 3, 12);
     test('this year omits the year, 12-hour clock', () {

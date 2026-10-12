@@ -197,7 +197,11 @@ class _DocumentRow extends StatelessWidget {
       child: InkWell(
         key: Key('document_row_${document.id}'),
         borderRadius: AppRadius.lgRadius,
-        onTap: () => context.push(AppRoutes.documentDetail(document.id)),
+        onTap: () => context.push(
+          document.status == DocumentStatus.sealed
+              ? AppRoutes.documentDetail(document.id)
+              : AppRoutes.documentPreview(document.id),
+        ),
         child: Container(
           padding: const EdgeInsets.all(AppSpacing.s3),
           decoration: BoxDecoration(

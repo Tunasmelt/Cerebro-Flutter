@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -10,6 +12,10 @@ import '../data/chat_message.dart';
 import '../data/document_titles_provider.dart';
 import '../data/resolved_answer.dart';
 import 'citation_chip.dart';
+import '../../../shared/widgets/app_markdown.dart';
+import '../../../shared/widgets/error_view.dart';
+import '../../../core/network/app_exception.dart';
+import 'typing_indicator.dart';
 
 /// One message in the conversation: the user's question, or an answer in
 /// whatever state it is in (waiting, streaming, done, failed, stopped).
@@ -52,7 +58,7 @@ class _UserBubble extends StatelessWidget {
       alignment: Alignment.centerRight,
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxWidth: MediaQuery.sizeOf(context).width * 0.82,
+          maxWidth: math.min(680, MediaQuery.sizeOf(context).width * 0.82),
         ),
         child: Container(
           key: Key('chat_user_${message.id}'),
@@ -116,7 +122,7 @@ class _AnswerBubble extends ConsumerWidget {
       alignment: Alignment.centerLeft,
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxWidth: MediaQuery.sizeOf(context).width * 0.92,
+          maxWidth: math.min(760, MediaQuery.sizeOf(context).width * 0.92),
         ),
         child: Container(
           key: Key('chat_answer_${message.id}'),
@@ -138,31 +144,30 @@ class _AnswerBubble extends ConsumerWidget {
                       ? 'Writing the answer…'
                       : 'Searching your documents…',
                 ),
-              if (hasText)
-                SelectionArea(
-                  child: Text.rich(
-                    TextSpan(
-                      style: AppTypography.base.copyWith(
-                        color: AppColors.textPrimary,
-                        height: 1.5,
-                      ),
-                      children: [
-                        for (final part in parts)
-                          switch (part) {
-                            TextPart(:final text) => TextSpan(text: text),
-                            ChipPart() => WidgetSpan(
-                              alignment: PlaceholderAlignment.middle,
-                              child: CitationChip(
-                                key: Key('citation_chip_${part.number}'),
-                                number: part.number,
-                                title: titleOf(part.documentId),
-                                enabled: available(part.documentId),
-                                onTap: () => onOpenDocument(part.documentId),
-                              ),
-                            ),
-                          },
-                      ],
-                    ),
+              if (hasText) _markdown(parts, titleOf, available),
+              if (hasText && !message.isStreaming)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: IconButton(
+                    key: Key('chat_copy_${message.id}'),
+                    tooltip: 'Copy answer',
+                    icon: const Icon(Icons.copy_outlined),
+                    onPressed: () async {
+                      final text = parts
+                          .map(
+                            (part) => switch (part) {
+                              TextPart(:final text) => text,
+                              ChipPart(:final number) => '[$number]',
+                            },
+                          )
+                          .join();
+                      await Clipboard.setData(ClipboardData(text: text));
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Answer copied')),
+                        );
+                      }
+                    },
                   ),
                 ),
               if (sources.isNotEmpty) ...[
@@ -195,17 +200,55 @@ class _AnswerBubble extends ConsumerWidget {
                   ),
                 ),
               if (message.status == ChatMessageStatus.failed)
-                _Failure(
-                  key: Key('chat_error_${message.id}'),
-                  message: message.error?.message ?? 'Something went wrong.',
-                  partial: hasText,
-                  canRetry: canRetry,
-                  onRetry: onRetry,
+                if (hasText) const Text('The answer above is incomplete.'),
+              if (message.status == ChatMessageStatus.failed)
+                Padding(
+                  padding: const EdgeInsets.only(top: AppSpacing.s3),
+                  child: ErrorView(
+                    retryKey: const Key('chat_retry'),
+                    key: Key('chat_error_${message.id}'),
+                    exception: message.error ?? const UnknownApiException(),
+                    onRetry: canRetry ? onRetry : null,
+                  ),
                 ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _markdown(
+    List<AnswerPart> parts,
+    String Function(String) titleOf,
+    bool Function(String) available,
+  ) {
+    var delimiter = '\uE000CEREBRO';
+    final text = parts.whereType<TextPart>().map((part) => part.text).join();
+    while (text.contains(delimiter)) {
+      delimiter += '_';
+    }
+    final data = parts
+        .map(
+          (part) => switch (part) {
+            TextPart(:final text) => text,
+            ChipPart(:final number) => '$delimiter$number\uE001',
+          },
+        )
+        .join();
+    return AppMarkdown(
+      data: data,
+      delimiter: delimiter,
+      inlineWidgets: {
+        for (final part in parts.whereType<ChipPart>())
+          part.number: CitationChip(
+            key: Key('citation_chip_${part.number}'),
+            number: part.number,
+            title: titleOf(part.documentId),
+            enabled: available(part.documentId),
+            onTap: () => onOpenDocument(part.documentId),
+          ),
+      },
     );
   }
 }
@@ -264,77 +307,7 @@ class _NoMatches extends StatelessWidget {
 
 class _Thinking extends StatelessWidget {
   const _Thinking({super.key, required this.label});
-
   final String label;
-
   @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const SizedBox(
-          width: 14,
-          height: 14,
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            color: AppColors.accentPrimary,
-          ),
-        ),
-        const SizedBox(width: AppSpacing.s2),
-        Text(
-          label,
-          style: AppTypography.sm.copyWith(color: AppColors.textSecondary),
-        ),
-      ],
-    );
-  }
-}
-
-class _Failure extends StatelessWidget {
-  const _Failure({
-    super.key,
-    required this.message,
-    required this.partial,
-    required this.canRetry,
-    required this.onRetry,
-  });
-
-  final String message;
-  final bool partial;
-  final bool canRetry;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(top: AppSpacing.s3),
-      padding: const EdgeInsets.all(AppSpacing.s3),
-      decoration: BoxDecoration(
-        color: AppColors.dangerSubtle,
-        borderRadius: AppRadius.mdRadius,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            partial ? '$message The answer above is incomplete.' : message,
-            style: AppTypography.sm.copyWith(color: AppColors.dangerHover),
-          ),
-          if (canRetry)
-            TextButton.icon(
-              key: const Key('chat_retry'),
-              style: TextButton.styleFrom(
-                foregroundColor: AppColors.textPrimary,
-                padding: EdgeInsets.zero,
-                minimumSize: const Size(0, AppSpacing.minTouchTarget),
-              ),
-              onPressed: onRetry,
-              icon: const Icon(Icons.refresh_rounded, size: 18),
-              label: const Text('Try again'),
-            ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => TypingIndicator(label: label);
 }

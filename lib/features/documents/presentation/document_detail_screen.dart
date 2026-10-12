@@ -14,7 +14,8 @@ import '../data/ingest_retry_controller.dart';
 import '../data/ingest_status.dart';
 import '../../sealed/presentation/sealed_document_controls.dart';
 import 'document_presentation.dart';
-import 'document_file_screen.dart';
+import 'package:go_router/go_router.dart';
+import '../../../app/app_routes.dart';
 import '../../../shared/widgets/app_confirm_dialog.dart';
 
 class DocumentDetailScreen extends ConsumerWidget {
@@ -162,11 +163,8 @@ class _DocumentDetailBody extends ConsumerWidget {
               key: const Key('document_view_file'),
               icon: const Icon(Icons.visibility_outlined),
               label: const Text('View file'),
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => DocumentFileScreen(documentId: documentId),
-                ),
-              ),
+              onPressed: () =>
+                  context.go(AppRoutes.documentPreview(documentId)),
             ),
           if (abandoned) ...[
             Container(

@@ -11,5 +11,8 @@ abstract final class AppRoutes {
   static const playground = '/settings/token-inspector';
   static const settings = '/settings';
 
-  static String documentDetail(String documentId) => '$documents/$documentId';
+  static String documentPreview(String documentId) => '$documents/$documentId';
+
+  static String documentDetail(String documentId) =>
+      '$documents/$documentId/details';
 }
