@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../shared/tokens/app_colors.dart';
-import '../../../shared/tokens/app_radius.dart';
+import '../../../shared/widgets/ask_field.dart';
 import '../../../shared/tokens/app_spacing.dart';
-import '../../../shared/tokens/app_typography.dart';
 
 /// The message box. Send while idle; Stop while an answer is on its way.
 class ChatComposer extends StatefulWidget {
@@ -54,11 +53,6 @@ class _ChatComposerState extends State<ChatComposer> {
     widget.onSend(text);
   }
 
-  OutlineInputBorder _border(Color color) => OutlineInputBorder(
-    borderRadius: AppRadius.lgRadius,
-    borderSide: BorderSide(color: color),
-  );
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -76,31 +70,10 @@ class _ChatComposerState extends State<ChatComposer> {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Expanded(
-            child: TextField(
-              key: const Key('chat_input'),
+            child: AskField(
+              inputKey: const Key('chat_input'),
               enabled: widget.enabled,
               controller: _controller,
-              minLines: 1,
-              maxLines: 5,
-              textCapitalization: TextCapitalization.sentences,
-              keyboardType: TextInputType.multiline,
-              textInputAction: TextInputAction.newline,
-              style: AppTypography.base.copyWith(color: AppColors.textPrimary),
-              decoration: InputDecoration(
-                hintText: 'Ask your documents…',
-                hintStyle: AppTypography.base.copyWith(
-                  color: AppColors.textDisabled,
-                ),
-                filled: true,
-                fillColor: AppColors.bgElevated,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.s4,
-                  vertical: AppSpacing.s3,
-                ),
-                border: _border(AppColors.borderDefault),
-                enabledBorder: _border(AppColors.borderDefault),
-                focusedBorder: _border(AppColors.accentPrimaryBorder),
-              ),
             ),
           ),
           const SizedBox(width: AppSpacing.s2),
