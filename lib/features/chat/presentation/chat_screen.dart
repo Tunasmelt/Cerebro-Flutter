@@ -172,6 +172,23 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   ),
               ],
             ),
+            if (chat.documentTitle != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    const Icon(Icons.description_outlined, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Chatting about ${chat.documentTitle}',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             Expanded(
               child: Stack(
                 fit: StackFit.expand,
@@ -228,6 +245,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                     message.status == ChatMessageStatus.failed,
                                 onRetry: controller.retry,
                                 onOpenDocument: _open,
+                                onOpenCitation: (part) {
+                                  if (widget.openDocument != null) {
+                                    _open(part.documentId);
+                                  } else {
+                                    context.push(
+                                      AppRoutes.citationEvidence(part.chunkId),
+                                    );
+                                  }
+                                },
                               );
                             },
                           ),

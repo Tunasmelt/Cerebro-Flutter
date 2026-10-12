@@ -24,6 +24,7 @@ abstract interface class ChatStreamApi {
   Stream<ChatStreamEvent> stream({
     required String sessionId,
     required String query,
+    String? documentId,
   });
 }
 
@@ -46,6 +47,7 @@ class DioChatStreamClient implements ChatStreamApi {
   Stream<ChatStreamEvent> stream({
     required String sessionId,
     required String query,
+    String? documentId,
   }) {
     final cancelToken = CancelToken();
     StreamSubscription<dynamic>? subscription;
@@ -81,6 +83,7 @@ class DioChatStreamClient implements ChatStreamApi {
           '/api/v1/chat/sessions/$sessionId/stream',
           data: {
             'query': query,
+            'document_id': ?documentId,
             if (activeUnlocks != null) 'unlocked': activeUnlocks!(),
           },
           cancelToken: cancelToken,

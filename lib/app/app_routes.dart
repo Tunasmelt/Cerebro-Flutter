@@ -11,6 +11,9 @@ abstract final class AppRoutes {
   static const playground = '/settings/token-inspector';
   static const settings = '/settings';
 
+  static String citationEvidence(String chunkId) =>
+      '/evidence/${Uri.encodeComponent(chunkId)}';
+
   static String documentPreview(String documentId) => '$documents/$documentId';
 
   static String documentDetail(String documentId) =>

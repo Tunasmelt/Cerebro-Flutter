@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../../../app/app_routes.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../shared/tokens/app_colors.dart';
@@ -87,6 +89,8 @@ class GraphAnswerCard extends ConsumerWidget {
                   canRetry: answer.status == ChatMessageStatus.failed,
                   onRetry: ref.read(chatControllerProvider.notifier).retry,
                   onOpenDocument: onOpenDocument,
+                  onOpenCitation: (part) =>
+                      context.push(AppRoutes.citationEvidence(part.chunkId)),
                 ),
               ),
             ),

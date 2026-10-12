@@ -54,6 +54,7 @@ class _RecordingStream implements ChatStreamApi {
   Stream<ChatStreamEvent> stream({
     required String sessionId,
     required String query,
+    String? documentId,
   }) => _inner.stream(sessionId: sessionId, query: query).map((event) {
     if (event is ChatRetrieval) retrievals.add(event);
     return event;

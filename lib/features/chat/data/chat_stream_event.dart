@@ -23,10 +23,15 @@ final class ChatHeartbeat extends ChatStreamEvent {
 
 /// What retrieval found. Arrives before any token.
 final class ChatRetrieval extends ChatStreamEvent {
-  const ChatRetrieval({required this.chunkIds, required this.documentIds});
+  const ChatRetrieval({
+    required this.chunkIds,
+    required this.documentIds,
+    this.scopeDocumentId,
+  });
 
   final List<String> chunkIds;
   final List<String> documentIds;
+  final String? scopeDocumentId;
 
   /// Retrieval found nothing relevant to ground an answer in.
   bool get isEmpty => chunkIds.isEmpty;
@@ -84,9 +89,14 @@ ChatStreamEvent? chatEventFromSse(SseEvent event) {
       return const ChatDone();
     case 'retrieval':
       final data = _object(event);
+      if (data['scope_document_id'] != null &&
+          data['scope_document_id'] is! String) {
+        throw const FormatException('Invalid retrieval scope');
+      }
       return ChatRetrieval(
         chunkIds: _stringList(data, 'chunk_ids', event),
         documentIds: _stringList(data, 'document_ids', event),
+        scopeDocumentId: data['scope_document_id'] as String?,
       );
     case 'token':
       return ChatToken(_string(_object(event), 'text', event));

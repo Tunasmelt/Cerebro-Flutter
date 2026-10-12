@@ -36,6 +36,8 @@ final chatHistoryApiProvider = Provider<ChatHistoryApi>((ref) {
 class ChatState {
   const ChatState({
     this.sessionId,
+    this.documentId,
+    this.documentTitle,
     this.messages = const [],
     this.startedAt,
     this.loading = false,
@@ -45,6 +47,8 @@ class ChatState {
   /// The server-side conversation id: created lazily on the first question,
   /// or the one of a past conversation that was reopened.
   final String? sessionId;
+  final String? documentId;
+  final String? documentTitle;
   final List<ChatMessage> messages;
 
   /// When the conversation began, if known (a reopened one; a live one is
@@ -68,6 +72,8 @@ class ChatState {
     bool clearLoadError = false,
   }) => ChatState(
     sessionId: sessionId ?? this.sessionId,
+    documentId: documentId,
+    documentTitle: documentTitle,
     messages: messages ?? this.messages,
     startedAt: startedAt,
     loading: loading ?? this.loading,
@@ -116,6 +122,13 @@ class ChatController extends Notifier<ChatState> {
     _reset();
     ref.read(graphPulseProvider.notifier).clear();
     state = const ChatState();
+  }
+
+  Future<void> chatAboutDocument(String id, String title) async {
+    if (state.busy || state.loading) return;
+    newChat();
+    state = ChatState(documentId: id, documentTitle: title);
+    await send('Summarize this document.');
   }
 
   /// Asks [question]. Completes when the turn has ended (answered, failed or
@@ -274,7 +287,11 @@ class ChatController extends Notifier<ChatState> {
 
     _subscription = ref
         .read(chatStreamApiProvider)
-        .stream(sessionId: sessionId, query: query)
+        .stream(
+          sessionId: sessionId,
+          query: query,
+          documentId: state.documentId,
+        )
         .listen(
           (event) {
             if (generation != _generation) return;
@@ -294,6 +311,24 @@ class ChatController extends Notifier<ChatState> {
       case ChatHeartbeat():
         break;
       case ChatRetrieval(:final chunkIds, :final documentIds):
+        final scope = state.documentId;
+        if (scope != null &&
+            (event.scopeDocumentId != scope ||
+                documentIds.any((id) => id != scope))) {
+          _generation++;
+          _subscription?.cancel();
+          _update(
+            id,
+            (m) => m.copyWith(
+              status: ChatMessageStatus.failed,
+              error: const UnknownApiException(
+                'Selected-document chat is unavailable. Please retry after the server update.',
+              ),
+            ),
+          );
+          if (!turn.isCompleted) turn.complete();
+          return;
+        }
         _update(
           id,
           (m) => m.copyWith(

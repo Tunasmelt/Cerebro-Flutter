@@ -25,6 +25,7 @@ class _Stream implements ChatStreamApi {
   Stream<ChatStreamEvent> stream({
     required String sessionId,
     required String query,
+    String? documentId,
   }) {
     final t = _Turn();
     turns.add(t);

@@ -26,6 +26,7 @@ class ChatBubble extends ConsumerWidget {
     required this.canRetry,
     required this.onRetry,
     required this.onOpenDocument,
+    this.onOpenCitation,
   });
 
   final ChatMessage message;
@@ -34,6 +35,7 @@ class ChatBubble extends ConsumerWidget {
   final bool canRetry;
   final VoidCallback onRetry;
   final ValueChanged<String> onOpenDocument;
+  final ValueChanged<ChipPart>? onOpenCitation;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -43,6 +45,7 @@ class ChatBubble extends ConsumerWidget {
       canRetry: canRetry,
       onRetry: onRetry,
       onOpenDocument: onOpenDocument,
+      onOpenCitation: onOpenCitation,
     );
   }
 }
@@ -87,12 +90,14 @@ class _AnswerBubble extends ConsumerWidget {
     required this.canRetry,
     required this.onRetry,
     required this.onOpenDocument,
+    this.onOpenCitation,
   });
 
   final ChatMessage message;
   final bool canRetry;
   final VoidCallback onRetry;
   final ValueChanged<String> onOpenDocument;
+  final ValueChanged<ChipPart>? onOpenCitation;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -183,7 +188,16 @@ class _AnswerBubble extends ConsumerWidget {
                         title: titleOf(source.documentId),
                         numbers: source.numbers,
                         enabled: available(source.documentId),
-                        onTap: () => onOpenDocument(source.documentId),
+                        onTap: () {
+                          final part = parts.whereType<ChipPart>().firstWhere(
+                            (p) => p.documentId == source.documentId,
+                          );
+                          if (onOpenCitation != null) {
+                            onOpenCitation!(part);
+                          } else {
+                            onOpenDocument(source.documentId);
+                          }
+                        },
                       ),
                   ],
                 ),
@@ -246,7 +260,13 @@ class _AnswerBubble extends ConsumerWidget {
             number: part.number,
             title: titleOf(part.documentId),
             enabled: available(part.documentId),
-            onTap: () => onOpenDocument(part.documentId),
+            onTap: () {
+              if (onOpenCitation != null) {
+                onOpenCitation!(part);
+              } else {
+                onOpenDocument(part.documentId);
+              }
+            },
           ),
       },
     );

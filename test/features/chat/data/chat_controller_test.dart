@@ -13,9 +13,10 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// One call to `stream()`, driven by the test.
 class _Turn {
-  _Turn(this.sessionId, this.query);
+  _Turn(this.sessionId, this.query, [this.documentId]);
   final String sessionId;
   final String query;
+  final String? documentId;
   bool cancelled = false;
   late final StreamController<ChatStreamEvent> controller =
       StreamController<ChatStreamEvent>(onCancel: () => cancelled = true);
@@ -31,8 +32,9 @@ class _FakeStream implements ChatStreamApi {
   Stream<ChatStreamEvent> stream({
     required String sessionId,
     required String query,
+    String? documentId,
   }) {
-    final turn = _Turn(sessionId, query);
+    final turn = _Turn(sessionId, query, documentId);
     turns.add(turn);
     return turn.controller.stream;
   }
@@ -411,4 +413,48 @@ void main() {
       expect(t.cancelled, isTrue);
     });
   });
+  test(
+    'document chat creates a fresh scoped conversation and preserves scope on followups',
+    () async {
+      final (:c, :stream, :sessions) = _setup();
+      final initial = _ctl(c).chatAboutDocument('selected', 'Notes');
+      await _tick();
+      expect(stream.turns.single.documentId, 'selected');
+      expect(stream.turns.single.query, 'Summarize this document.');
+      stream.turns.single.add(
+        const ChatRetrieval(
+          chunkIds: ['c'],
+          documentIds: ['selected'],
+          scopeDocumentId: 'selected',
+        ),
+      );
+      stream.turns.single.add(const ChatDone());
+      await initial;
+      final followup = _ctl(c).send('What is the deadline?');
+      await _tick();
+      expect(stream.turns.last.documentId, 'selected');
+      stream.turns.last.add(const ChatDone());
+      await followup;
+      _ctl(c).newChat();
+      expect(_state(c).documentId, isNull);
+      expect(_state(c).documentTitle, isNull);
+    },
+  );
+
+  test(
+    'unscoped or unrelated retrieval cannot render an answer to a scoped question',
+    () async {
+      final (:c, :stream, :sessions) = _setup();
+      final request = _ctl(c).chatAboutDocument('selected', 'Notes');
+      await _tick();
+      stream.turns.single.add(
+        const ChatRetrieval(chunkIds: ['wrong'], documentIds: ['other']),
+      );
+      stream.turns.single.add(const ChatToken('Unrelated answer'));
+      await request;
+      expect(_answer(c).status, ChatMessageStatus.failed);
+      expect(_answer(c).text, isEmpty);
+      expect(stream.turns.single.cancelled, isTrue);
+    },
+  );
 }
