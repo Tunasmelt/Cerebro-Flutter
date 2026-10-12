@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_force_directed_graph/flutter_force_directed_graph.dart';
@@ -56,7 +58,9 @@ class _GraphScreenState extends ConsumerState<GraphScreen>
   final _askController = TextEditingController();
 
   String _query = '';
-  bool _showLegend = true;
+
+  /// Node types the legend chips have dimmed.
+  final Set<GraphNodeType> _hiddenTypes = {};
 
   /// The latest answer is shown over the graph once a question has been asked
   /// from it (until dismissed).
@@ -122,12 +126,34 @@ class _GraphScreenState extends ConsumerState<GraphScreen>
       _builtFrom = snapshot;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || !identical(_controller, controller)) return;
-        controller.center();
+        _fitToView();
         // A fresh graph has nothing expanded.
         ref.read(graphExpansionProvider.notifier).collapse();
       });
     }
     return _controller!;
+  }
+
+  /// Puts the graph's middle in the middle of the view and zooms so the whole
+  /// layout fits, with room for the controls above and below it. The server's
+  /// layout has a fixed radius, so without this a small graph floats in a sea
+  /// of space and a wide one runs off the edges.
+  void _fitToView() {
+    final controller = _controller;
+    if (controller == null) return;
+    controller.center();
+    controller.scale = _fitScale(
+      [for (final n in controller.graph.nodes) (n.position.x, n.position.y)],
+      MediaQuery.sizeOf(context),
+      min: controller.minScale,
+      max: controller.maxScale,
+    );
+  }
+
+  void _zoomBy(double factor) {
+    final controller = _controller;
+    if (controller == null) return;
+    controller.scale = controller.scale * factor;
   }
 
   /// The package un-fixes every node whenever one is touched, which starts its
@@ -308,6 +334,25 @@ class _GraphScreenState extends ConsumerState<GraphScreen>
                         ),
                       ],
                     ),
+                    if (snapshot != null &&
+                        snapshot.nodes.isNotEmpty &&
+                        !_showAnswer &&
+                        expanded == null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: AppSpacing.s1),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: GraphLegend(
+                            hidden: _hiddenTypes,
+                            onToggle: (type) => setState(() {
+                              if (!_hiddenTypes.remove(type)) {
+                                _hiddenTypes.add(type);
+                              }
+                              _controller?.needUpdate();
+                            }),
+                          ),
+                        ),
+                      ),
                     if (snapshot != null) _Notes(snapshot: snapshot),
                     if (replaying) const _ReplayingPill(),
                     const Spacer(),
@@ -332,17 +377,18 @@ class _GraphScreenState extends ConsumerState<GraphScreen>
               ),
             ),
           ),
-          if (_showLegend &&
-              !_showAnswer &&
+          if (!_showAnswer &&
               expanded == null &&
               snapshot != null &&
               snapshot.nodes.isNotEmpty)
             Positioned(
-              left: AppSpacing.s4,
+              right: AppSpacing.s4,
               bottom: AppSpacing.s20,
               child: SafeArea(
-                child: GraphLegend(
-                  onDismiss: () => setState(() => _showLegend = false),
+                child: _ZoomControls(
+                  onZoomIn: () => _zoomBy(1.25),
+                  onZoomOut: () => _zoomBy(0.8),
+                  onFit: _fitToView,
                 ),
               ),
             ),
@@ -427,7 +473,9 @@ class _GraphScreenState extends ConsumerState<GraphScreen>
           node: node,
           matched: matched,
           selected: selected,
-          dimmed: _query.isNotEmpty && !matched && !selected,
+          dimmed:
+              (_query.isNotEmpty && !matched && !selected) ||
+              _hiddenTypes.contains(node.type),
           pulsing: _pulsingIds.contains(node.id),
           pulse: _pulseAnim,
           onTap: () => toggle(node.id),
@@ -435,6 +483,97 @@ class _GraphScreenState extends ConsumerState<GraphScreen>
       },
       edgesBuilder: (context, a, b, distance) =>
           GraphEdgeLine(length: distance),
+    );
+  }
+}
+
+/// The scale at which a layout with these node positions (already centred on
+/// the origin) fits a view of [size], leaving room above and below for the
+/// search bar and the ask bar. Clamped to [min]..[max], and never zoomed in
+/// past 1.5 so a two-node graph is not enormous.
+double fitScaleFor(
+  List<(double, double)> positions,
+  Size size, {
+  required double min,
+  required double max,
+}) => _fitScale(positions, size, min: min, max: max);
+
+double _fitScale(
+  List<(double, double)> positions,
+  Size size, {
+  required double min,
+  required double max,
+}) {
+  if (positions.isEmpty) return 1;
+  var reachX = 0.0;
+  var reachY = 0.0;
+  for (final (x, y) in positions) {
+    reachX = math.max(reachX, x.abs());
+    reachY = math.max(reachY, y.abs());
+  }
+  // Half the usable view, minus a node's own size and some breathing room.
+  const margin = 48.0;
+  final halfW = (size.width - 2 * AppSpacing.s4) / 2 - margin;
+  final halfH = size.height * 0.55 / 2 - margin;
+  final scaleX = reachX <= 0 ? double.infinity : halfW / reachX;
+  final scaleY = reachY <= 0 ? double.infinity : halfH / reachY;
+  final fit = math.min(scaleX, scaleY);
+  if (fit.isInfinite) return 1;
+  return fit.clamp(min, math.min(max, 1.5));
+}
+
+/// Zoom in / out / fit, for the people (and the hands) that pinch does not
+/// suit.
+class _ZoomControls extends StatelessWidget {
+  const _ZoomControls({
+    required this.onZoomIn,
+    required this.onZoomOut,
+    required this.onFit,
+  });
+
+  final VoidCallback onZoomIn;
+  final VoidCallback onZoomOut;
+  final VoidCallback onFit;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget button(Key key, String tooltip, IconData icon, VoidCallback onTap) =>
+        IconButton(
+          key: key,
+          tooltip: tooltip,
+          onPressed: onTap,
+          icon: Icon(icon, size: 20),
+          color: AppColors.textPrimary,
+          constraints: const BoxConstraints(
+            minWidth: AppSpacing.minTouchTarget,
+            minHeight: AppSpacing.minTouchTarget,
+          ),
+        );
+    return Container(
+      key: const Key('graph_zoom_controls'),
+      decoration: BoxDecoration(
+        color: AppColors.bgElevated.withValues(alpha: 0.92),
+        borderRadius: AppRadius.lgRadius,
+        border: Border.all(color: AppColors.borderSubtle),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          button(const Key('graph_zoom_in'), 'Zoom in', Icons.add, onZoomIn),
+          button(
+            const Key('graph_zoom_out'),
+            'Zoom out',
+            Icons.remove,
+            onZoomOut,
+          ),
+          button(
+            const Key('graph_fit'),
+            'Fit graph to screen',
+            Icons.center_focus_strong_outlined,
+            onFit,
+          ),
+        ],
+      ),
     );
   }
 }
@@ -450,7 +589,7 @@ class _Notes extends StatelessWidget {
   Widget build(BuildContext context) {
     final notes = <String>[
       if (snapshot.nodes.length > 1 && !snapshot.isClustered)
-        'Groups are not computed yet, so documents are spread evenly.',
+        'Documents are spread evenly until Cerebro groups them.',
       if (snapshot.edgesUnavailable)
         "Links between documents couldn't be loaded.",
     ];

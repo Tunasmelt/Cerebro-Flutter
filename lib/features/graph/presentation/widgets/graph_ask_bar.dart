@@ -40,35 +40,13 @@ class GraphAskBar extends StatelessWidget {
           ),
           child: Row(
             children: [
-              InkWell(
+              IconButton(
                 key: const Key('graph_history'),
-                onTap: onHistory,
-                borderRadius: AppRadius.mdRadius,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(
-                    minHeight: AppSpacing.minTouchTarget,
-                  ),
-                  child: Container(
-                    height: 28,
-                    margin: const EdgeInsets.symmetric(vertical: 8),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.s2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceHover,
-                      borderRadius: AppRadius.mdRadius,
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      'history',
-                      style: AppTypography.xs.copyWith(
-                        color: AppColors.grayDim,
-                      ),
-                    ),
-                  ),
-                ),
+                tooltip: 'Past conversations',
+                onPressed: onHistory,
+                icon: const Icon(Icons.history_rounded, size: 20),
+                color: AppColors.textSecondary,
               ),
-              const SizedBox(width: AppSpacing.s2),
               Expanded(
                 child: TextField(
                   controller: controller,
@@ -82,6 +60,11 @@ class GraphAskBar extends StatelessWidget {
                     isDense: true,
                     filled: false,
                     border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    disabledBorder: InputBorder.none,
+                    errorBorder: InputBorder.none,
+                    focusedErrorBorder: InputBorder.none,
                     hintText: 'Ask about your documents…',
                     hintStyle: AppTypography.sm.copyWith(
                       color: AppColors.grayDim,
@@ -112,7 +95,7 @@ class GraphAskBar extends StatelessWidget {
                   child: const Text(
                     'Ask',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 14,
                       fontWeight: AppTypography.weightSemibold,
                     ),
                   ),

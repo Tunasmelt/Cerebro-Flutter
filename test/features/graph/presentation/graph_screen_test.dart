@@ -7,6 +7,7 @@ import 'package:cerebro_mobile/features/graph/data/graph_api.dart';
 import 'package:cerebro_mobile/features/graph/data/graph_layout.dart';
 import 'package:cerebro_mobile/features/graph/data/graph_models.dart';
 import 'package:cerebro_mobile/features/graph/presentation/graph_screen.dart';
+import 'package:cerebro_mobile/features/graph/presentation/widgets/graph_node_dot.dart';
 import 'package:cerebro_mobile/shared/theme/app_theme.dart';
 import 'package:cerebro_mobile/shared/tokens/app_colors.dart';
 import 'package:flutter/material.dart';
@@ -208,7 +209,7 @@ void main() {
     final api = _FakeGraph()..nodeRows = [_n('a'), _n('b'), _n('c')];
     await _pump(tester, api);
     expect(find.byKey(const Key('graph_notes')), findsOneWidget);
-    expect(find.textContaining('not computed yet'), findsOneWidget);
+    expect(find.textContaining('spread evenly'), findsOneWidget);
     for (final id in ['a', 'b', 'c']) {
       expect(_dot(id), findsOneWidget);
     }
@@ -262,7 +263,14 @@ void main() {
     // finder's center is not where the node is: the view's middle plus the
     // node's offset (x: -1 of 1 fitted to the layout radius).
     final middle = tester.getCenter(find.byKey(const Key('graph_canvas')));
-    await tester.tapAt(middle + const Offset(-graphLayoutRadius, 0));
+    // The graph is fitted to the view, so the layout radius is scaled.
+    final scale = tester
+        .widget<ForceDirectedGraphWidget<String>>(
+          find.byKey(const Key('graph_canvas')),
+        )
+        .controller
+        .scale;
+    await tester.tapAt(middle + Offset(-graphLayoutRadius * scale, 0));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     // In the panel (the node's own label is left off so it does not sit on
@@ -380,5 +388,199 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
     expect(api.nodeCalls, 2);
     expect(_dot('b'), findsOneWidget);
+  });
+
+  group('UI pass F1: chrome, legend filter, zoom and fit', () {
+    ForceDirectedGraphController<String> controllerOf(WidgetTester tester) =>
+        tester
+            .widget<ForceDirectedGraphWidget<String>>(
+              find.byKey(const Key('graph_canvas')),
+            )
+            .controller;
+
+    _FakeGraph threeKinds() => _FakeGraph()
+      ..nodeRows = [
+        _n('doc', x: -1, y: 0),
+        _n('pic', x: 0, y: 0, mime: 'image/png'),
+        _n('vault', x: 1, y: 0, status: 'sealed'),
+      ];
+
+    bool dimmed(WidgetTester tester, String id) => tester
+        .widgetList<GraphNodeDot>(find.byType(GraphNodeDot))
+        .firstWhere((w) => w.node.id == id)
+        .dimmed;
+
+    group('fitScaleFor', () {
+      const size = Size(400, 800);
+      test('an empty or single-point layout stays at 1', () {
+        expect(fitScaleFor([], size, min: 0.3, max: 3), 1);
+        expect(fitScaleFor([(0, 0)], size, min: 0.3, max: 3), 1);
+      });
+
+      test('a tiny layout is zoomed in, but never past 1.5', () {
+        expect(fitScaleFor([(-10, 0), (10, 0)], size, min: 0.3, max: 3), 1.5);
+      });
+
+      test('a wide layout is zoomed out to fit the width', () {
+        // half usable width = (400 - 32) / 2 - 48 = 136
+        expect(
+          fitScaleFor([(-400, 0), (400, 0)], size, min: 0.3, max: 3),
+          closeTo(136 / 400, 1e-9),
+        );
+      });
+
+      test('a tall layout is limited by the height instead', () {
+        // half usable height = 800 * 0.55 / 2 - 48 = 172
+        expect(
+          fitScaleFor([(0, -400), (0, 400)], size, min: 0.3, max: 3),
+          closeTo(172 / 400, 1e-9),
+        );
+      });
+
+      test('the smaller of the two axes wins, and min is respected', () {
+        expect(
+          fitScaleFor(
+            [(-100, 0), (100, 0), (0, -2000)],
+            size,
+            min: 0.3,
+            max: 3,
+          ),
+          0.3,
+        );
+      });
+    });
+
+    testWidgets('the search and ask fields draw no box of their own', (
+      tester,
+    ) async {
+      await _pump(tester, threeKinds());
+      final decorators = tester.widgetList<InputDecorator>(
+        find.byType(InputDecorator),
+      );
+      expect(decorators, isNotEmpty);
+      for (final d in decorators) {
+        expect(d.decoration.enabledBorder, InputBorder.none);
+        expect(d.decoration.focusedBorder, InputBorder.none);
+      }
+    });
+
+    testWidgets('History is a labelled 44px button, not lowercase text', (
+      tester,
+    ) async {
+      await _pump(tester, threeKinds());
+      final history = find.byKey(const Key('graph_history'));
+      expect(tester.widget<IconButton>(history).tooltip, 'Past conversations');
+      expect(tester.getSize(history).height, greaterThanOrEqualTo(44));
+      expect(find.text('history'), findsNothing);
+    });
+
+    testWidgets('the legend names each type and filters by tap', (
+      tester,
+    ) async {
+      await _pump(tester, threeKinds());
+      for (final name in ['Document', 'Image', 'Sealed']) {
+        expect(find.text(name), findsOneWidget);
+      }
+      expect(dimmed(tester, 'doc'), isFalse);
+
+      await tester.tap(find.byKey(const Key('graph_legend_document')));
+      await tester.pump();
+      expect(dimmed(tester, 'doc'), isTrue);
+      expect(dimmed(tester, 'pic'), isFalse);
+      expect(dimmed(tester, 'vault'), isFalse);
+
+      await tester.tap(find.byKey(const Key('graph_legend_document')));
+      await tester.pump();
+      expect(dimmed(tester, 'doc'), isFalse);
+    });
+
+    testWidgets('the legend chips sit side by side on one row', (tester) async {
+      await _pump(tester, threeKinds());
+      final tops = {
+        for (final t in ['document', 'image', 'sealed'])
+          tester.getTopLeft(find.byKey(Key('graph_legend_$t'))).dy,
+      };
+      expect(tops, hasLength(1), reason: 'the chips stacked: $tops');
+      final lefts = [
+        for (final t in ['document', 'image', 'sealed'])
+          tester.getTopLeft(find.byKey(Key('graph_legend_$t'))).dx,
+      ];
+      expect(lefts, orderedEquals([...lefts]..sort()));
+    });
+
+    testWidgets('legend chips are 44px touch targets', (tester) async {
+      await _pump(tester, threeKinds());
+      for (final type in ['document', 'image', 'sealed']) {
+        expect(
+          tester.getSize(find.byKey(Key('graph_legend_$type'))).height,
+          greaterThanOrEqualTo(44),
+        );
+      }
+    });
+
+    testWidgets('an empty graph has no legend and no zoom controls', (
+      tester,
+    ) async {
+      await _pump(tester, _FakeGraph());
+      expect(find.byKey(const Key('graph_legend')), findsNothing);
+      expect(find.byKey(const Key('graph_zoom_controls')), findsNothing);
+    });
+
+    testWidgets('zoom in, zoom out and fit work without pinching', (
+      tester,
+    ) async {
+      await _pump(tester, threeKinds());
+      final c = controllerOf(tester);
+      final fitted = c.scale;
+
+      await tester.tap(find.byKey(const Key('graph_zoom_in')));
+      await tester.pump();
+      expect(c.scale, closeTo((fitted * 1.25).clamp(0.3, 3), 1e-9));
+      expect(c.scale, greaterThan(fitted));
+
+      await tester.tap(find.byKey(const Key('graph_zoom_out')));
+      await tester.tap(find.byKey(const Key('graph_zoom_out')));
+      await tester.pump();
+      expect(c.scale, lessThan(fitted));
+
+      await tester.tap(find.byKey(const Key('graph_fit')));
+      await tester.pump();
+      expect(c.scale, closeTo(fitted, 1e-9));
+    });
+
+    testWidgets('zoom buttons are 44px touch targets with tooltips', (
+      tester,
+    ) async {
+      await _pump(tester, threeKinds());
+      for (final k in ['graph_zoom_in', 'graph_zoom_out', 'graph_fit']) {
+        final f = find.byKey(Key(k));
+        expect(tester.getSize(f).height, greaterThanOrEqualTo(44), reason: k);
+        expect(tester.widget<IconButton>(f).tooltip, isNotEmpty, reason: k);
+      }
+    });
+
+    testWidgets('opening a node tucks the legend and zoom controls away', (
+      tester,
+    ) async {
+      await _pump(tester, threeKinds());
+      expect(find.byKey(const Key('graph_legend')), findsOneWidget);
+      final middle = tester.getCenter(find.byKey(const Key('graph_canvas')));
+      final scale = controllerOf(tester).scale;
+      await tester.tapAt(middle + Offset(-graphLayoutRadius * scale, 0));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.byKey(const Key('node_panel')), findsOneWidget);
+      expect(find.byKey(const Key('graph_legend')), findsNothing);
+      expect(find.byKey(const Key('graph_zoom_controls')), findsNothing);
+    });
+
+    testWidgets('the unclustered note is friendly', (tester) async {
+      await _pump(tester, _FakeGraph()..nodeRows = [_n('a'), _n('b')]);
+      expect(
+        find.text('Documents are spread evenly until Cerebro groups them.'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('not computed'), findsNothing);
+    });
   });
 }

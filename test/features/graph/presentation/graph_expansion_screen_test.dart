@@ -444,6 +444,8 @@ void main() {
           n.data: Offset(n.position.x, n.position.y),
       };
       final middle = tester.getCenter(find.byKey(const Key('graph_canvas')));
+      // A drag of N screen pixels moves the layout N / scale units.
+      final scale = _controller(tester).scale;
 
       // Empty space: well below the row of nodes, above the ask bar.
       final gesture = await tester.startGesture(middle + const Offset(0, 140));
@@ -456,8 +458,16 @@ void main() {
 
       for (final n in _controller(tester).graph.nodes) {
         final was = before[n.data]!;
-        expect(n.position.x - was.dx, closeTo(60, 1e-3), reason: n.data);
-        expect(n.position.y - was.dy, closeTo(-30, 1e-3), reason: n.data);
+        expect(
+          n.position.x - was.dx,
+          closeTo(60 / scale, 1e-3),
+          reason: n.data,
+        );
+        expect(
+          n.position.y - was.dy,
+          closeTo(-30 / scale, 1e-3),
+          reason: n.data,
+        );
       }
       expect(_panel, findsNothing, reason: 'a pan is not a tap');
     });
@@ -467,7 +477,8 @@ void main() {
       await _pump(tester, api);
       final c = _controller(tester);
       final middle = tester.getCenter(find.byKey(const Key('graph_canvas')));
-      expect(c.scale, 1.0);
+      // Opens fitted to the view, not at 1.0.
+      expect(c.scale, inInclusiveRange(0.3, 1.5));
 
       // Above the legend (bottom left), which would swallow a touch.
       Future<void> pinch(double from, double to) async {

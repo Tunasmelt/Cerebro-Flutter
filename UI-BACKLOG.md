@@ -68,6 +68,8 @@ profile/release build on the phone**; run the perf test on the phone too:
   headings). If the owner wants that changed too, it is one constant.
 
 ## Refinements spotted on the emulator walk (Graph is phase F)
+Status: the Graph items below (double border, legend over nodes, lowercase
+labels, crowded note) were fixed in F1.
 - **Graph:** the search field shows a double border (a rounded field inside a
   rounded container); the type legend sits on top of nodes; "history" and
   "dismiss" are lowercase and look like body text; the grey "Groups are not
