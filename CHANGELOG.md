@@ -2270,3 +2270,32 @@ Owner-reported on a real device (see `UI-BACKLOG.md`).
 - **Tests:** 17 new (sign-out prompt both ways, grouping, Appearance not a
   button, chevrons; sealed card, reveal, cancel, touch targets, countdown,
   live-region error, wrong-status hidden); 15 injected faults, all caught.
+
+### UI/UX pass - F1: Graph chrome, legend filter, zoom and fit
+- **Search and ask fields:** each drew a second box inside its own container
+  (the app theme's per-state input borders leaked through `border: none`); now
+  every state is borderless.
+- **Legend:** the card that sat over the nodes is now three compact chips
+  under the search bar (Document / Image / Sealed) that are also filters: tap
+  one to dim every node of that type, tap again to restore. 44px touch targets,
+  announced as "Image nodes, shown/dimmed". They tuck away while an answer or a
+  node panel is open, as the card did.
+- **Fit to view:** the graph now opens zoomed to fit the screen (clamped
+  0.3-1.5, from the layout's extent and the usable height between the controls)
+  instead of at 1.0 on a fixed radius. New **zoom in / zoom out / fit** buttons
+  (bottom right) for hands that do not pinch.
+- **History** in the ask bar is a 44px icon button with a tooltip instead of
+  tiny lowercase text; "Ask" is 14px instead of 12.
+- **Copy:** "Groups are not computed yet, so documents are spread evenly." became
+  "Documents are spread evenly until Cerebro groups them."
+- **Found on the emulator, not by the tests:** my first legend stacked its
+  chips one per line (a Center takes the whole row) and the note then sat on
+  top of nodes. Fixed, and a test now requires the chips to share one row (it
+  fails on the broken layout).
+- **Tests:** 5 existing tests adjusted because the graph is no longer at scale
+  1.0 on load (tap offsets, drag distances and the pinch start now use the real
+  scale); 14 new. 14 injected faults, all caught; one survivor was a redundant
+  size constraint, removed.
+- **Still to do in Phase F:** accessibility (node Semantics, List view,
+  reduce-motion), the node panel as a draggable sheet, pulse polish, and the
+  approved one-time recluster check.

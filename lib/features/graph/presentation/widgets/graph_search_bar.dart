@@ -54,16 +54,28 @@ class GraphSearchBar extends StatelessWidget {
                 child: TextField(
                   controller: controller,
                   onChanged: onChanged,
-                  style: AppTypography.sm.copyWith(color: AppColors.textPrimary),
+                  style: AppTypography.sm.copyWith(
+                    color: AppColors.textPrimary,
+                  ),
                   decoration: InputDecoration(
                     isDense: true,
                     filled: false,
+                    // Every state, not just `border`: the app theme sets the
+                    // per-state borders, which would draw a second box inside
+                    // this container.
                     border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    disabledBorder: InputBorder.none,
+                    errorBorder: InputBorder.none,
+                    focusedErrorBorder: InputBorder.none,
                     hintText: 'Search nodes…',
-                    hintStyle:
-                        AppTypography.sm.copyWith(color: AppColors.grayDim),
-                    contentPadding:
-                        const EdgeInsets.symmetric(vertical: AppSpacing.s3),
+                    hintStyle: AppTypography.sm.copyWith(
+                      color: AppColors.grayDim,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.s3,
+                    ),
                   ),
                 ),
               ),
@@ -94,7 +106,9 @@ class GraphSearchBar extends StatelessWidget {
             ),
             child: Text(
               '$matchCount match${matchCount == 1 ? '' : 'es'}',
-              style: AppTypography.xs.copyWith(color: AppColors.accentSecondary),
+              style: AppTypography.xs.copyWith(
+                color: AppColors.accentSecondary,
+              ),
             ),
           ),
         ],

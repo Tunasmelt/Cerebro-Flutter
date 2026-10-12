@@ -302,7 +302,7 @@ void main() {
       await _frames(tester);
       expect(find.byKey(const Key('graph_answer')), findsOneWidget);
       expect(
-        find.text('node color = type'),
+        find.byKey(const Key('graph_legend')),
         findsNothing,
         reason: 'the legend must not cover the answer',
       );
@@ -323,7 +323,7 @@ void main() {
       await tester.tap(find.byKey(const Key('graph_answer_close')));
       await _frames(tester, 2);
       expect(find.byKey(const Key('graph_answer')), findsNothing);
-      expect(find.text('node color = type'), findsOneWidget);
+      expect(find.byKey(const Key('graph_legend')), findsOneWidget);
     });
 
     testWidgets('a second question while one is running is not sent', (
