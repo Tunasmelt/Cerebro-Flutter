@@ -3,13 +3,28 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../app/app_routes.dart';
 import '../../../shared/tokens/app_colors.dart';
+import '../../../shared/tokens/app_spacing.dart';
 import '../../../shared/tokens/app_typography.dart';
+import '../../../shared/widgets/app_skeleton.dart';
 import '../../../shared/widgets/error_view.dart';
+import '../../../shared/widgets/status_pill.dart';
 import '../../auth/data/current_user_provider.dart';
 import '../../documents/data/documents_list_notifier.dart';
 import '../data/todo_api.dart';
 import '../data/todo_controller.dart';
 import '../../../shared/widgets/app_confirm_dialog.dart';
+
+/// Colour and label for a task's priority. High is red, medium teal, low
+/// grey; amber is reserved for sealed documents, so it is not used here.
+({String label, Color color}) priorityStyle(TodoPriority priority) =>
+    switch (priority) {
+      TodoPriority.high => (label: 'High', color: AppColors.danger),
+      TodoPriority.medium => (
+        label: 'Medium',
+        color: AppColors.accentSecondary,
+      ),
+      TodoPriority.low => (label: 'Low', color: AppColors.textSecondary),
+    };
 
 class TodoView extends ConsumerStatefulWidget {
   const TodoView({super.key});
@@ -34,9 +49,7 @@ class _TodoViewState extends ConsumerState<TodoView> {
       confirmLabel: 'Delete',
       destructive: true,
     );
-    if (accepted &&
-        mounted &&
-        ref.read(currentUserIdProvider) == owner) {
+    if (accepted && mounted && ref.read(currentUserIdProvider) == owner) {
       await ref.read(todoControllerProvider.notifier).delete(task.id);
     }
   }
@@ -92,10 +105,15 @@ class _TodoViewState extends ConsumerState<TodoView> {
                       ),
                     ),
                   ),
-                  Text(
-                    '${task.priority.name[0].toUpperCase()}${task.priority.name.substring(1)} priority',
-                    style: AppTypography.xs.copyWith(
-                      color: AppColors.textSecondary,
+                  Padding(
+                    padding: const EdgeInsets.only(top: AppSpacing.s1),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: StatusPill(
+                        key: ValueKey('todo_priority_${task.id}'),
+                        label: priorityStyle(task.priority).label,
+                        color: priorityStyle(task.priority).color,
+                      ),
                     ),
                   ),
                   if (task.documentId case final String id)
@@ -140,11 +158,9 @@ class _TodoViewState extends ConsumerState<TodoView> {
                 icon: const Icon(Icons.add),
                 label: const Text('Add task'),
               ),
+              // The open-task count lives in the screen header, like the card
+              // count on the Board tab.
               const Spacer(),
-              Text(
-                '${(state.tasks ?? []).where((task) => !task.completed).length} open',
-                style: AppTypography.mono(AppTypography.sm),
-              ),
               IconButton(
                 tooltip: 'Refresh tasks',
                 onPressed: busy ? null : controller.reload,
@@ -155,25 +171,28 @@ class _TodoViewState extends ConsumerState<TodoView> {
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Wrap(
-            spacing: 8,
-            children: [
-              ChoiceChip(
-                label: const Text('All'),
-                selectedColor: AppColors.accentPrimarySubtle,
-                checkmarkColor: AppColors.accentPrimary,
-                selected: _priority == null,
-                onSelected: (_) => setState(() => _priority = null),
-              ),
-              for (final priority in TodoPriority.values)
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Wrap(
+              spacing: 8,
+              children: [
                 ChoiceChip(
-                  label: Text(priority.name),
+                  label: const Text('All'),
                   selectedColor: AppColors.accentPrimarySubtle,
                   checkmarkColor: AppColors.accentPrimary,
-                  selected: _priority == priority,
-                  onSelected: (_) => setState(() => _priority = priority),
+                  selected: _priority == null,
+                  onSelected: (_) => setState(() => _priority = null),
                 ),
-            ],
+                for (final priority in TodoPriority.values)
+                  ChoiceChip(
+                    label: Text(priorityStyle(priority).label),
+                    selectedColor: AppColors.accentPrimarySubtle,
+                    checkmarkColor: AppColors.accentPrimary,
+                    selected: _priority == priority,
+                    onSelected: (_) => setState(() => _priority = priority),
+                  ),
+              ],
+            ),
           ),
         ),
         if (busy) const LinearProgressIndicator(key: Key('todo_busy')),
@@ -185,7 +204,12 @@ class _TodoViewState extends ConsumerState<TodoView> {
         Expanded(
           child: state.tasks == null
               ? state.loading
-                    ? const Center(child: CircularProgressIndicator())
+                    ? const Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: AppSpacing.s4,
+                        ),
+                        child: AppSkeletonList(),
+                      )
                     : const SizedBox.shrink()
               : ListView(
                   key: const Key('todo_list'),
@@ -194,11 +218,29 @@ class _TodoViewState extends ConsumerState<TodoView> {
                     const Text('Active', style: AppTypography.lg),
                     if (grouped.active.isEmpty)
                       Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Text(
-                          _priority == null
-                              ? 'No active tasks. Add one above.'
-                              : 'No ${_priority!.name}-priority active tasks.',
+                        key: const Key('todo_empty'),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: AppSpacing.s8,
+                          horizontal: AppSpacing.s4,
+                        ),
+                        child: Column(
+                          children: [
+                            const Icon(
+                              Icons.task_alt_rounded,
+                              size: 32,
+                              color: AppColors.textSecondary,
+                            ),
+                            const SizedBox(height: AppSpacing.s3),
+                            Text(
+                              _priority == null
+                                  ? 'No active tasks. Add one above.'
+                                  : 'No ${_priority!.name}-priority active tasks.',
+                              textAlign: TextAlign.center,
+                              style: AppTypography.sm.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     for (final task in grouped.active) row(task),
@@ -306,7 +348,7 @@ class _TaskEditorState extends ConsumerState<_TaskEditor> {
                     for (final priority in TodoPriority.values)
                       DropdownMenuItem(
                         value: priority,
-                        child: Text(priority.name),
+                        child: Text(priorityStyle(priority).label),
                       ),
                   ],
                   onChanged: busy

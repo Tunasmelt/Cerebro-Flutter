@@ -66,3 +66,13 @@ profile/release build on the phone**; run the perf test on the phone too:
   redirect only reacts to sign-out, not to a refresh failure.
 - Numbers and labels still use JetBrains Mono (the font change covers UI and
   headings). If the owner wants that changed too, it is one constant.
+
+## Refinements spotted on the emulator walk (Graph is phase F)
+- **Graph:** the search field shows a double border (a rounded field inside a
+  rounded container); the type legend sits on top of nodes; "history" and
+  "dismiss" are lowercase and look like body text; the grey "Groups are not
+  computed yet..." line crowds the search bar. All belong to Phase F1.
+- **Documents:** the "+" button covers the status pill of the row beneath it
+  when scrolled; a little more bottom padding or a smaller/extended button
+  would stop that.
+- **Settings:** not re-checked in this walk; Phase E3.

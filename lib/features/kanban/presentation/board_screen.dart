@@ -3,9 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../app/app_routes.dart';
 import '../../../shared/tokens/app_colors.dart';
-import '../../../shared/tokens/app_typography.dart';
+import '../../../shared/tokens/app_spacing.dart';
+import '../../../shared/widgets/app_screen_header.dart';
+import '../../../shared/widgets/app_skeleton.dart';
 import '../../../shared/widgets/error_view.dart';
 import '../../documents/data/documents_list_notifier.dart';
+import '../../todo/data/todo_controller.dart';
 import '../../todo/presentation/todo_view.dart';
 import '../data/kanban_board.dart';
 import '../data/kanban_controller.dart';
@@ -43,6 +46,11 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
     final controller = ref.read(kanbanControllerProvider.notifier);
     final board = state.board;
     final documents = ref.watch(documentsListProvider).valueOrNull ?? [];
+    final openTasks = ref
+        .watch(todoControllerProvider)
+        .tasks
+        ?.where((task) => !task.completed)
+        .length;
     return Scaffold(
       backgroundColor: AppColors.bgBase,
       floatingActionButton: !_todo && board != null && board.columns.isNotEmpty
@@ -58,39 +66,35 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
         bottom: false,
         child: Column(
           children: [
+            AppScreenHeader(
+              title: _todo ? 'Tasks' : board?.title ?? 'Board',
+              subtitle: _todo
+                  ? openTasks == null
+                        ? null
+                        : '$openTasks open'
+                  : board == null
+                  ? null
+                  : '${board.cards.length} cards',
+              actions: [
+                if (!_todo)
+                  IconButton(
+                    tooltip: 'Refresh board',
+                    onPressed: state.loading || state.saving
+                        ? null
+                        : controller.reload,
+                    icon: const Icon(Icons.refresh),
+                  ),
+              ],
+            ),
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.s4,
+                AppSpacing.s1,
+                AppSpacing.s4,
+                AppSpacing.s3,
+              ),
               child: Column(
                 children: [
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.dashboard_outlined,
-                        color: AppColors.accentPrimary,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          _todo ? 'Tasks' : board?.title ?? 'Board',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                      ),
-                      if (!_todo && board != null)
-                        Text(
-                          '${board.cards.length} cards',
-                          style: AppTypography.mono(AppTypography.sm),
-                        ),
-                      if (!_todo)
-                        IconButton(
-                          tooltip: 'Refresh board',
-                          onPressed: state.loading || state.saving
-                              ? null
-                              : controller.reload,
-                          icon: const Icon(Icons.refresh),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
                   SegmentedButton<bool>(
                     style: SegmentedButton.styleFrom(
                       selectedBackgroundColor: AppColors.accentPrimary,
@@ -142,7 +146,10 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
                           context.push(AppRoutes.documentDetail(id)),
                     )
                   : state.loading
-                  ? const Center(child: CircularProgressIndicator())
+                  ? const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: AppSpacing.s4),
+                      child: AppSkeletonList(),
+                    )
                   : const SizedBox.shrink(),
             ),
           ],

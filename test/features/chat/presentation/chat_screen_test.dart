@@ -144,6 +144,31 @@ void main() {
     );
   });
 
+  testWidgets('suggested prompts are outlined, full-width buttons that ask', (
+    tester,
+  ) async {
+    final h = await _pump(tester);
+    final button = find.widgetWithText(OutlinedButton, 'Summarize notes.txt');
+    expect(button, findsOneWidget);
+    // Full width of the empty state's content, so they read as buttons.
+    expect(
+      tester.getSize(button).width,
+      greaterThan(
+        tester.getSize(find.byKey(const Key('chat_empty'))).width - 1,
+      ),
+    );
+
+    await tester.tap(button);
+    await _pumpFor(tester);
+    expect(find.byKey(const Key('chat_empty')), findsNothing);
+    expect(h.stream.turns, hasLength(1));
+  });
+
+  testWidgets('no documents, no suggested prompts', (tester) async {
+    await _pump(tester, documents: const []);
+    expect(find.byType(OutlinedButton), findsNothing);
+  });
+
   testWidgets('asking shows the question, clears the box, and walks through '
       'searching → writing → the answer', (tester) async {
     final h = await _pump(tester);
