@@ -2189,3 +2189,26 @@ Owner-reported on a real device (see `UI-BACKLOG.md`).
 - **Tests:** filter/search tests rewritten for the new UI plus two new ones
   (tapping the selected chip clears it; the search icon toggles the bar and
   clears on close); mutation-checked.
+
+### UI/UX pass - E1: Auth (sign in, sign up)
+- **Shared pieces** (`auth_card.dart`): `AuthBrand` (violet tile with the brain
+  glyph + wordmark, now on both screens; sign-up had none), `AuthCard` (fills
+  the screen width up to 440px instead of a fixed 360px, so a 320px phone is no
+  longer cramped and a tablet is not stretched), `AuthMessage` (replaces the
+  three copy-pasted red banners; announced to screen readers).
+- **Forms:** an empty submit now says what is missing ("Enter your email.",
+  "Enter your password." / "Choose a password.") and clears as the user types,
+  instead of the button silently doing nothing. Password fields have a
+  show/hide eye; keyboard actions go Next / Next / Done; the fields are an
+  `AutofillGroup`; the screens sit inside a `SafeArea`.
+- **Unchanged on purpose:** the "Passwords don't match." banner and every test
+  key (`sign_in_*`, `sign_up_*`, `check_email_*`).
+- **Not done (needs an owner call):** the expired-session issue from the
+  backlog. The fix would sign the user out on a 401 from the API, but a 401 on
+  one endpoint could then log someone out wrongly; it deserves its own change
+  and test of which responses count.
+- **Tests:** 12 new (inline errors, clearing, eye, keyboard actions, card
+  width at 320 and 1200, brand, live region, sign-up parity); 11 injected
+  faults all caught. Emulator (profile build): new sign-in screen with brand
+  tile, full-width card, eye toggle, and the red inline messages after an empty
+  submit.
