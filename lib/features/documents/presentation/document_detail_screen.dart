@@ -7,6 +7,7 @@ import '../../../shared/tokens/app_radius.dart';
 import '../../../shared/tokens/app_spacing.dart';
 import '../../../shared/tokens/app_typography.dart';
 import '../../../shared/widgets/error_view.dart';
+import '../../../shared/widgets/status_pill.dart';
 import '../data/document.dart';
 import '../data/delete_document_controller.dart';
 import '../data/document_detail_provider.dart';
@@ -117,6 +118,8 @@ class _DocumentDetailBody extends ConsumerWidget {
               Expanded(
                 child: Text(
                   document.title,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
                   style: AppTypography.lg.copyWith(
                     color: AppColors.textPrimary,
                     fontWeight: AppTypography.weightSemibold,
@@ -128,7 +131,7 @@ class _DocumentDetailBody extends ConsumerWidget {
           const SizedBox(height: AppSpacing.s5),
           _DetailRow(
             label: 'Status',
-            child: _StatusBadge(
+            child: StatusPill(
               label: abandoned ? 'Incomplete' : documentStatusLabel(status),
               color: statusColor,
             ),
@@ -431,6 +434,7 @@ class _DetailRow extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.s4),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
             width: 100,
@@ -439,31 +443,9 @@ class _DetailRow extends StatelessWidget {
               style: AppTypography.sm.copyWith(color: AppColors.textSecondary),
             ),
           ),
-          child,
+          Flexible(child: child),
         ],
       ),
-    );
-  }
-}
-
-class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({required this.label, required this.color});
-
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.s3,
-        vertical: AppSpacing.s1,
-      ),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: AppRadius.pillRadius,
-      ),
-      child: Text(label, style: AppTypography.xs.copyWith(color: color)),
     );
   }
 }

@@ -8,7 +8,11 @@ import '../../../shared/tokens/app_colors.dart';
 import '../../../shared/tokens/app_radius.dart';
 import '../../../shared/tokens/app_spacing.dart';
 import '../../../shared/tokens/app_typography.dart';
+import '../../../shared/widgets/app_empty_state.dart';
+import '../../../shared/widgets/app_screen_header.dart';
+import '../../../shared/widgets/app_skeleton.dart';
 import '../../../shared/widgets/error_view.dart';
+import '../../../shared/widgets/status_pill.dart';
 import '../../auth/data/current_user_provider.dart';
 import '../data/document.dart';
 import '../data/documents_list_notifier.dart';
@@ -22,7 +26,8 @@ import 'upload_source_sheet.dart';
 /// Real Documents list against `GET /api/v1/documents` (Milestone 2.1)
 /// with the upload entry point (Milestone 2.2): the Add button opens a
 /// source sheet (file / photo library / camera), and in-flight uploads
-/// appear above the list.
+/// appear above the list. Once there are documents, a title search and
+/// status chips narrow the list.
 class DocumentsScreen extends ConsumerStatefulWidget {
   const DocumentsScreen({super.key});
 
@@ -33,6 +38,8 @@ class DocumentsScreen extends ConsumerStatefulWidget {
 class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
   late final AppLifecycleListener _lifecycle;
   bool _refreshingOnResume = false;
+  final _search = TextEditingController();
+  DocumentFilter _filter = DocumentFilter.all;
 
   @override
   void initState() {
@@ -55,6 +62,7 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
   @override
   void dispose() {
     _lifecycle.dispose();
+    _search.dispose();
     super.dispose();
   }
 
@@ -84,6 +92,7 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
   Widget build(BuildContext context) {
     final documents = ref.watch(documentsListProvider);
     final notifier = ref.read(documentsListProvider.notifier);
+    final loaded = documents.valueOrNull;
 
     return Scaffold(
       backgroundColor: AppColors.bgBase,
@@ -100,28 +109,27 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.s4,
-                AppSpacing.s6,
-                AppSpacing.s4,
-                AppSpacing.s4,
-              ),
-              child: Text(
-                'Documents',
-                style: AppTypography.xxxl.copyWith(
-                  fontFamily: AppTypography.fontFamilyDisplay,
-                  fontWeight: AppTypography.weightBold,
-                  color: AppColors.textPrimary,
-                ),
-              ),
+            AppScreenHeader(
+              title: 'Documents',
+              subtitle: loaded == null || loaded.isEmpty
+                  ? null
+                  : '${loaded.length} '
+                        '${loaded.length == 1 ? 'document' : 'documents'}',
             ),
             const UploadList(),
+            if (loaded != null && loaded.isNotEmpty)
+              _SearchAndFilters(
+                controller: _search,
+                filter: _filter,
+                onQuery: (_) => setState(() {}),
+                onFilter: (f) => setState(() => _filter = f),
+              ),
             Expanded(
               child: documents.when(
-                loading: () => const Center(
+                loading: () => const Padding(
                   key: Key('documents_loading'),
-                  child: CircularProgressIndicator(),
+                  padding: EdgeInsets.symmetric(horizontal: AppSpacing.s4),
+                  child: AppSkeletonList(),
                 ),
                 error: (error, _) => ErrorView(
                   key: const Key('documents_error'),
@@ -131,49 +139,136 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
                   expanded: true,
                   onRetry: notifier.refresh,
                 ),
-                data: (docs) => RefreshIndicator(
-                  onRefresh: notifier.refresh,
-                  child: docs.isEmpty
-                      ? ListView(
-                          // A scrollable single child, not a bare Center:
-                          // RefreshIndicator needs a scrollable
-                          // descendant to trigger from, even when the
-                          // empty state itself doesn't scroll.
-                          children: const [
-                            SizedBox(height: AppSpacing.s16),
-                            Center(
-                              key: Key('documents_empty'),
-                              child: Text(
-                                'No documents yet.',
-                                style: TextStyle(
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
+                data: (docs) {
+                  final shown = filterDocuments(
+                    docs,
+                    query: _search.text,
+                    filter: _filter,
+                    now: DateTime.now(),
+                  );
+                  return RefreshIndicator(
+                    onRefresh: notifier.refresh,
+                    child: docs.isEmpty
+                        ? AppEmptyState(
+                            key: const Key('documents_empty'),
+                            icon: Icons.description_outlined,
+                            title: 'No documents yet.',
+                            message:
+                                'Add a PDF, a note or a photo and Cerebro '
+                                'will make it searchable.',
+                            actionLabel: 'Add a document',
+                            onAction: () => _onAddPressed(context, ref),
+                          )
+                        : shown.isEmpty
+                        ? AppEmptyState(
+                            key: const Key('documents_no_match'),
+                            icon: Icons.search_off_rounded,
+                            title: 'Nothing matches.',
+                            message: 'Try a different word or filter.',
+                            actionLabel: 'Clear filters',
+                            onAction: () => setState(() {
+                              _search.clear();
+                              _filter = DocumentFilter.all;
+                            }),
+                          )
+                        : ListView.separated(
+                            key: const Key('documents_list'),
+                            // Room under the last row for the floating add
+                            // button: its height plus the margin around it.
+                            padding: const EdgeInsets.fromLTRB(
+                              AppSpacing.s4,
+                              0,
+                              AppSpacing.s4,
+                              56 + 2 * kFloatingActionButtonMargin,
                             ),
-                          ],
-                        )
-                      : ListView.separated(
-                          key: const Key('documents_list'),
-                          // Bottom room so the last row can scroll clear
-                          // of the floating add button (56 + 16 margin).
-                          padding: const EdgeInsets.fromLTRB(
-                            AppSpacing.s4,
-                            0,
-                            AppSpacing.s4,
-                            88,
+                            itemCount: shown.length,
+                            separatorBuilder: (_, _) =>
+                                const SizedBox(height: AppSpacing.s2),
+                            itemBuilder: (context, index) =>
+                                _DocumentRow(document: shown[index]),
                           ),
-                          itemCount: docs.length,
-                          separatorBuilder: (_, _) =>
-                              const SizedBox(height: AppSpacing.s2),
-                          itemBuilder: (context, index) =>
-                              _DocumentRow(document: docs[index]),
-                        ),
-                ),
+                  );
+                },
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _SearchAndFilters extends StatelessWidget {
+  const _SearchAndFilters({
+    required this.controller,
+    required this.filter,
+    required this.onQuery,
+    required this.onFilter,
+  });
+
+  final TextEditingController controller;
+  final DocumentFilter filter;
+  final ValueChanged<String> onQuery;
+  final ValueChanged<DocumentFilter> onFilter;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.s4,
+            0,
+            AppSpacing.s4,
+            AppSpacing.s2,
+          ),
+          child: TextField(
+            key: const Key('documents_search'),
+            controller: controller,
+            onChanged: onQuery,
+            textInputAction: TextInputAction.search,
+            style: AppTypography.sm.copyWith(color: AppColors.textPrimary),
+            decoration: InputDecoration(
+              hintText: 'Search documents',
+              prefixIcon: const Icon(Icons.search_rounded, size: 20),
+              suffixIcon: controller.text.isEmpty
+                  ? null
+                  : IconButton(
+                      key: const Key('documents_search_clear'),
+                      tooltip: 'Clear search',
+                      icon: const Icon(Icons.close_rounded, size: 20),
+                      onPressed: () {
+                        controller.clear();
+                        onQuery('');
+                      },
+                    ),
+            ),
+          ),
+        ),
+        SizedBox(
+          height: AppSpacing.minTouchTarget,
+          child: ListView.separated(
+            key: const Key('documents_filters'),
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s4),
+            itemCount: DocumentFilter.values.length,
+            separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.s2),
+            itemBuilder: (context, i) {
+              final f = DocumentFilter.values[i];
+              return Center(
+                child: ChoiceChip(
+                  key: Key('documents_filter_${f.name}'),
+                  label: Text(f.label),
+                  selected: f == filter,
+                  onSelected: (_) => onFilter(f),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: AppSpacing.s2),
+      ],
     );
   }
 }
@@ -254,21 +349,11 @@ class _DocumentRow extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: AppSpacing.s2),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.s2,
-                  vertical: AppSpacing.s1,
-                ),
-                decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.12),
-                  borderRadius: AppRadius.pillRadius,
-                ),
-                child: Text(
-                  abandoned
-                      ? 'Incomplete'
-                      : documentStatusLabel(document.status),
-                  style: AppTypography.xs.copyWith(color: statusColor),
-                ),
+              StatusPill(
+                label: abandoned
+                    ? 'Incomplete'
+                    : documentStatusLabel(document.status),
+                color: statusColor,
               ),
             ],
           ),

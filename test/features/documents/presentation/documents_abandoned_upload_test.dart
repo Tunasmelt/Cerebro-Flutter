@@ -1,5 +1,6 @@
 // Phase 2 Gate: after the app is killed mid-upload, the half-created document
 // must not sit in the list looking like it is processing.
+import 'package:cerebro_mobile/shared/widgets/status_pill.dart';
 import 'package:cerebro_mobile/features/auth/data/current_user_provider.dart';
 import 'package:cerebro_mobile/features/documents/data/document.dart';
 import 'package:cerebro_mobile/features/documents/data/documents_repository_provider.dart';
@@ -57,7 +58,13 @@ void main() {
       ]);
 
       expect(find.text('Incomplete'), findsOneWidget);
-      expect(find.text('Processing'), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byType(StatusPill),
+          matching: find.text('Processing'),
+        ),
+        findsNothing,
+      );
     },
   );
 
@@ -79,7 +86,13 @@ void main() {
       ),
     ]);
 
-    expect(find.text('Processing'), findsNWidgets(2));
+    expect(
+      find.descendant(
+        of: find.byType(StatusPill),
+        matching: find.text('Processing'),
+      ),
+      findsNWidgets(2),
+    );
     expect(find.text('Incomplete'), findsNothing);
   });
 }

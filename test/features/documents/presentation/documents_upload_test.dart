@@ -43,10 +43,7 @@ void main() {
           storageUploaderProvider.overrideWithValue(storage),
           uploadPickerProvider.overrideWithValue(picker),
         ],
-        child: MaterialApp(
-          theme: AppTheme.dark,
-          home: const DocumentsScreen(),
-        ),
+        child: MaterialApp(theme: AppTheme.dark, home: const DocumentsScreen()),
       ),
     );
     await tester.pumpAndSettle();
@@ -159,55 +156,80 @@ void main() {
     },
   );
 
-  testWidgets('a failed upload shows the shared ErrorView and can be dismissed', (
+  testWidgets('an uploading row shows the real percentage as bytes go out', (
     tester,
   ) async {
-    storage.putError = const NetworkUnreachableException();
+    final putGate = Completer<void>();
+    storage
+      ..putGate = putGate
+      ..progressEvents = [(25, 100), (50, 100)];
     await pumpScreen(tester);
     await openSheet(tester);
 
     await tester.tap(find.byKey(const Key('upload_source_file')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('50%'), findsOneWidget);
+
+    putGate.complete();
     await tester.pumpAndSettle();
-
-    expect(find.text('Failed'), findsOneWidget);
-    expect(find.byKey(const Key('error_view_offline')), findsOneWidget);
-    expect(
-      find.text("Can't reach Cerebro. Check your connection."),
-      findsOneWidget,
-    );
-    expect(log.entries, ['init', 'put'], reason: 'confirm was never called');
-
-    await tester.tap(find.textContaining('Dismiss'));
-    await tester.pumpAndSettle();
-
-    expect(find.byKey(const Key('upload_list')), findsNothing);
+    expect(find.textContaining('%'), findsNothing);
   });
 
   testWidgets(
-    "a server rejection shows the server's own message on the row",
+    'a failed upload shows the shared ErrorView and can be dismissed',
     (tester) async {
-      api.initError = const RequestRejectedException(
-        "'application/zip' is not a supported file type",
-        code: 'unsupported_mime_type',
-      );
+      storage.putError = const NetworkUnreachableException();
       await pumpScreen(tester);
       await openSheet(tester);
 
       await tester.tap(find.byKey(const Key('upload_source_file')));
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const Key('error_view_rejected')), findsOneWidget);
+      expect(find.text('Failed'), findsOneWidget);
+      expect(find.byKey(const Key('error_view_offline')), findsOneWidget);
       expect(
-        find.text("'application/zip' is not a supported file type"),
+        find.text("Can't reach Cerebro. Check your connection."),
         findsOneWidget,
       );
+      expect(log.entries, ['init', 'put'], reason: 'confirm was never called');
+
+      await tester.tap(find.textContaining('Dismiss'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('upload_list')), findsNothing);
     },
   );
+
+  testWidgets("a server rejection shows the server's own message on the row", (
+    tester,
+  ) async {
+    api.initError = const RequestRejectedException(
+      "'application/zip' is not a supported file type",
+      code: 'unsupported_mime_type',
+    );
+    await pumpScreen(tester);
+    await openSheet(tester);
+
+    await tester.tap(find.byKey(const Key('upload_source_file')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('error_view_rejected')), findsOneWidget);
+    expect(
+      find.text("'application/zip' is not a supported file type"),
+      findsOneWidget,
+    );
+  });
 
   testWidgets('an oversized file is rejected on the row with no network call', (
     tester,
   ) async {
-    picker.result = fakePickedUpload(name: 'big.pdf', mime: 'application/pdf', sizeBytes: 52428801);
+    picker.result = fakePickedUpload(
+      name: 'big.pdf',
+      mime: 'application/pdf',
+      sizeBytes: 52428801,
+    );
     await pumpScreen(tester);
     await openSheet(tester);
 
@@ -233,10 +255,20 @@ void main() {
           createdAt: DateTime.utc(2026),
         ),
     ];
-    await pumpScreen(tester, documents: FakeDocumentsRepository(documents: docs));
+    await pumpScreen(
+      tester,
+      documents: FakeDocumentsRepository(documents: docs),
+    );
 
-    await tester.drag(find.byKey(const Key('documents_list')), const Offset(0, -3000));
-    await tester.pumpAndSettle();
+    // The list's extent is estimated until the last row is built, so one
+    // drag may stop short; a second reaches the real end.
+    for (var i = 0; i < 2; i++) {
+      await tester.drag(
+        find.byKey(const Key('documents_list')),
+        const Offset(0, -3000),
+      );
+      await tester.pumpAndSettle();
+    }
 
     final fab = tester.getRect(find.byKey(const Key('documents_add_fab')));
     final last = tester.getRect(find.text('doc-11.txt'));
@@ -246,7 +278,14 @@ void main() {
       reason: 'the final row is hidden under the floating add button',
     );
     // The status badge sits at the row's right edge, where the button is.
-    final row = tester.getRect(find.ancestor(of: find.text('doc-11.txt'), matching: find.byType(Container)).first);
+    final row = tester.getRect(
+      find
+          .ancestor(
+            of: find.text('doc-11.txt'),
+            matching: find.byType(Container),
+          )
+          .first,
+    );
     expect(row.bottom, lessThanOrEqualTo(fab.top));
   });
 }

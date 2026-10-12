@@ -105,12 +105,24 @@ class _UploadRow extends StatelessWidget {
                   color: failed ? AppColors.danger : AppColors.textSecondary,
                 ),
               ),
+              if (item.flow.stage == UploadStage.uploading &&
+                  (item.progress ?? 0) > 0) ...[
+                const SizedBox(width: AppSpacing.s2),
+                Text(
+                  '${((item.progress ?? 0) * 100).round()}%',
+                  key: Key('upload_percent_${item.id}'),
+                  style: AppTypography.mono(
+                    AppTypography.xs,
+                  ).copyWith(color: AppColors.textSecondary),
+                ),
+              ],
             ],
           ),
           if (!failed) ...[
             const SizedBox(height: AppSpacing.s2),
             LinearProgressIndicator(
               key: Key('upload_progress_${item.id}'),
+              semanticsLabel: 'Upload progress',
               // Real progress while bytes go to Storage; indeterminate
               // for the other stages, which have no measurable length.
               value: item.flow.stage == UploadStage.uploading

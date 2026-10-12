@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../shared/tokens/app_colors.dart';
 import '../data/document.dart';
+import '../data/ingest_status.dart';
 
 /// Visual mapping for a document's mime type and status. Colors follow
 /// `Mockups 2.0/src/components/Documents.tsx` (the web reference) for
@@ -89,4 +90,51 @@ String formatDocumentSize(int bytes) {
 String formatDocumentDate(DateTime date) {
   final local = date.toLocal();
   return '${local.month}/${local.day}/${local.year}';
+}
+
+/// The status chips above the Documents list.
+enum DocumentFilter {
+  all('All'),
+  ready('Ready'),
+  processing('Processing'),
+  failed('Failed'),
+  sealed('Sealed');
+
+  const DocumentFilter(this.label);
+  final String label;
+}
+
+/// The documents matching a title search and a status chip. An upload that
+/// never finished reads "Incomplete", so it belongs under Failed, not
+/// Processing.
+List<DocumentSummary> filterDocuments(
+  List<DocumentSummary> docs, {
+  String query = '',
+  DocumentFilter filter = DocumentFilter.all,
+  required DateTime now,
+}) {
+  final q = query.trim().toLowerCase();
+  return [
+    for (final d in docs)
+      if ((q.isEmpty || d.title.toLowerCase().contains(q)) &&
+          _matchesFilter(d, filter, now))
+        d,
+  ];
+}
+
+bool _matchesFilter(DocumentSummary d, DocumentFilter f, DateTime now) {
+  if (f == DocumentFilter.all) return true;
+  final abandoned = summaryIsAbandonedUpload(d, now);
+  switch (f) {
+    case DocumentFilter.all:
+      return true;
+    case DocumentFilter.ready:
+      return !abandoned && d.status == DocumentStatus.ready;
+    case DocumentFilter.processing:
+      return !abandoned && d.status == DocumentStatus.processing;
+    case DocumentFilter.failed:
+      return abandoned || d.status == DocumentStatus.failed;
+    case DocumentFilter.sealed:
+      return d.status == DocumentStatus.sealed;
+  }
 }
