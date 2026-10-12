@@ -51,18 +51,9 @@ void main() {
       expect(titles(DocumentFilter.all), hasLength(5));
     });
 
-    test('each status chip keeps only its own documents', () {
+    test('Ready and Sealed each keep only their own documents', () {
       expect(titles(DocumentFilter.ready), ['Alpha report']);
-      expect(titles(DocumentFilter.processing), ['beta notes']);
       expect(titles(DocumentFilter.sealed), ['Delta vault']);
-    });
-
-    test('Failed includes an abandoned upload; Processing does not', () {
-      expect(titles(DocumentFilter.failed), ['Gamma scan', 'Epsilon draft']);
-      expect(
-        titles(DocumentFilter.processing),
-        isNot(contains('Epsilon draft')),
-      );
     });
 
     test('search is case-insensitive, trimmed, and combines with a chip', () {
@@ -88,15 +79,23 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    testWidgets('shows a count, a search box and the status chips', (
+    Future<void> openSearch(WidgetTester tester) async {
+      await tester.tap(find.byKey(const Key('documents_search_toggle')));
+      await tester.pump();
+    }
+
+    testWidgets('shows a count, a search icon, and only Ready and Sealed', (
       tester,
     ) async {
       await pump(tester, docs);
       expect(find.text('5 documents'), findsOneWidget);
-      expect(find.byKey(const Key('documents_search')), findsOneWidget);
-      for (final f in DocumentFilter.values) {
-        expect(find.byKey(Key('documents_filter_${f.name}')), findsOneWidget);
-      }
+      expect(find.byKey(const Key('documents_search_toggle')), findsOneWidget);
+      // The search bar is hidden until the icon is tapped.
+      expect(find.byKey(const Key('documents_search')), findsNothing);
+      expect(find.byKey(const Key('documents_filter_ready')), findsOneWidget);
+      expect(find.byKey(const Key('documents_filter_sealed')), findsOneWidget);
+      expect(find.byKey(const Key('documents_filter_all')), findsNothing);
+      expect(find.byType(ChoiceChip), findsNWidgets(2));
     });
 
     testWidgets('a single document reads "1 document"', (tester) async {
@@ -104,10 +103,29 @@ void main() {
       expect(find.text('1 document'), findsOneWidget);
     });
 
+    testWidgets('the icon opens the search bar and closing it clears it', (
+      tester,
+    ) async {
+      await pump(tester, docs);
+      await openSearch(tester);
+      expect(find.byKey(const Key('documents_search')), findsOneWidget);
+      await tester.enterText(find.byKey(const Key('documents_search')), 'beta');
+      await tester.pump();
+      expect(find.byKey(const Key('document_row_Alpha report')), findsNothing);
+
+      await openSearch(tester); // the same button now closes
+      expect(find.byKey(const Key('documents_search')), findsNothing);
+      expect(
+        find.byKey(const Key('document_row_Alpha report')),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('typing narrows the list; a chip narrows it further', (
       tester,
     ) async {
       await pump(tester, docs);
+      await openSearch(tester);
       await tester.enterText(find.byKey(const Key('documents_search')), 'ta');
       await tester.pump();
       // "ta" is in beta and Delta only.
@@ -122,10 +140,25 @@ void main() {
       expect(find.byKey(const Key('document_row_beta notes')), findsNothing);
     });
 
+    testWidgets('tapping the selected chip again shows everything', (
+      tester,
+    ) async {
+      await pump(tester, docs);
+      await tester.tap(find.byKey(const Key('documents_filter_ready')));
+      await tester.pump();
+      expect(find.byKey(const Key('document_row_Delta vault')), findsNothing);
+
+      await tester.tap(find.byKey(const Key('documents_filter_ready')));
+      await tester.pump();
+      expect(find.byKey(const Key('document_row_Delta vault')), findsOneWidget);
+      expect(find.byKey(const Key('document_row_Gamma scan')), findsOneWidget);
+    });
+
     testWidgets('no match shows a message, and Clear filters restores all', (
       tester,
     ) async {
       await pump(tester, docs);
+      await openSearch(tester);
       await tester.enterText(find.byKey(const Key('documents_search')), 'zzz');
       await tester.pump();
       expect(find.byKey(const Key('documents_no_match')), findsOneWidget);
@@ -144,10 +177,11 @@ void main() {
       );
     });
 
-    testWidgets('Clear filters also resets the status chip', (tester) async {
+    testWidgets('Clear filters also resets the chip', (tester) async {
       await pump(tester, docs);
       await tester.tap(find.byKey(const Key('documents_filter_sealed')));
       await tester.pump();
+      await openSearch(tester);
       await tester.enterText(
         find.byKey(const Key('documents_search')),
         'Alpha',
@@ -161,25 +195,11 @@ void main() {
         find.byKey(const Key('document_row_Alpha report')),
         findsOneWidget,
       );
-      expect(
-        tester
-            .widget<ChoiceChip>(find.byKey(const Key('documents_filter_all')))
-            .selected,
-        isTrue,
-      );
-    });
-
-    testWidgets('the clear (x) button empties the search', (tester) async {
-      await pump(tester, docs);
-      await tester.enterText(find.byKey(const Key('documents_search')), 'beta');
-      await tester.pump();
-      expect(find.byKey(const Key('document_row_Alpha report')), findsNothing);
-      await tester.tap(find.byKey(const Key('documents_search_clear')));
-      await tester.pump();
-      expect(
-        find.byKey(const Key('document_row_Alpha report')),
-        findsOneWidget,
-      );
+      for (final chip in tester.widgetList<ChoiceChip>(
+        find.byType(ChoiceChip),
+      )) {
+        expect(chip.selected, isFalse);
+      }
     });
 
     testWidgets('an empty account has no search or chips, only the CTA', (
@@ -187,7 +207,7 @@ void main() {
     ) async {
       await pump(tester, const []);
       expect(find.byKey(const Key('documents_empty')), findsOneWidget);
-      expect(find.byKey(const Key('documents_search')), findsNothing);
+      expect(find.byKey(const Key('documents_search_toggle')), findsNothing);
       expect(find.byKey(const Key('documents_filters')), findsNothing);
       expect(find.text('Add a document'), findsOneWidget);
     });

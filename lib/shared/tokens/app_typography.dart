@@ -9,8 +9,11 @@ import 'package:flutter/material.dart';
 /// `mono` is for numeric values (token counts, byte sizes, hashes) —
 /// same "monospace for numbers" rule as web, per flutter-rules.md.
 abstract final class AppTypography {
-  static const String fontFamilyUi = 'DM Sans';
-  static const String fontFamilyDisplay = 'Outfit';
+  // The app's own typeface (owner's request, 2026-10-12: a better font than
+  // the web's DM Sans / Outfit pair). One family for UI and headings; the
+  // headings get weight and size, not a second face. Numbers stay monospace.
+  static const String fontFamilyUi = 'Plus Jakarta Sans';
+  static const String fontFamilyDisplay = 'Plus Jakarta Sans';
   static const String fontFamilyMono = 'JetBrains Mono';
 
   static const xs = TextStyle(fontSize: 12, height: 16 / 12);
@@ -30,8 +33,8 @@ abstract final class AppTypography {
 
   /// Numeric/tabular text (token counts, byte sizes, hashes) — always
   /// monospace, matching web's `--font-mono` convention.
-  static TextStyle mono(TextStyle base) =>
-      base.copyWith(fontFamily: fontFamilyMono, fontFeatures: const [
-        FontFeature.tabularFigures(),
-      ]);
+  static TextStyle mono(TextStyle base) => base.copyWith(
+    fontFamily: fontFamilyMono,
+    fontFeatures: const [FontFeature.tabularFigures()],
+  );
 }

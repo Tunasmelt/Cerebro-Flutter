@@ -2163,3 +2163,29 @@ still needs its own layout work — phases B and E.
   "Nothing matches" with Clear filters. Seen on the device: type badges of
   different widths (MD vs PDF) misaligned the titles, so the badge is now a
   fixed 48px. No screenshots committed (they show real document names).
+
+### UI/UX pass - owner fixes after Phase D (list, filters/search, font)
+Owner-reported on a real device (see `UI-BACKLOG.md`).
+- **Filters and search:** Documents now shows only **Ready** and **Sealed**
+  chips (tap the selected one again to show everything); search is an icon in
+  the header that opens the search bar and closes it again (closing clears it).
+  Processing / Failed / "All" chips and the always-visible search box are gone.
+  Failed and Incomplete documents stay visible in the list with their pill; they
+  just have no chip.
+- **Font:** the app's UI and headings now use **Plus Jakarta Sans** (bundled
+  variable font, weights 400-700, SIL OFL) instead of DM Sans / Outfit; numbers
+  and labels stay JetBrains Mono. App-only: the web tokens are unchanged.
+- **List lag:** measured, not reproduced. `integration_test` perf test added
+  (`flutter drive ... --profile`); on the emulator build time is small and
+  raster time is too noisy to blame the rows (with either font). Needs a check
+  on a profile build on the phone; the debug build the owner used is slow by
+  nature.
+- **Found while testing:** an expired session leaves the user on the tabs with
+  "session expired" errors instead of sending them to Sign in (logged in the
+  backlog, not fixed here).
+- **Emulator (profile build):** new font on Documents, Settings and Sign in;
+  search icon opens the bar with a close x and typing narrows the list; the two
+  chips sit under the header.
+- **Tests:** filter/search tests rewritten for the new UI plus two new ones
+  (tapping the selected chip clears it; the search icon toggles the bar and
+  clears on close); mutation-checked.
