@@ -27,6 +27,7 @@ class _FakeStream implements ChatStreamApi {
   Stream<ChatStreamEvent> stream({
     required String sessionId,
     required String query,
+    String? documentId,
   }) {
     final turn = _Turn();
     turns.add(turn);

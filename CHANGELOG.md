@@ -4,6 +4,19 @@ Format: date, what changed, why. Append, don't rewrite history — if a
 decision gets reversed later, the reversal is a new entry, not an edit
 to the old one.
 
+## 2026-10-12 — Scoped chat and citation evidence
+
+- Make Graph's Chat about this action start a fresh conversation scoped to
+  the selected document. Keep that scope for follow-up questions and show it
+  in Chat; reject a server response that fails to attest the scope.
+- Send citation chips to an owned source-evidence view with the actual excerpt,
+  page or image region when available, and an explicit full-document action.
+  Legacy image citations show the whole image without claiming exact bounds.
+- Coordinate with the web/API change: vague first turns ask for a source or
+  topic, retrieval enforces relevance, and selected chat never searches other
+  documents. Real local backend checks covered vague chat, selected sources,
+  excerpts and image bytes; native and web flows covered the corresponding UI.
+
 ## 2026-10-12 — UI/UX F2 graph interactions
 
 - Replace the fixed node panel with a draggable sheet snapping at 25%, 45%

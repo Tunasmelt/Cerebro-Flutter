@@ -239,7 +239,11 @@ void main() {
       () async {
         final (:client, :adapter) = _setup();
         final run = _Run(
-          client.stream(sessionId: 'sess-9', query: 'what is cerebro?'),
+          client.stream(
+            sessionId: 'sess-9',
+            query: 'what is cerebro?',
+            documentId: 'selected',
+          ),
         );
         adapter.send('event: done\ndata: {}\n\n');
         await run.done.future;
@@ -247,7 +251,10 @@ void main() {
         final request = adapter.seen!;
         expect(request.method, 'POST');
         expect(request.path, '/api/v1/chat/sessions/sess-9/stream');
-        expect(request.data, {'query': 'what is cerebro?'});
+        expect(request.data, {
+          'query': 'what is cerebro?',
+          'document_id': 'selected',
+        });
         expect(request.headers['Accept'], 'text/event-stream');
         expect(
           request.headers['authorization'] ?? request.headers['Authorization'],

@@ -464,9 +464,23 @@ class _GraphScreenState extends ConsumerState<GraphScreen>
                                   onSelectChunk: ref
                                       .read(graphExpansionProvider.notifier)
                                       .selectChunk,
-                                  onChatAboutThis: ref
-                                      .read(graphExpansionProvider.notifier)
-                                      .collapse,
+                                  onChatAboutThis: () {
+                                    if (chat.busy || chat.loading) return;
+                                    if (expanded.type == GraphNodeType.sealed) {
+                                      _openDocument(expanded.id);
+                                      return;
+                                    }
+                                    ref
+                                        .read(graphExpansionProvider.notifier)
+                                        .collapse();
+                                    ref
+                                        .read(chatControllerProvider.notifier)
+                                        .chatAboutDocument(
+                                          expanded.id,
+                                          expanded.title,
+                                        );
+                                    context.go(AppRoutes.chat);
+                                  },
                                   onOpenInDocuments: () =>
                                       _openDocument(expanded.id),
                                 ),

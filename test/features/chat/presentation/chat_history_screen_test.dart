@@ -62,6 +62,7 @@ class _NoStream implements ChatStreamApi {
   Stream<ChatStreamEvent> stream({
     required String sessionId,
     required String query,
+    String? documentId,
   }) => const Stream.empty();
 }
 

@@ -7,6 +7,7 @@ import '../features/auth/data/auth_state.dart';
 import '../features/auth/presentation/sign_in_screen.dart';
 import '../features/auth/presentation/sign_up_screen.dart';
 import '../features/chat/presentation/chat_history_screen.dart';
+import '../features/chat/presentation/citation_evidence_screen.dart';
 import '../features/chat/presentation/chat_screen.dart';
 import '../features/documents/presentation/document_detail_screen.dart';
 import '../features/documents/presentation/document_file_screen.dart';
@@ -69,6 +70,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.signUp,
         builder: (context, state) => const SignUpScreen(),
+      ),
+      GoRoute(
+        path: '/evidence/:chunkId',
+        builder: (context, state) =>
+            CitationEvidenceScreen(chunkId: state.pathParameters['chunkId']!),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
