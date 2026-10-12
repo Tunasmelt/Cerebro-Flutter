@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../../../../shared/widgets/ask_field.dart';
 
 import '../../../../shared/tokens/app_colors.dart';
 import '../../../../shared/tokens/app_radius.dart';
@@ -13,10 +15,14 @@ class GraphAskBar extends StatelessWidget {
     required this.controller,
     required this.onAsk,
     this.onHistory,
+    this.enabled = true,
+    this.busy = false,
   });
 
   final TextEditingController controller;
   final ValueChanged<String> onAsk;
+  final bool enabled;
+  final bool busy;
 
   /// Opens the list of past conversations to replay on the graph.
   final VoidCallback? onHistory;
@@ -48,37 +54,22 @@ class GraphAskBar extends StatelessWidget {
                 color: AppColors.textSecondary,
               ),
               Expanded(
-                child: TextField(
+                child: AskField(
+                  inputKey: const Key('graph_ask_input'),
                   controller: controller,
-                  style: AppTypography.sm.copyWith(
-                    color: AppColors.textPrimary,
-                  ),
-                  onSubmitted: (v) {
-                    if (v.trim().isNotEmpty) onAsk(v);
-                  },
-                  decoration: InputDecoration(
-                    isDense: true,
-                    filled: false,
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    disabledBorder: InputBorder.none,
-                    errorBorder: InputBorder.none,
-                    focusedErrorBorder: InputBorder.none,
-                    hintText: 'Ask about your documents…',
-                    hintStyle: AppTypography.sm.copyWith(
-                      color: AppColors.grayDim,
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      vertical: AppSpacing.s3,
-                    ),
-                  ),
+                  enabled: enabled,
+                  compact: true,
                 ),
               ),
               SizedBox(
                 height: AppSpacing.minTouchTarget,
                 child: TextButton(
-                  onPressed: hasText ? () => onAsk(controller.text) : null,
+                  onPressed: hasText && enabled && !busy
+                      ? () {
+                          HapticFeedback.lightImpact();
+                          onAsk(controller.text);
+                        }
+                      : null,
                   style: TextButton.styleFrom(
                     backgroundColor: AppColors.accentPrimary,
                     disabledBackgroundColor: AppColors.accentPrimary.withValues(

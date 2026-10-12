@@ -583,4 +583,105 @@ void main() {
       expect(find.textContaining('not computed'), findsNothing);
     });
   });
+  group('F2 interactions', () {
+    ForceDirectedGraphController<String> controller(WidgetTester tester) =>
+        tester
+            .widget<ForceDirectedGraphWidget<String>>(
+              find.byKey(const Key('graph_canvas')),
+            )
+            .controller;
+
+    testWidgets(
+      'Next match centers each result, wraps, and disables for no matches',
+      (tester) async {
+        final api = _FakeGraph()
+          ..nodeRows = [
+            _n('a', title: 'Guide Alpha', x: -1, y: 0),
+            _n('b', title: 'Guide Beta', x: 1, y: 0),
+            _n('c', title: 'Other', x: 0, y: 1),
+          ];
+        await _pump(tester, api);
+        final search = find.byType(TextField).first;
+        await tester.enterText(search, 'Guide');
+        await tester.pump();
+        expect(find.text('2 matches'), findsOneWidget);
+        for (final id in ['a', 'b', 'a']) {
+          await tester.tap(find.byKey(const Key('graph_next_match')));
+          await tester.pump();
+          final position = controller(
+            tester,
+          ).graph.nodes.firstWhere((n) => n.data == id).position;
+          expect(position.x, closeTo(0, 0.001));
+          expect(position.y, closeTo(0, 0.001));
+        }
+        await tester.enterText(search, 'missing');
+        await tester.pump();
+        expect(
+          tester
+              .widget<IconButton>(find.byKey(const Key('graph_next_match')))
+              .onPressed,
+          isNull,
+        );
+        await tester.enterText(search, 'Beta');
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('graph_next_match')));
+        await tester.pump();
+        expect(
+          controller(
+            tester,
+          ).graph.nodes.firstWhere((n) => n.data == 'b').position.length,
+          closeTo(0, 0.001),
+        );
+      },
+    );
+
+    testWidgets(
+      'double-tap zooms empty canvas and a single tap collapses the sheet',
+      (tester) async {
+        await _pump(tester, _FakeGraph()..nodeRows = [_n('a', x: 0, y: 0)]);
+        final canvas = find.byKey(const Key('graph_canvas'));
+        final point = tester.getTopLeft(canvas) + const Offset(90, 220);
+        final before = controller(tester).scale;
+        await tester.tapAt(point);
+        await tester.pump(const Duration(milliseconds: 60));
+        await tester.tapAt(point);
+        await tester.pump(const Duration(milliseconds: 350));
+        expect(controller(tester).scale, closeTo(before * 1.5, 0.001));
+        await tester.tapAt(tester.getCenter(canvas));
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(find.byKey(const Key('node_panel')), findsOneWidget);
+        await tester.tapAt(point);
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(find.byKey(const Key('node_panel')), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'sheet grows and snaps while the selected node stays above it',
+      (tester) async {
+        await _pump(tester, _FakeGraph()..nodeRows = [_n('a', x: 0, y: 0)]);
+        final canvas = find.byKey(const Key('graph_canvas'));
+        await tester.tapAt(tester.getCenter(canvas));
+        await tester.pump(const Duration(milliseconds: 400));
+        final panel = find.byKey(const Key('node_panel'));
+        final initial = tester.getSize(panel).height;
+        await tester.drag(
+          find.byKey(const Key('node_sheet_handle')),
+          const Offset(0, -210),
+        );
+        await tester.pump(const Duration(seconds: 1));
+        await tester.pump();
+        expect(tester.getSize(panel).height, greaterThan(initial + 50));
+        final c = controller(tester);
+        final n = c.graph.nodes.single;
+        final nodeY = tester.getCenter(canvas).dy - n.position.y * c.scale;
+        expect(nodeY, lessThan(tester.getTopLeft(panel).dy));
+        expect(
+          find.byKey(const Key('node_open')).hitTestable(),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
 }

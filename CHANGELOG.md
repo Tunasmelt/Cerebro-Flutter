@@ -4,6 +4,18 @@ Format: date, what changed, why. Append, don't rewrite history — if a
 decision gets reversed later, the reversal is a new entry, not an edit
 to the old one.
 
+## 2026-10-12 — UI/UX F2 graph interactions
+
+- Replace the fixed node panel with a draggable sheet snapping at 25%, 45%
+  and 80%; keep document actions visible and chunks lazily rendered.
+- Position selected nodes using the sheet extent and zoom; add empty-canvas
+  collapse, double-tap zoom and cycling search-result navigation.
+- Reuse a shared multiline question field in Chat and Graph, preserving drafts
+  during streaming while preventing duplicate submission.
+- Verified clean analysis, 1,033 tests (30 opt-in skips), Android debug build
+  and Pixel checks against real graph/chunk data. Device flows did not submit
+  a new conversation. See docs/ui-ux-phase-f2-graph-interactions.md.
+
 ## 2026-10-12 — UI/UX Phase C and direct previews
 
 - Render chat Markdown with trusted inline citations, code/answer copy,

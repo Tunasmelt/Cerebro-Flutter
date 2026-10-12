@@ -30,6 +30,7 @@ class NodeInfoPanel extends StatelessWidget {
     required this.onSelectChunk,
     required this.onChatAboutThis,
     required this.onOpenInDocuments,
+    this.scrollController,
   });
 
   final GraphNodeData node;
@@ -39,10 +40,13 @@ class NodeInfoPanel extends StatelessWidget {
   final ValueChanged<String> onSelectChunk;
   final VoidCallback onChatAboutThis;
   final VoidCallback onOpenInDocuments;
+  final ScrollController? scrollController;
 
   @override
   Widget build(BuildContext context) {
-    final maxHeight = MediaQuery.sizeOf(context).height * 0.5;
+    final maxHeight = scrollController == null
+        ? MediaQuery.sizeOf(context).height * 0.5
+        : double.infinity;
     return ConstrainedBox(
       constraints: BoxConstraints(maxHeight: maxHeight),
       child: DecoratedBox(
@@ -63,16 +67,56 @@ class NodeInfoPanel extends StatelessWidget {
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _Header(node: node, onClose: onClose),
-              const SizedBox(height: AppSpacing.s2),
-              Flexible(
-                child: _Body(
-                  node: node,
-                  expansion: expansion,
-                  onRetry: onRetry,
-                  onSelectChunk: onSelectChunk,
+              Expanded(
+                child: CustomScrollView(
+                  controller: scrollController,
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (scrollController != null)
+                            Center(
+                              child: Container(
+                                key: const Key('node_sheet_handle'),
+                                width: 40,
+                                height: 4,
+                                margin: const EdgeInsets.only(
+                                  bottom: AppSpacing.s3,
+                                ),
+                                decoration: const BoxDecoration(
+                                  color: AppColors.textDisabled,
+                                  borderRadius: AppRadius.pillRadius,
+                                ),
+                              ),
+                            ),
+                          _Header(node: node, onClose: onClose),
+                          const SizedBox(height: AppSpacing.s2),
+                          _Body(
+                            node: node,
+                            expansion: expansion,
+                            onRetry: onRetry,
+                            onSelectChunk: onSelectChunk,
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (expansion.load == ChunkLoad.loaded &&
+                        expansion.chunks.isNotEmpty)
+                      SliverList.builder(
+                        key: const Key('node_chunk_list'),
+                        itemCount: expansion.chunks.length,
+                        itemBuilder: (context, i) => _ChunkRow(
+                          chunk: expansion.chunks[i],
+                          number: i + 1,
+                          selected:
+                              expansion.chunks[i].id ==
+                              expansion.selectedChunkId,
+                          onTap: () => onSelectChunk(expansion.chunks[i].id),
+                        ),
+                      ),
+                  ],
                 ),
               ),
               const SizedBox(height: AppSpacing.s3),
@@ -257,23 +301,6 @@ class _Body extends StatelessWidget {
           _SelectedChunk(chunk: selected),
           const SizedBox(height: AppSpacing.s2),
         ],
-        Flexible(
-          flex: 2,
-          child: ListView.builder(
-            key: const Key('node_chunk_list'),
-            // No inherited inset: a ListView would otherwise pad its top by the
-            // status-bar height, leaving a gap above the first row.
-            padding: EdgeInsets.zero,
-            shrinkWrap: true,
-            itemCount: chunks.length,
-            itemBuilder: (context, i) => _ChunkRow(
-              chunk: chunks[i],
-              number: i + 1,
-              selected: chunks[i].id == expansion.selectedChunkId,
-              onTap: () => onSelectChunk(chunks[i].id),
-            ),
-          ),
-        ),
       ],
     );
   }
@@ -292,53 +319,46 @@ class _SelectedChunk extends StatelessWidget {
     final text = chunk.content.trim();
     final cut = text.length > maxChunkTextChars;
     final where = _where(chunk);
-    // Flexible (one part to the list's two), so in a short panel the selected
-    // text gives way — it scrolls — rather than overflowing or squeezing the
-    // list out.
-    return Flexible(
-      flex: 1,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxHeight: 140),
-        child: Container(
-          key: const Key('node_selected_chunk'),
-          width: double.infinity,
-          padding: const EdgeInsets.all(AppSpacing.s3),
-          decoration: BoxDecoration(
-            color: AppColors.bgBase,
-            borderRadius: AppRadius.mdRadius,
-            border: Border.all(color: AppColors.accentPrimaryBorder),
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (where.isNotEmpty)
-                  Text(
-                    where,
-                    style: AppTypography.xs.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                SelectableText(
-                  text.isEmpty
-                      ? '(no text)'
-                      : cut
-                      ? text.substring(0, maxChunkTextChars)
-                      : text,
-                  style: AppTypography.sm.copyWith(
-                    color: AppColors.textPrimary,
+    // Selected text stays bounded inside the scrollable panel.
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxHeight: 140),
+      child: Container(
+        key: const Key('node_selected_chunk'),
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppSpacing.s3),
+        decoration: BoxDecoration(
+          color: AppColors.bgBase,
+          borderRadius: AppRadius.mdRadius,
+          border: Border.all(color: AppColors.accentPrimaryBorder),
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (where.isNotEmpty)
+                Text(
+                  where,
+                  style: AppTypography.xs.copyWith(
+                    color: AppColors.textSecondary,
                   ),
                 ),
-                if (cut)
-                  Text(
-                    key: const Key('node_chunk_cut'),
-                    '… shortened — ${text.length} characters in all',
-                    style: AppTypography.xs.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
+              SelectableText(
+                text.isEmpty
+                    ? '(no text)'
+                    : cut
+                    ? text.substring(0, maxChunkTextChars)
+                    : text,
+                style: AppTypography.sm.copyWith(color: AppColors.textPrimary),
+              ),
+              if (cut)
+                Text(
+                  key: const Key('node_chunk_cut'),
+                  '… shortened — ${text.length} characters in all',
+                  style: AppTypography.xs.copyWith(
+                    color: AppColors.textSecondary,
                   ),
-              ],
-            ),
+                ),
+            ],
           ),
         ),
       ),

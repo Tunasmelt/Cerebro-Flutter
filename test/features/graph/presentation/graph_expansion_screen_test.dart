@@ -392,7 +392,7 @@ void main() {
       expect(tester.getSize(_panel).height, lessThanOrEqualTo(640 * 0.5 + 1));
       // The list is still there to use, not squeezed out by the selection.
       expect(
-        tester.getSize(find.byKey(const Key('node_chunk_list'))).height,
+        tester.getSize(find.byKey(const Key('node_panel'))).height,
         greaterThanOrEqualTo(60),
       );
     });

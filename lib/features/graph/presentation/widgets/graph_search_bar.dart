@@ -17,6 +17,7 @@ class GraphSearchBar extends StatelessWidget {
     required this.matchCount,
     required this.onChanged,
     required this.onClear,
+    this.onNext,
   });
 
   final TextEditingController controller;
@@ -24,6 +25,7 @@ class GraphSearchBar extends StatelessWidget {
   final int matchCount;
   final ValueChanged<String> onChanged;
   final VoidCallback onClear;
+  final VoidCallback? onNext;
 
   @override
   Widget build(BuildContext context) {
@@ -85,6 +87,7 @@ class GraphSearchBar extends StatelessWidget {
                   height: AppSpacing.minTouchTarget,
                   child: IconButton(
                     padding: EdgeInsets.zero,
+                    tooltip: 'Clear search',
                     iconSize: 14,
                     icon: const Icon(Icons.close, color: AppColors.grayDim),
                     onPressed: onClear,
@@ -104,11 +107,22 @@ class GraphSearchBar extends StatelessWidget {
               color: AppColors.accentSecondarySubtle,
               borderRadius: AppRadius.pillRadius,
             ),
-            child: Text(
-              '$matchCount match${matchCount == 1 ? '' : 'es'}',
-              style: AppTypography.xs.copyWith(
-                color: AppColors.accentSecondary,
-              ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '$matchCount match${matchCount == 1 ? '' : 'es'}',
+                  style: AppTypography.xs.copyWith(
+                    color: AppColors.accentSecondary,
+                  ),
+                ),
+                IconButton(
+                  key: const Key('graph_next_match'),
+                  tooltip: 'Next match',
+                  onPressed: matchCount > 0 ? onNext : null,
+                  icon: const Icon(Icons.arrow_forward, size: 18),
+                ),
+              ],
             ),
           ),
         ],

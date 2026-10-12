@@ -1039,6 +1039,13 @@ found that would embarrass a live demo.
 
 ## Cross-phase rules
 
+UI/UX cross-cutting progress (2026-10-12): F1 merged through PR #47. F2 adds
+draggable graph details, search-result navigation, double-tap zoom and shared
+question input. Clean analysis, 1,033 tests and the Android debug build pass;
+Pixel checks use real graph/chunk responses. See
+docs/ui-ux-phase-f2-graph-interactions.md for scope and limits. This records
+implementation verification and does not change any owner gate.
+
 - A milestone's exit criteria are re-run, not re-litigated, if a later
   phase's work touches its code — a regression against a passed
   milestone is tracked as a regression, not silently absorbed into the

@@ -28,10 +28,6 @@ import 'widgets/graph_search_bar.dart';
 import 'widgets/node_info_panel.dart';
 import 'widgets/replay_sheet.dart';
 
-/// What share of the screen's height the node panel may cover; an expanded
-/// node is brought into the part above it.
-const double _panelShare = 0.5;
-
 /// The brain graph — Cerebro's 2D, deliberately-not-3D visual index of a
 /// user's vault (architecture-and-spec.md §5, CLAUDE.md "2D graph is a
 /// deliberate choice").
@@ -58,6 +54,9 @@ class _GraphScreenState extends ConsumerState<GraphScreen>
   final _askController = TextEditingController();
 
   String _query = '';
+  int _matchIndex = -1;
+  double _panelShare = 0.45;
+  Size _canvasSize = Size.zero;
 
   /// Node types the legend chips have dimmed.
   final Set<GraphNodeType> _hiddenTypes = {};
@@ -184,11 +183,27 @@ class _GraphScreenState extends ConsumerState<GraphScreen>
     if (controller == null) return;
     final node = _nodeFor(controller, id);
     if (node == null) return;
-    final height = MediaQuery.sizeOf(context).height;
+    final height = _canvasSize.height;
     // The graph's origin is the middle of the view; y points up.
-    final visibleMiddle = height * (1 - _panelShare) / 2;
-    final targetY = height / 2 - visibleMiddle;
+    final padding = MediaQuery.paddingOf(context);
+    final panelTop =
+        height - padding.bottom - (height - padding.vertical) * _panelShare;
+    final visibleMiddle = (math.min(160, panelTop / 2) + panelTop) / 2;
+    final targetY = (height / 2 - visibleMiddle) / controller.scale;
     controller.locateToPosition(node.position.x, node.position.y - targetY);
+  }
+
+  void _nextMatch(GraphSnapshot snapshot) {
+    final matches = snapshot.nodes.where(_matches).toList();
+    if (matches.isEmpty) return;
+    FocusScope.of(context).unfocus();
+    setState(() => _matchIndex = (_matchIndex + 1) % matches.length);
+    final id = matches[_matchIndex].id;
+    if (ref.read(graphExpansionProvider).nodeId != null) {
+      _bringIntoView(id);
+    } else {
+      _controller?.locateTo(id);
+    }
   }
 
   bool _matches(GraphNodeData node) =>
@@ -271,6 +286,8 @@ class _GraphScreenState extends ConsumerState<GraphScreen>
   @override
   Widget build(BuildContext context) {
     final graph = ref.watch(graphProvider);
+    final chat = ref.watch(chatControllerProvider);
+
     // Keep the last graph on screen while a refresh is in flight.
     final snapshot = graph.valueOrNull;
     final expansion = ref.watch(graphExpansionProvider);
@@ -283,6 +300,7 @@ class _GraphScreenState extends ConsumerState<GraphScreen>
     ref.listen<GraphExpansion>(graphExpansionProvider, (previous, next) {
       final id = next.nodeId;
       if (id != null && id != previous?.nodeId) {
+        _panelShare = 0.45;
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) _bringIntoView(id);
         });
@@ -297,125 +315,168 @@ class _GraphScreenState extends ConsumerState<GraphScreen>
 
     return Scaffold(
       backgroundColor: AppColors.bgBase,
-      body: Stack(
-        children: [
-          Positioned.fill(child: _body(graph, snapshot, byId, expansion)),
-          Positioned.fill(
-            child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s4),
-                child: Column(
-                  children: [
-                    const SizedBox(height: AppSpacing.s2),
-                    Row(
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          _canvasSize = constraints.biggest;
+          return Stack(
+            children: [
+              Positioned.fill(child: _body(graph, snapshot, byId, expansion)),
+              Positioned.fill(
+                child: SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.s4,
+                    ),
+                    child: Column(
                       children: [
-                        Expanded(
-                          child: GraphSearchBar(
-                            controller: _searchController,
-                            query: _query,
-                            matchCount: snapshot == null
-                                ? 0
-                                : snapshot.nodes.where(_matches).length,
-                            onChanged: (v) => setState(() => _query = v),
-                            onClear: () {
-                              _searchController.clear();
-                              setState(() => _query = '');
-                            },
+                        const SizedBox(height: AppSpacing.s2),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: GraphSearchBar(
+                                controller: _searchController,
+                                query: _query,
+                                matchCount: snapshot == null
+                                    ? 0
+                                    : snapshot.nodes.where(_matches).length,
+                                onNext: snapshot == null
+                                    ? null
+                                    : () => _nextMatch(snapshot),
+                                onChanged: (v) => setState(() {
+                                  _query = v;
+                                  _matchIndex = -1;
+                                }),
+                                onClear: () {
+                                  _searchController.clear();
+                                  setState(() {
+                                    _query = '';
+                                    _matchIndex = -1;
+                                  });
+                                },
+                              ),
+                            ),
+                            IconButton(
+                              key: const Key('graph_refresh'),
+                              tooltip: 'Refresh',
+                              onPressed: graph.isLoading
+                                  ? null
+                                  : () => ref
+                                        .read(graphProvider.notifier)
+                                        .refresh(),
+                              icon: const Icon(Icons.refresh),
+                            ),
+                          ],
+                        ),
+                        if (snapshot != null &&
+                            snapshot.nodes.isNotEmpty &&
+                            !_showAnswer &&
+                            expanded == null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: AppSpacing.s1),
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: GraphLegend(
+                                hidden: _hiddenTypes,
+                                onToggle: (type) => setState(() {
+                                  if (!_hiddenTypes.remove(type)) {
+                                    _hiddenTypes.add(type);
+                                  }
+                                  _controller?.needUpdate();
+                                }),
+                              ),
+                            ),
                           ),
-                        ),
-                        IconButton(
-                          key: const Key('graph_refresh'),
-                          tooltip: 'Refresh',
-                          onPressed: graph.isLoading
-                              ? null
-                              : () =>
-                                    ref.read(graphProvider.notifier).refresh(),
-                          icon: const Icon(Icons.refresh),
-                        ),
+                        if (snapshot != null) _Notes(snapshot: snapshot),
+                        if (replaying) const _ReplayingPill(),
+                        const Spacer(),
+                        if (expanded == null && _showAnswer)
+                          Padding(
+                            padding: const EdgeInsets.only(
+                              bottom: AppSpacing.s2,
+                            ),
+                            child: GraphAnswerCard(
+                              onClose: () =>
+                                  setState(() => _showAnswer = false),
+                              onOpenInChat: () => context.go(AppRoutes.chat),
+                              onOpenDocument: _openDocument,
+                            ),
+                          ),
+                        if (expanded == null)
+                          GraphAskBar(
+                            controller: _askController,
+                            enabled: !chat.loading && chat.loadError == null,
+                            busy: chat.busy,
+                            onAsk: _handleAsk,
+                            onHistory: _openReplayPicker,
+                          ),
+                        const SizedBox(height: AppSpacing.s2),
                       ],
                     ),
-                    if (snapshot != null &&
-                        snapshot.nodes.isNotEmpty &&
-                        !_showAnswer &&
-                        expanded == null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: AppSpacing.s1),
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: GraphLegend(
-                            hidden: _hiddenTypes,
-                            onToggle: (type) => setState(() {
-                              if (!_hiddenTypes.remove(type)) {
-                                _hiddenTypes.add(type);
-                              }
-                              _controller?.needUpdate();
-                            }),
+                  ),
+                ),
+              ),
+              if (!_showAnswer &&
+                  expanded == null &&
+                  snapshot != null &&
+                  snapshot.nodes.isNotEmpty)
+                Positioned(
+                  right: AppSpacing.s4,
+                  bottom: AppSpacing.s20,
+                  child: SafeArea(
+                    child: _ZoomControls(
+                      onZoomIn: () => _zoomBy(1.25),
+                      onZoomOut: () => _zoomBy(0.8),
+                      onFit: _fitToView,
+                    ),
+                  ),
+                ),
+              if (expanded != null)
+                Positioned.fill(
+                  child: SafeArea(
+                    child:
+                        NotificationListener<DraggableScrollableNotification>(
+                          onNotification: (notification) {
+                            _panelShare = notification.extent;
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              if (mounted) _bringIntoView(expanded.id);
+                            });
+                            return false;
+                          },
+                          child: DraggableScrollableSheet(
+                            key: ValueKey('node_sheet_${expanded.id}'),
+                            initialChildSize: 0.45,
+                            minChildSize: 0.25,
+                            maxChildSize: 0.8,
+                            snap: true,
+                            snapSizes: const [0.25, 0.45, 0.8],
+                            shouldCloseOnMinExtent: false,
+                            builder: (context, scrollController) =>
+                                NodeInfoPanel(
+                                  node: expanded,
+                                  expansion: expansion,
+                                  scrollController: scrollController,
+                                  onClose: ref
+                                      .read(graphExpansionProvider.notifier)
+                                      .collapse,
+                                  onRetry: ref
+                                      .read(graphExpansionProvider.notifier)
+                                      .retry,
+                                  onSelectChunk: ref
+                                      .read(graphExpansionProvider.notifier)
+                                      .selectChunk,
+                                  onChatAboutThis: ref
+                                      .read(graphExpansionProvider.notifier)
+                                      .collapse,
+                                  onOpenInDocuments: () =>
+                                      _openDocument(expanded.id),
+                                ),
                           ),
                         ),
-                      ),
-                    if (snapshot != null) _Notes(snapshot: snapshot),
-                    if (replaying) const _ReplayingPill(),
-                    const Spacer(),
-                    if (expanded == null && _showAnswer)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: AppSpacing.s2),
-                        child: GraphAnswerCard(
-                          onClose: () => setState(() => _showAnswer = false),
-                          onOpenInChat: () => context.go(AppRoutes.chat),
-                          onOpenDocument: _openDocument,
-                        ),
-                      ),
-                    if (expanded == null)
-                      GraphAskBar(
-                        controller: _askController,
-                        onAsk: _handleAsk,
-                        onHistory: _openReplayPicker,
-                      ),
-                    const SizedBox(height: AppSpacing.s2),
-                  ],
+                  ),
                 ),
-              ),
-            ),
-          ),
-          if (!_showAnswer &&
-              expanded == null &&
-              snapshot != null &&
-              snapshot.nodes.isNotEmpty)
-            Positioned(
-              right: AppSpacing.s4,
-              bottom: AppSpacing.s20,
-              child: SafeArea(
-                child: _ZoomControls(
-                  onZoomIn: () => _zoomBy(1.25),
-                  onZoomOut: () => _zoomBy(0.8),
-                  onFit: _fitToView,
-                ),
-              ),
-            ),
-          if (expanded != null)
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: SafeArea(
-                top: false,
-                child: NodeInfoPanel(
-                  node: expanded,
-                  expansion: expansion,
-                  onClose: ref.read(graphExpansionProvider.notifier).collapse,
-                  onRetry: ref.read(graphExpansionProvider.notifier).retry,
-                  onSelectChunk: ref
-                      .read(graphExpansionProvider.notifier)
-                      .selectChunk,
-                  // Routing a node to Chat is a later milestone.
-                  onChatAboutThis: ref
-                      .read(graphExpansionProvider.notifier)
-                      .collapse,
-                  onOpenInDocuments: () => _openDocument(expanded.id),
-                ),
-              ),
-            ),
-        ],
+            ],
+          );
+        },
       ),
     );
   }
@@ -459,30 +520,35 @@ class _GraphScreenState extends ConsumerState<GraphScreen>
     }
 
     final toggle = ref.read(graphExpansionProvider.notifier).toggle;
-    return ForceDirectedGraphWidget<String>(
-      key: const Key('graph_canvas'),
-      controller: _controllerFor(snapshot),
-      onDraggingUpdate: (_) => _keepLayoutStatic(),
-      onDraggingEnd: (_) => _keepLayoutStatic(),
-      nodesBuilder: (context, id) {
-        final node = byId[id];
-        if (node == null) return const SizedBox.shrink();
-        final matched = _matches(node);
-        final selected = node.id == expansion.nodeId;
-        return GraphNodeDot(
-          node: node,
-          matched: matched,
-          selected: selected,
-          dimmed:
-              (_query.isNotEmpty && !matched && !selected) ||
-              _hiddenTypes.contains(node.type),
-          pulsing: _pulsingIds.contains(node.id),
-          pulse: _pulseAnim,
-          onTap: () => toggle(node.id),
-        );
-      },
-      edgesBuilder: (context, a, b, distance) =>
-          GraphEdgeLine(length: distance),
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: ref.read(graphExpansionProvider.notifier).collapse,
+      onDoubleTap: () => _zoomBy(1.5),
+      child: ForceDirectedGraphWidget<String>(
+        key: const Key('graph_canvas'),
+        controller: _controllerFor(snapshot),
+        onDraggingUpdate: (_) => _keepLayoutStatic(),
+        onDraggingEnd: (_) => _keepLayoutStatic(),
+        nodesBuilder: (context, id) {
+          final node = byId[id];
+          if (node == null) return const SizedBox.shrink();
+          final matched = _matches(node);
+          final selected = node.id == expansion.nodeId;
+          return GraphNodeDot(
+            node: node,
+            matched: matched,
+            selected: selected,
+            dimmed:
+                (_query.isNotEmpty && !matched && !selected) ||
+                _hiddenTypes.contains(node.type),
+            pulsing: _pulsingIds.contains(node.id),
+            pulse: _pulseAnim,
+            onTap: () => toggle(node.id),
+          );
+        },
+        edgesBuilder: (context, a, b, distance) =>
+            GraphEdgeLine(length: distance),
+      ),
     );
   }
 }
