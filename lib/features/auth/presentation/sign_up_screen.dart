@@ -4,12 +4,12 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/app_routes.dart';
 import '../../../shared/tokens/app_colors.dart';
-import '../../../shared/tokens/app_radius.dart';
 import '../../../shared/tokens/app_spacing.dart';
 import '../../../shared/tokens/app_typography.dart';
 import '../data/auth_notifier.dart';
 import '../data/auth_state.dart';
 import '../../../shared/widgets/app_text_field.dart';
+import 'auth_card.dart';
 
 /// No sign-up mockup exists yet (only `SignIn.tsx` was reviewed) — this
 /// mirrors web's real, working pattern instead
@@ -31,12 +31,22 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   final _confirmPasswordController = TextEditingController();
   String? _localError;
 
+  /// Set once the user has tried to submit, so an empty field is called out
+  /// (clearing as they type) instead of the button silently doing nothing.
+  bool _submitted = false;
+
   @override
   void initState() {
     super.initState();
+    _emailController.addListener(_onTyped);
+    _passwordController.addListener(_onTyped);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) ref.read(authNotifierProvider.notifier).clearStatus();
     });
+  }
+
+  void _onTyped() {
+    if (_submitted) setState(() {});
   }
 
   @override
@@ -52,6 +62,8 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     final password = _passwordController.text;
     final confirm = _confirmPasswordController.text;
 
+    setState(() => _submitted = true);
+    if (email.isEmpty || password.isEmpty) return;
     if (password != confirm) {
       setState(() => _localError = "Passwords don't match.");
       return;
@@ -86,86 +98,89 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
         elevation: 0,
         title: const Text('Create your account'),
       ),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(AppSpacing.s6),
-          child: Container(
-            width: 360,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
             padding: const EdgeInsets.all(AppSpacing.s6),
-            decoration: BoxDecoration(
-              color: AppColors.bgElevated,
-              borderRadius: AppRadius.lgRadius,
-              border: Border.all(color: AppColors.borderSubtle),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AppTextField(
-                  key: const Key('sign_up_email'),
-                  label: 'Email',
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  autofillHints: const [AutofillHints.email],
-                ),
-                const SizedBox(height: AppSpacing.s4),
-                AppTextField(
-                  key: const Key('sign_up_password'),
-                  label: 'Password',
-                  controller: _passwordController,
-                  obscureText: true,
-                  autofillHints: const [AutofillHints.newPassword],
-                ),
-                const SizedBox(height: AppSpacing.s4),
-                AppTextField(
-                  key: const Key('sign_up_confirm_password'),
-                  label: 'Confirm password',
-                  controller: _confirmPasswordController,
-                  obscureText: true,
-                  autofillHints: const [AutofillHints.newPassword],
-                  onSubmitted: (_) => _handleSubmit(),
-                ),
-                if (errorMessage != null) ...[
-                  const SizedBox(height: AppSpacing.s3),
-                  Container(
-                    key: const Key('sign_up_error'),
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.s3,
-                      vertical: AppSpacing.s2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.dangerSubtle,
-                      borderRadius: AppRadius.mdRadius,
-                    ),
-                    child: Text(
-                      errorMessage,
-                      style: AppTypography.xs.copyWith(
-                        color: AppColors.dangerHover,
-                      ),
+            child: AutofillGroup(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const AuthBrand(),
+                  const SizedBox(height: AppSpacing.s6),
+                  AuthCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        AppTextField(
+                          key: const Key('sign_up_email'),
+                          label: 'Email',
+                          controller: _emailController,
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
+                          autofillHints: const [AutofillHints.email],
+                          errorText:
+                              _submitted && _emailController.text.trim().isEmpty
+                              ? 'Enter your email.'
+                              : null,
+                        ),
+                        const SizedBox(height: AppSpacing.s4),
+                        AppTextField(
+                          key: const Key('sign_up_password'),
+                          label: 'Password',
+                          controller: _passwordController,
+                          obscureText: true,
+                          showVisibilityToggle: true,
+                          textInputAction: TextInputAction.next,
+                          autofillHints: const [AutofillHints.newPassword],
+                          errorText:
+                              _submitted && _passwordController.text.isEmpty
+                              ? 'Choose a password.'
+                              : null,
+                        ),
+                        const SizedBox(height: AppSpacing.s4),
+                        AppTextField(
+                          key: const Key('sign_up_confirm_password'),
+                          label: 'Confirm password',
+                          controller: _confirmPasswordController,
+                          obscureText: true,
+                          showVisibilityToggle: true,
+                          textInputAction: TextInputAction.done,
+                          autofillHints: const [AutofillHints.newPassword],
+                          onSubmitted: (_) => _handleSubmit(),
+                        ),
+                        if (errorMessage != null) ...[
+                          const SizedBox(height: AppSpacing.s3),
+                          AuthMessage(
+                            errorMessage,
+                            key: const Key('sign_up_error'),
+                          ),
+                        ],
+                        const SizedBox(height: AppSpacing.s5),
+                        SizedBox(
+                          width: double.infinity,
+                          height: AppSpacing.minTouchTarget,
+                          child: ElevatedButton(
+                            key: const Key('sign_up_submit'),
+                            onPressed: loading ? null : _handleSubmit,
+                            child: loading
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: AppColors.textOnAccent,
+                                    ),
+                                  )
+                                : const Text('Create account'),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
-                const SizedBox(height: AppSpacing.s5),
-                SizedBox(
-                  width: double.infinity,
-                  height: AppSpacing.minTouchTarget,
-                  child: ElevatedButton(
-                    key: const Key('sign_up_submit'),
-                    onPressed: loading ? null : _handleSubmit,
-                    child: loading
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: AppColors.textOnAccent,
-                            ),
-                          )
-                        : const Text('Create account'),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         ),
@@ -242,24 +257,7 @@ class _CheckEmailScreenState extends ConsumerState<_CheckEmailScreen> {
               ),
               if (error != null) ...[
                 const SizedBox(height: AppSpacing.s4),
-                Container(
-                  key: const Key('check_email_error'),
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.s3,
-                    vertical: AppSpacing.s2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.dangerSubtle,
-                    borderRadius: AppRadius.mdRadius,
-                  ),
-                  child: Text(
-                    error,
-                    style: AppTypography.xs.copyWith(
-                      color: AppColors.dangerHover,
-                    ),
-                  ),
-                ),
+                AuthMessage(error, key: const Key('check_email_error')),
               ],
               if (_status == _ResendStatus.sent) ...[
                 const SizedBox(height: AppSpacing.s4),

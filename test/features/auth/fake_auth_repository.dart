@@ -16,6 +16,9 @@ class FakeAuthRepository implements AuthRepository {
   /// [SignUpOutcome] (for signUp).
   Object? nextResult;
 
+  int signInCalls = 0;
+  int signUpCalls = 0;
+
   @override
   String? get currentUserId => _userId;
 
@@ -24,6 +27,7 @@ class FakeAuthRepository implements AuthRepository {
 
   @override
   Future<void> signIn({required String email, required String password}) async {
+    signInCalls++;
     final result = nextResult;
     if (result is AuthFailureException) throw result;
     if (result is String) {
@@ -39,6 +43,7 @@ class FakeAuthRepository implements AuthRepository {
     required String email,
     required String password,
   }) async {
+    signUpCalls++;
     final result = nextResult;
     if (result is AuthFailureException) throw result;
     if (result is SignUpOutcome) return result;
