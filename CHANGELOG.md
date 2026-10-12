@@ -2134,3 +2134,32 @@ still needs its own layout work — phases B and E.
 - Added a rendered pressed-state background regression. All 15 focused
   navigation checks and the physical Pixel 22-command smoke pass. Held-press
   screenshot confirms the tab section stays dark.
+
+
+### UI/UX pass - D: Documents
+- **List screen:** the shared `AppScreenHeader` with a count ("5 documents",
+  "1 document"), a title search box and status chips (All / Ready / Processing
+  / Failed / Sealed). An upload that never finished counts as Failed, not
+  Processing, matching its "Incomplete" label. Search and chips appear only
+  once there are documents; "Clear filters" resets both.
+- **States:** skeleton rows while loading (no spinner), a real empty state
+  with an "Add a document" button that opens the same source sheet as the
+  floating button, and a "Nothing matches" state for a search or chip with no
+  results. Both empty states stay pull-to-refresh-able.
+- **Rows:** status uses the shared `StatusPill`; the list's bottom padding is
+  now derived from the floating button's size and margin instead of a magic 88.
+- **Uploads:** an uploading row shows the real percentage beside the stage.
+- **Detail:** status uses `StatusPill`; label/value rows no longer overflow on
+  narrow screens or large text; very long titles wrap to three lines.
+- **Found while testing:** the list's estimated scroll extent can stop one
+  drag short of the end (the existing "scroll clear of the add button" test
+  assumed a single drag reached it); the test now drags twice.
+- **Tests:** 12 new (filter logic, search, chips, no-match, clear, empty CTA,
+  skeleton, touch-target height, upload percent); four existing assertions
+  scoped to the status pill because the chips now share the words "Ready" and
+  "Processing". 14 injected faults all caught.
+- **Device (Pixel 9 Pro XL, debug build):** list with 22 real documents shows
+  the count, search, chips and pills; the Processing chip (no matches) shows
+  "Nothing matches" with Clear filters. Seen on the device: type badges of
+  different widths (MD vs PDF) misaligned the titles, so the badge is now a
+  fixed 48px. No screenshots committed (they show real document names).

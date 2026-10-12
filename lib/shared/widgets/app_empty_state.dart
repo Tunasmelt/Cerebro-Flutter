@@ -33,6 +33,9 @@ class AppEmptyState extends StatelessWidget {
     // text, landscape) rather than overflowing.
     return LayoutBuilder(
       builder: (context, constraints) => SingleChildScrollView(
+        // Always scrollable so a parent RefreshIndicator can pull even when
+        // the content fits.
+        physics: const AlwaysScrollableScrollPhysics(),
         child: ConstrainedBox(
           constraints: BoxConstraints(minHeight: constraints.maxHeight),
           child: Center(

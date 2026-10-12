@@ -1,3 +1,4 @@
+import 'package:cerebro_mobile/shared/widgets/status_pill.dart';
 import 'package:cerebro_mobile/core/network/app_exception.dart';
 import 'package:cerebro_mobile/features/auth/data/current_user_provider.dart';
 import 'package:cerebro_mobile/features/documents/data/document.dart';
@@ -48,7 +49,13 @@ void main() {
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await tester.pumpAndSettle();
     expect(repo.listCalls, 2);
-    expect(find.text('Ready'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(StatusPill),
+        matching: find.text('Ready'),
+      ),
+      findsOneWidget,
+    );
     await tester.pumpWidget(const SizedBox());
   });
 
@@ -100,7 +107,13 @@ void main() {
     expect(find.byKey(const Key('document_row_doc-1')), findsOneWidget);
     expect(find.text('notes.txt'), findsOneWidget);
     expect(find.textContaining('2.0kb'), findsOneWidget);
-    expect(find.text('Ready'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(StatusPill),
+        matching: find.text('Ready'),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('shows the shared ErrorView, not a raw exception, on failure', (
