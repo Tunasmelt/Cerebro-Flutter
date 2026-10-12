@@ -8,6 +8,7 @@ import 'package:cerebro_mobile/features/documents/data/documents_repository_prov
 import 'package:cerebro_mobile/features/kanban/data/kanban_api.dart';
 import 'package:cerebro_mobile/features/kanban/presentation/board_screen.dart';
 import 'package:cerebro_mobile/shared/theme/app_theme.dart';
+import 'package:cerebro_mobile/shared/widgets/app_screen_header.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -57,7 +58,28 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Tasks'), findsOneWidget);
     expect(find.text('Active'), findsOneWidget);
+    // The open count sits in the header, as the card count does on Board.
+    expect(find.text('1 open'), findsOneWidget);
   });
+  testWidgets('uses the shared header, and fits a 320px phone on both tabs', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await mount(tester);
+
+    expect(find.byType(AppScreenHeader), findsOneWidget);
+    expect(find.text('My Board'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.text('Todo'));
+    await tester.pumpAndSettle();
+    expect(find.text('Tasks'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'blank title is rejected; create saves optional document and closes',
     (tester) async {

@@ -103,7 +103,7 @@ void main() {
     tester,
   ) async {
     await mount(tester);
-    await tester.tap(find.text('high'));
+    await tester.tap(find.widgetWithText(ChoiceChip, 'High'));
     await tester.pumpAndSettle();
     expect(find.text('Active task'), findsNothing);
     expect(find.text('Completed (1)'), findsOneWidget);

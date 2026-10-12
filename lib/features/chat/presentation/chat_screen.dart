@@ -298,15 +298,31 @@ class _EmptyState extends ConsumerWidget {
                   color: AppColors.textSecondary,
                 ),
               ),
+              if (titles.isNotEmpty) const SizedBox(height: AppSpacing.s4),
+              // Outlined, full-width, left-aligned: they read as tappable
+              // suggestions rather than loose lines of coloured text.
               for (final title in titles)
-                TextButton.icon(
-                  onPressed: () =>
-                      onPrompt('Summarize the key points in "$title".'),
-                  icon: const Icon(Icons.auto_awesome_outlined),
-                  label: Text(
-                    'Summarize $title',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                Padding(
+                  padding: const EdgeInsets.only(top: AppSpacing.s2),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        alignment: Alignment.centerLeft,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.s3,
+                          vertical: AppSpacing.s3,
+                        ),
+                      ),
+                      onPressed: () =>
+                          onPrompt('Summarize the key points in "$title".'),
+                      icon: const Icon(Icons.auto_awesome_outlined, size: 18),
+                      label: Text(
+                        'Summarize $title',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                   ),
                 ),
             ],

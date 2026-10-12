@@ -1,7 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../shared/tokens/app_colors.dart';
+import '../../../shared/tokens/app_radius.dart';
+import '../../../shared/tokens/app_shadows.dart';
+import '../../../shared/tokens/app_spacing.dart';
 import '../../../shared/tokens/app_typography.dart';
+import '../../../shared/widgets/status_pill.dart';
 import '../data/kanban_board.dart';
 
 /// Native dragging and menu alternatives. Indices exclude the moved card.
@@ -30,6 +35,10 @@ class KanbanView extends StatefulWidget {
 class _KanbanViewState extends State<KanbanView> {
   final _scroll = ScrollController();
   final _dropKeys = <(String, int, bool), GlobalKey>{};
+
+  /// Column width: most of the screen on a phone (so the next column peeks
+  /// in as a hint to scroll), capped on a tablet.
+  double _columnWidth = 272;
   Offset? _dragPosition;
   Timer? _edgeTimer;
   double _edgeStep = 0;
@@ -127,7 +136,7 @@ class _KanbanViewState extends State<KanbanView> {
             color: candidates.isEmpty
                 ? Colors.transparent
                 : AppColors.accentPrimarySubtle,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: AppRadius.lgRadius,
           ),
           child: child,
         ),
@@ -138,7 +147,12 @@ class _KanbanViewState extends State<KanbanView> {
     final body = Card(
       key: ValueKey('kanban_card_${card.id}'),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 6, 8, 12),
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.s3,
+          AppSpacing.s2,
+          AppSpacing.s2,
+          AppSpacing.s3,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -149,11 +163,14 @@ class _KanbanViewState extends State<KanbanView> {
                   size: 18,
                   color: AppColors.textSecondary,
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: AppSpacing.s2),
                 Expanded(
                   child: Text(
                     card.title,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
+                    style: AppTypography.base.copyWith(
+                      fontWeight: AppTypography.weightSemibold,
+                      color: AppColors.textPrimary,
+                    ),
                   ),
                 ),
                 PopupMenuButton<(String, String?)>(
@@ -209,7 +226,9 @@ class _KanbanViewState extends State<KanbanView> {
                 card.description,
                 maxLines: 4,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: AppColors.textSecondary),
+                style: AppTypography.sm.copyWith(
+                  color: AppColors.textSecondary,
+                ),
               ),
             if (card.documentId case final String id)
               Padding(
@@ -231,18 +250,30 @@ class _KanbanViewState extends State<KanbanView> {
       data: card,
       maxSimultaneousDrags: widget.saving ? 0 : 1,
       onDragUpdate: _dragUpdate,
+      // LongPressDraggable already gives a selection haptic on pick-up.
       onDragStarted: () => _dragPosition = null,
       onDragEnd: (details) {
         if (details.wasAccepted) {
+          HapticFeedback.lightImpact();
           _finishDrag(card);
         } else {
           _stopScroll();
           _dragPosition = null;
         }
       },
+      // Lifted: slightly larger, with a deep shadow, so it reads as held.
       feedback: Material(
         color: Colors.transparent,
-        child: SizedBox(width: 256, child: body),
+        child: SizedBox(
+          width: _columnWidth - AppSpacing.s4,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: AppRadius.lgRadius,
+              boxShadow: AppShadows.lg,
+            ),
+            child: Transform.scale(scale: 1.03, child: body),
+          ),
+        ),
       ),
       childWhenDragging: Opacity(opacity: 0.3, child: body),
       child: body,
@@ -250,11 +281,23 @@ class _KanbanViewState extends State<KanbanView> {
   }
 
   @override
-  Widget build(BuildContext context) => SingleChildScrollView(
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      _columnWidth = (constraints.maxWidth * 0.82).clamp(260.0, 340.0);
+      return _columns();
+    },
+  );
+
+  Widget _columns() => SingleChildScrollView(
     key: const Key('kanban_columns'),
     scrollDirection: Axis.horizontal,
     controller: _scroll,
-    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+    padding: const EdgeInsets.fromLTRB(
+      AppSpacing.s4,
+      0,
+      AppSpacing.s4,
+      AppSpacing.s4,
+    ),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -262,9 +305,9 @@ class _KanbanViewState extends State<KanbanView> {
           (column) => (column, widget.board.inColumn(column)),
         ))
           Padding(
-            padding: const EdgeInsets.only(right: 12),
+            padding: const EdgeInsets.only(right: AppSpacing.s3),
             child: SizedBox(
-              width: 272,
+              width: _columnWidth,
               child: Column(
                 children: [
                   _drop(
@@ -275,15 +318,16 @@ class _KanbanViewState extends State<KanbanView> {
                         Expanded(
                           child: Text(
                             column.toUpperCase(),
-                            style: const TextStyle(
+                            style: AppTypography.xs.copyWith(
                               color: AppColors.textSecondary,
-                              fontWeight: FontWeight.w600,
+                              fontWeight: AppTypography.weightSemibold,
+                              letterSpacing: 0.8,
                             ),
                           ),
                         ),
-                        Text(
-                          '${cards.length}',
-                          style: AppTypography.mono(AppTypography.sm),
+                        StatusPill(
+                          label: '${cards.length}',
+                          color: AppColors.textSecondary,
                         ),
                         IconButton(
                           tooltip: 'Add card to $column',
@@ -314,6 +358,7 @@ class _KanbanViewState extends State<KanbanView> {
                                 'Drop cards here',
                                 style: TextStyle(
                                   color: AppColors.textSecondary,
+                                  fontSize: 13,
                                 ),
                               ),
                             ),
