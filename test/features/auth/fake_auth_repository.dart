@@ -18,6 +18,7 @@ class FakeAuthRepository implements AuthRepository {
 
   int signInCalls = 0;
   int signUpCalls = 0;
+  int signOutCalls = 0;
 
   @override
   String? get currentUserId => _userId;
@@ -67,6 +68,7 @@ class FakeAuthRepository implements AuthRepository {
 
   @override
   Future<void> signOut() async {
+    signOutCalls++;
     _userId = null;
     _controller.add(null);
   }
