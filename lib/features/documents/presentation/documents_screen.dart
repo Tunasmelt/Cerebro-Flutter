@@ -306,10 +306,9 @@ class _DocumentRow extends StatelessWidget {
           child: Row(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.s2,
-                  vertical: AppSpacing.s1,
-                ),
+                width: 48,
+                alignment: Alignment.center,
+                padding: const EdgeInsets.symmetric(vertical: AppSpacing.s1),
                 decoration: BoxDecoration(
                   color: typeColor.withValues(alpha: 0.12),
                   borderRadius: AppRadius.smRadius,

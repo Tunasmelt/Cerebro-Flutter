@@ -2158,3 +2158,8 @@ still needs its own layout work — phases B and E.
   skeleton, touch-target height, upload percent); four existing assertions
   scoped to the status pill because the chips now share the words "Ready" and
   "Processing". 14 injected faults all caught.
+- **Device (Pixel 9 Pro XL, debug build):** list with 22 real documents shows
+  the count, search, chips and pills; the Processing chip (no matches) shows
+  "Nothing matches" with Clear filters. Seen on the device: type badges of
+  different widths (MD vs PDF) misaligned the titles, so the badge is now a
+  fixed 48px. No screenshots committed (they show real document names).
