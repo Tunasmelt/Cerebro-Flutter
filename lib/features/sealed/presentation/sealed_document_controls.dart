@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../shared/tokens/app_colors.dart';
+import '../../../shared/tokens/app_radius.dart';
+import '../../../shared/tokens/app_spacing.dart';
+import '../../../shared/tokens/app_typography.dart';
 import '../../auth/data/current_user_provider.dart';
 import '../../documents/data/document.dart';
 import '../../documents/data/document_detail_provider.dart';
@@ -26,6 +29,7 @@ class _ControlsState extends ConsumerState<SealedDocumentControls> {
   final _password = TextEditingController();
   bool _prompt = false;
   bool _busy = false;
+  bool _reveal = false;
   String? _error;
   int _generation = 0;
 
@@ -130,88 +134,234 @@ class _ControlsState extends ConsumerState<SealedDocumentControls> {
     if (!sealing && widget.status != DocumentStatus.sealed) {
       return const SizedBox.shrink();
     }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 16),
-        if (unlock != null) ...[
-          Text(
-            'Unlocked · ${unlock.expiresAt.difference(DateTime.now()).inSeconds.clamp(0, 900) ~/ 60}m '
-            '${unlock.expiresAt.difference(DateTime.now()).inSeconds.clamp(0, 900) % 60}s remaining',
-            key: const Key('sealed_countdown'),
-            style: const TextStyle(color: AppColors.accentLocked),
+    final remaining = unlock?.expiresAt
+        .difference(DateTime.now())
+        .inSeconds
+        .clamp(0, 900);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.s4),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppSpacing.s4),
+        decoration: BoxDecoration(
+          color: AppColors.accentLockedSubtle,
+          borderRadius: AppRadius.lgRadius,
+          border: Border.all(
+            color: AppColors.accentLocked.withValues(alpha: 0.35),
           ),
-          const Text(
-            'Available in chat until this unlock expires. Content stays in memory.',
-          ),
-          TextButton.icon(
-            key: const Key('sealed_lock'),
-            onPressed: () => ref
-                .read(unlockSessionProvider.notifier)
-                .forget(widget.documentId),
-            icon: const Icon(Icons.lock_outline),
-            label: const Text('Lock now'),
-          ),
-          Text(unlock.content, key: const Key('sealed_content')),
-        ] else if (!_prompt) ...[
-          OutlinedButton.icon(
-            key: const Key('sealed_open_prompt'),
-            onPressed: () => setState(() {
-              _prompt = true;
-              _error = null;
-            }),
-            icon: Icon(
-              sealing ? Icons.lock_outline : Icons.lock_open,
-              color: AppColors.accentLocked,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  unlock != null ? Icons.lock_open : Icons.lock_outline,
+                  color: AppColors.accentLocked,
+                  size: 20,
+                ),
+                const SizedBox(width: AppSpacing.s2),
+                Expanded(
+                  child: Text(
+                    unlock != null
+                        ? 'Unlocked'
+                        : sealing
+                        ? 'Seal this document'
+                        : 'Sealed',
+                    style: AppTypography.base.copyWith(
+                      color: AppColors.accentLocked,
+                      fontWeight: AppTypography.weightSemibold,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            label: Text(sealing ? 'Seal document' : 'Unlock document'),
-          ),
-        ] else ...[
-          Text(
-            sealing
-                ? 'Sealing removes this document’s content from search. Keep your passphrase: it cannot be recovered.'
-                : 'Unlock for up to 15 minutes with the passphrase used to seal this document.',
-          ),
-          TextField(
-            key: const Key('sealed_passphrase'),
-            controller: _password,
-            enabled: !_busy,
-            obscureText: true,
-            autocorrect: false,
-            enableSuggestions: false,
-            enableIMEPersonalizedLearning: false,
-            decoration: const InputDecoration(labelText: 'Passphrase'),
-            onChanged: (_) => setState(() {}),
-            onSubmitted: (_) => _submit(),
-          ),
-          Wrap(
-            children: [
-              FilledButton(
-                key: const Key('sealed_confirm'),
-                onPressed: _busy || _password.text.isEmpty ? null : _submit,
-                child: Text(
-                  _busy
-                      ? 'Working…'
-                      : sealing
-                      ? 'Confirm seal'
-                      : 'Unlock',
+            const SizedBox(height: AppSpacing.s3),
+            if (unlock != null) ...[
+              Text(
+                'Unlocked · ${remaining! ~/ 60}m ${remaining % 60}s remaining',
+                key: const Key('sealed_countdown'),
+                style: AppTypography.mono(
+                  AppTypography.sm,
+                ).copyWith(color: AppColors.accentLocked),
+              ),
+              const SizedBox(height: AppSpacing.s1),
+              Text(
+                'Available in chat until this unlock expires. Content stays '
+                'in memory.',
+                style: AppTypography.sm.copyWith(
+                  color: AppColors.textSecondary,
                 ),
               ),
-              TextButton(
-                onPressed: _busy
-                    ? null
-                    : () => setState(() {
-                        _prompt = false;
-                        _password.clear();
-                        _error = null;
-                      }),
-                child: const Text('Cancel'),
+              const SizedBox(height: AppSpacing.s3),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(AppSpacing.s3),
+                decoration: BoxDecoration(
+                  color: AppColors.bgBase,
+                  borderRadius: AppRadius.mdRadius,
+                  border: Border.all(color: AppColors.borderSubtle),
+                ),
+                child: Text(
+                  unlock.content,
+                  key: const Key('sealed_content'),
+                  style: AppTypography.sm.copyWith(
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.s3),
+              SizedBox(
+                width: double.infinity,
+                height: AppSpacing.minTouchTarget,
+                child: OutlinedButton.icon(
+                  key: const Key('sealed_lock'),
+                  onPressed: () => ref
+                      .read(unlockSessionProvider.notifier)
+                      .forget(widget.documentId),
+                  icon: const Icon(Icons.lock_outline),
+                  label: const Text('Lock now'),
+                ),
+              ),
+            ] else if (!_prompt) ...[
+              Text(
+                sealing
+                    ? 'Sealing removes this document’s content from search. '
+                          'You choose a passphrase to open it again.'
+                    : 'Its content is hidden from search and chat until you '
+                          'unlock it with your passphrase.',
+                style: AppTypography.sm.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.s3),
+              SizedBox(
+                width: double.infinity,
+                height: AppSpacing.minTouchTarget,
+                child: OutlinedButton.icon(
+                  key: const Key('sealed_open_prompt'),
+                  onPressed: () => setState(() {
+                    _prompt = true;
+                    _error = null;
+                  }),
+                  icon: Icon(
+                    sealing ? Icons.lock_outline : Icons.lock_open,
+                    color: AppColors.accentLocked,
+                  ),
+                  label: Text(sealing ? 'Seal document' : 'Unlock document'),
+                ),
+              ),
+            ] else ...[
+              Text(
+                sealing
+                    ? 'Sealing removes this document’s content from search. Keep your passphrase: it cannot be recovered.'
+                    : 'Unlock for up to 15 minutes with the passphrase used to seal this document.',
+                style: AppTypography.sm.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.s3),
+              TextField(
+                key: const Key('sealed_passphrase'),
+                controller: _password,
+                enabled: !_busy,
+                obscureText: !_reveal,
+                autocorrect: false,
+                enableSuggestions: false,
+                enableIMEPersonalizedLearning: false,
+                textInputAction: TextInputAction.done,
+                style: AppTypography.sm.copyWith(color: AppColors.textPrimary),
+                decoration: InputDecoration(
+                  labelText: 'Passphrase',
+                  suffixIcon: IconButton(
+                    key: const Key('sealed_reveal'),
+                    tooltip: _reveal ? 'Hide passphrase' : 'Show passphrase',
+                    icon: Icon(
+                      _reveal
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                      size: 20,
+                    ),
+                    onPressed: () => setState(() => _reveal = !_reveal),
+                  ),
+                ),
+                onChanged: (_) => setState(() {}),
+                onSubmitted: (_) => _submit(),
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: AppSpacing.s3),
+                Semantics(
+                  liveRegion: true,
+                  container: true,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.s3,
+                      vertical: AppSpacing.s2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.dangerSubtle,
+                      borderRadius: AppRadius.mdRadius,
+                    ),
+                    child: Text(
+                      _error!,
+                      key: const Key('sealed_error'),
+                      style: AppTypography.xs.copyWith(
+                        color: AppColors.dangerHover,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: AppSpacing.s3),
+              Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: AppSpacing.minTouchTarget,
+                      child: TextButton(
+                        onPressed: _busy
+                            ? null
+                            : () => setState(() {
+                                _prompt = false;
+                                _reveal = false;
+                                _password.clear();
+                                _error = null;
+                              }),
+                        child: const Text('Cancel'),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.s2),
+                  Expanded(
+                    flex: 2,
+                    child: SizedBox(
+                      height: AppSpacing.minTouchTarget,
+                      child: FilledButton(
+                        key: const Key('sealed_confirm'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.accentLocked,
+                          foregroundColor: AppColors.textOnAccent,
+                        ),
+                        onPressed: _busy || _password.text.isEmpty
+                            ? null
+                            : _submit,
+                        child: Text(
+                          _busy
+                              ? 'Working…'
+                              : sealing
+                              ? 'Confirm seal'
+                              : 'Unlock',
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
-          ),
-          if (_error != null) Text(_error!, key: const Key('sealed_error')),
-        ],
-      ],
+          ],
+        ),
+      ),
     );
   }
 }

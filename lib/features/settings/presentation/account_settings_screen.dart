@@ -4,6 +4,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/network/app_exception.dart';
 import '../../../core/network/generated_api_client_provider.dart';
+import '../../../shared/tokens/app_colors.dart';
+import '../../../shared/tokens/app_spacing.dart';
+import '../../../shared/tokens/app_typography.dart';
 import '../../auth/data/auth_exception.dart';
 import '../../auth/data/auth_notifier.dart';
 import '../../auth/data/current_user_provider.dart';
@@ -195,6 +198,36 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
     ),
   );
 
+  /// A small caps label above a group of fields (same look as the section
+  /// headers on the Settings tab, without their extra side padding).
+  Widget _section(String label, {Color? color}) => Padding(
+    padding: const EdgeInsets.only(top: AppSpacing.s6, bottom: AppSpacing.s2),
+    child: Semantics(
+      header: true,
+      child: Text(
+        label.toUpperCase(),
+        style: AppTypography.xs.copyWith(
+          color: color ?? AppColors.textSecondary,
+          fontWeight: AppTypography.weightSemibold,
+          letterSpacing: 0.8,
+        ),
+      ),
+    ),
+  );
+
+  Widget _hint(String text) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: AppSpacing.s2),
+    child: Text(
+      text,
+      style: AppTypography.sm.copyWith(color: AppColors.textSecondary),
+    ),
+  );
+
+  Widget _full(Widget button) => Padding(
+    padding: const EdgeInsets.only(top: AppSpacing.s2),
+    child: SizedBox(width: double.infinity, child: button),
+  );
+
   @override
   Widget build(BuildContext context) {
     if (ref.watch(currentUserIdProvider) != widget.account.id) {
@@ -221,38 +254,58 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
           padding: const EdgeInsets.all(16),
           children: [
             if (_busy) const LinearProgressIndicator(),
-            const Text('Profile'),
+            _section('Profile'),
             _field('Display name', _name),
             _field('Avatar URL', _avatar),
-            FilledButton(
-              onPressed: _busy ? null : _saveProfile,
-              child: const Text('Save profile'),
+            _full(
+              FilledButton(
+                onPressed: _busy ? null : _saveProfile,
+                child: const Text('Save profile'),
+              ),
             ),
-            const Divider(),
+            _section('Email'),
             _field('Email address', _email),
-            const Text('Changing your email requires confirmation.'),
-            OutlinedButton(
-              onPressed: _busy ? null : _saveEmail,
-              child: const Text('Change email'),
+            _hint('Changing your email requires confirmation.'),
+            _full(
+              OutlinedButton(
+                onPressed: _busy ? null : _saveEmail,
+                child: const Text('Change email'),
+              ),
             ),
-            const Divider(),
+            _section('Password'),
             _field('New password', _password, secret: true),
             _field('Confirm password', _confirmPassword, secret: true),
-            OutlinedButton(
-              onPressed: _busy ? null : _savePassword,
-              child: const Text('Update password'),
+            _full(
+              OutlinedButton(
+                onPressed: _busy ? null : _savePassword,
+                child: const Text('Update password'),
+              ),
             ),
-            const Divider(),
-            const Text('Delete vault data'),
-            const Text(
+            _section('Danger zone', color: AppColors.danger),
+            Text(
+              'Delete vault data',
+              style: AppTypography.base.copyWith(
+                color: AppColors.textPrimary,
+                fontWeight: AppTypography.weightSemibold,
+              ),
+            ),
+            _hint(
               'Permanently removes your documents, chats, boards and tasks, including sealed content. Your sign-in account remains. This cannot be undone.',
             ),
             _field('Type DELETE to confirm', _delete),
             ListenableBuilder(
               listenable: _delete,
-              builder: (context, _) => OutlinedButton(
-                onPressed: _busy || _delete.text != 'DELETE' ? null : _wipe,
-                child: const Text('Delete vault data'),
+              builder: (context, _) => _full(
+                OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.danger,
+                    side: BorderSide(
+                      color: AppColors.danger.withValues(alpha: 0.6),
+                    ),
+                  ),
+                  onPressed: _busy || _delete.text != 'DELETE' ? null : _wipe,
+                  child: const Text('Delete vault data'),
+                ),
               ),
             ),
           ],

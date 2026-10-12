@@ -2240,3 +2240,33 @@ Owner-reported on a real device (see `UI-BACKLOG.md`).
   card, priority styles, chip labels/alignment, skeleton, empty state, 320px
   fit for both tabs, chat suggestions); 17 injected faults, all caught.
   Emulator (profile build): Board header/columns/peek, Tasks header and chips.
+
+### UI/UX pass - E3: Settings, Account, Sealed
+- **Settings:** the shared screen header; the account row and the tool rows
+  (Token Inspector, Data sources, Appearance) are grouped in cards with
+  chevrons on the tappable ones. **Appearance** is shown as plain information
+  (the app is dark-only; there is nothing to choose) instead of looking like a
+  setting. Section labels (Data & storage, Sealed documents, Connection) use the
+  shared section header, and the explanatory paragraphs are styled as secondary
+  text. **Sign out now asks first** ("Sign out?").
+- **Account settings:** fields grouped under Profile / Email / Password / Danger
+  zone headings, full-width buttons, hints styled as secondary text, and the
+  destructive "Delete vault data" button is red. The typed-DELETE gate and every
+  behaviour are unchanged.
+- **Sealed (the live control on the document screen):** now an amber lock card
+  (amber stays sealed-only): a heading ("Sealed" / "Seal this document" /
+  "Unlocked"), an explanation, a passphrase field with a show/hide eye, 44px
+  Cancel / Unlock-or-Confirm-seal buttons, the countdown in amber monospace, the
+  unlocked text in its own box, a full-width Lock now button, and the error in a
+  screen-reader live region. Every key and message the existing tests use is
+  unchanged. The old unwired sealed screen, unlock sheet and demo switcher (and
+  their test) were deleted: nothing in the app used them.
+- **Found while building:** a patch script I wrote saved the curly apostrophes
+  in the sealed text in the wrong encoding; the compiler caught it at once. All
+  changed files were checked as valid UTF-8.
+- **Not done:** the version/help/legal rows and a settings-wide "storage by
+  document" redesign; they need data the app does not have yet (a version
+  package, real legal URLs).
+- **Tests:** 17 new (sign-out prompt both ways, grouping, Appearance not a
+  button, chevrons; sealed card, reveal, cancel, touch targets, countdown,
+  live-region error, wrong-status hidden); 15 injected faults, all caught.

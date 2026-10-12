@@ -287,6 +287,9 @@ void main() {
     button.onPressed!();
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.byKey(const Key('settings_sign_out_confirm')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.byKey(const Key('sign_in_submit')), findsOneWidget);
   });

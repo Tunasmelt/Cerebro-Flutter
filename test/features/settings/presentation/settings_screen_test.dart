@@ -5,6 +5,8 @@ import 'package:cerebro_mobile/core/network/connection_status_notifier.dart';
 import 'package:cerebro_mobile/features/auth/data/auth_notifier.dart';
 import 'package:cerebro_mobile/features/settings/presentation/settings_screen.dart';
 import 'package:cerebro_mobile/shared/theme/app_theme.dart';
+import 'package:cerebro_mobile/shared/widgets/app_screen_header.dart';
+import 'package:cerebro_mobile/shared/widgets/app_section_header.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -65,7 +67,13 @@ void main() {
     );
     await tester.tap(find.byKey(const Key('settings_sign_out')));
     await tester.pumpAndSettle();
+    // Signing out asks first; nothing happens until it is confirmed.
+    expect(find.text('Sign out?'), findsOneWidget);
+    expect(fakeRepository.signOutCalls, 0);
+    await tester.tap(find.byKey(const Key('settings_sign_out_confirm')));
+    await tester.pumpAndSettle();
 
+    expect(fakeRepository.signOutCalls, 1);
     expect(fakeRepository.currentUserId, isNull);
   });
 
@@ -195,6 +203,64 @@ void main() {
       await tester.pump();
 
       expect(fake.checkCount, 2);
+    });
+  });
+
+  group('grouping and sign-out confirmation (UI pass E3)', () {
+    Future<void> mountTall(WidgetTester tester) async {
+      await tester.binding.setSurfaceSize(const Size(400, 1600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(buildApp(extraOverrides: [connectedOverride()]));
+      await tester.pump();
+    }
+
+    testWidgets('uses the shared header and section headers', (tester) async {
+      await mountTall(tester);
+      expect(find.byType(AppScreenHeader), findsOneWidget);
+      final sections = [
+        for (final h in tester.widgetList<AppSectionHeader>(
+          find.byType(AppSectionHeader),
+        ))
+          h.label,
+      ];
+      expect(
+        sections,
+        containsAll(['Data & storage', 'Sealed documents', 'Connection']),
+      );
+    });
+
+    testWidgets('Appearance is information, not a button', (tester) async {
+      await mountTall(tester);
+      final tile = tester.widget<ListTile>(
+        find.widgetWithText(ListTile, 'Appearance'),
+      );
+      expect(tile.onTap, isNull);
+      expect(tile.trailing, isNull);
+    });
+
+    testWidgets('tappable rows show a chevron', (tester) async {
+      await mountTall(tester);
+      for (final title in ['Token Inspector', 'Data sources']) {
+        final tile = tester.widget<ListTile>(
+          find.widgetWithText(ListTile, title),
+        );
+        expect(tile.onTap, isNotNull, reason: title);
+        expect(tile.trailing, isA<Icon>(), reason: title);
+      }
+    });
+
+    testWidgets('cancelling the sign-out prompt keeps you signed in', (
+      tester,
+    ) async {
+      await mountTall(tester);
+      await tester.tap(find.byKey(const Key('settings_sign_out')));
+      await tester.pumpAndSettle();
+      expect(find.text('Sign out?'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('settings_sign_out_cancel')));
+      await tester.pumpAndSettle();
+      expect(find.text('Sign out?'), findsNothing);
+      expect(fakeRepository.signOutCalls, 0);
     });
   });
 }
