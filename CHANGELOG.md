@@ -2213,6 +2213,34 @@ Owner-reported on a real device (see `UI-BACKLOG.md`).
   tile, full-width card, eye toggle, and the red inline messages after an empty
   submit.
 
+### UI/UX pass - E2: Board and Tasks, plus small refinements found on a walk of the app
+- **Board header:** the shared `AppScreenHeader` (title + "7 cards" + refresh)
+  replaces the hand-built row; the Tasks tab shows its open count ("1 open")
+  in the same place, so the Board/Todo switch no longer jumps position.
+- **Columns:** width follows the screen (82% of it, 260-340px) instead of a
+  fixed 272, so on a phone the next column peeks in as a hint to scroll and a
+  tablet gets wider columns. Headers use type tokens, with the card count as a
+  pill. Spacing/radius literals replaced by tokens.
+- **Dragging:** the held card is lifted (3% larger, deep shadow) and a light
+  impact is felt on drop; the pick-up haptic is Flutter's own (an extra one I
+  first added doubled it, so I removed mine).
+- **Tasks:** priority is a coloured pill in words (High red, Medium teal, Low
+  grey; never amber, which is for sealed only) instead of grey "High priority"
+  text; filter chips read All / Low / Medium / High and start at the left edge
+  (they were centred); skeleton rows while loading; the empty state gets an
+  icon.
+- **Found by testing:** the Tasks header (Add task + open count + refresh)
+  overflowed by 18px on a 320px-wide phone. The count moved to the screen
+  header, which also fixed it.
+- **Refinement from the walk:** Chat's suggested prompts were bare lines of
+  violet text; they are now outlined, full-width buttons.
+- **Not changed (judged redundant by a mutation check):** the task editor's
+  fixed 360px width already shrinks inside AlertDialog on a 320px phone.
+- **Tests:** 20 new (column width at 300/400/1200, count pills, haptics, lifted
+  card, priority styles, chip labels/alignment, skeleton, empty state, 320px
+  fit for both tabs, chat suggestions); 17 injected faults, all caught.
+  Emulator (profile build): Board header/columns/peek, Tasks header and chips.
+
 ### UI/UX pass - E3: Settings, Account, Sealed
 - **Settings:** the shared screen header; the account row and the tool rows
   (Token Inspector, Data sources, Appearance) are grouped in cards with
