@@ -2351,6 +2351,65 @@ Owner-reported on a real device (see `UI-BACKLOG.md`).
   0.5s; not diagnosed (see the PR).
 - **Still to do:** F5, the one approved `POST /graph/recluster` check.
 
+### UI/UX pass - G: cross-cutting QA and the design record
+- **QA harness** (`test/qa/`): one pass over nine screens (Sign in, Sign up,
+  Documents, Chat, Board/Tasks, Settings, Account settings, Graph) at a 320px
+  phone, a 400px phone and an 840px tablet, at normal and 1.3x text. It checks
+  that nothing overflows, that tappable things are at least 44pt (Flutter's
+  `iOSTapTargetGuideline`) and that every tappable thing has a spoken label
+  (`labeledTapTargetGuideline`). Adding a screen is one entry in a list. 56
+  checks.
+- **Two real findings, both on the Graph:** the search field was 42px tall (now
+  a 44px target), and the background tap-to-collapse / double-tap-to-zoom
+  gestures (F2) were announced to screen readers as a full-screen button with no
+  name; they are now excluded from semantics (the node panel's close button and
+  the zoom buttons are the accessible routes). Both failed the harness before
+  the fixes.
+- **Harness checked with injected faults:** a missing tooltip, the graph gesture
+  back in semantics and a 20px search field are caught. Two other mutations
+  survived and were right to: a 30px button (Material pads small buttons back to
+  a 48px hit area) and a 600px card (its width is clamped to the screen).
+- **`DESIGN.md`** is generated from the token files and shared widgets by
+  `dart tool/generate_design_md.dart`: 54 colours, 14 spacing, 4 radii, 9 type
+  styles, motion, elevation, 12 shared components, the patterns and the rules
+  the tests enforce. `test/shared/design_md_test.dart` fails if a token or shared
+  widget is missing from it (verified by removing one of each).
+- **Text contrast** stays measured from the tokens
+  (`test/shared/app_contrast_test.dart`), not from screenshots.
+- **Device verification so far (emulator unless noted):** Documents, Sign in,
+  Settings, Sealed card, Board, Tasks, Chat suggestions, Graph (A-F4) were each
+  looked at on the emulator in their own phase; the owner's Pixel has had builds
+  from D onward. A final all-screens pass on a **release** build is still the
+  owner's, with the real-device items already recorded: scroll feel on a profile
+  build, TalkBack on hardware, graph FPS.
+- **Not done / owner:** the recluster result (F5) and the chat generation stall
+  are backend issues recorded in the F5 entry; the recluster fix is a separate
+  PR in the web/API repo.
+
+### UI/UX pass - F5: the approved recluster check (result: the backend did not finish)
+The owner approved exactly one `POST /graph/recluster` on the test account.
+- **Before:** `GET /graph/nodes` returned 26 nodes, none placed (no cluster_id,
+  x or y); `GET /graph/edges` returned 0 edges. The app shows this as "Documents
+  are spread evenly until Cerebro groups them."
+- **The call:** `POST /graph/recluster` -> **202** `{"status":"recluster_started"}`.
+- **After:** polled both endpoints every 4s for 2 minutes (30 reads). Nothing
+  changed: still 26 nodes, 0 placed, 0 clusters, 0 edges. The background job did
+  not produce a layout in that time.
+- **Not repeated:** one call was approved, so there was no second attempt. The
+  same account's live chat question (asked from the Graph tab on the same day)
+  also stayed on "Searching your documents..." for over 90 seconds while
+  `/health` answered in 0.5s. Both depend on server-side work after the
+  response (embeddings / background tasks); a common cause on the server is
+  plausible but unconfirmed. The Render logs were not read (the tool needs the
+  owner to confirm a workspace).
+- **What this means for the app:** the graph's clustered view (positions and
+  edges) has still not been seen against real data. The fit-to-view, legend,
+  zoom and pulse work was verified on the unclustered layout and by widget
+  tests with clustered fixtures only. Nothing in the app changed for F5.
+- **Next step for the owner:** check the Render logs for the API around the
+  recluster and for `POST /chat/.../stream`; then a second recluster (needs a
+  fresh approval) will show whether it was a transient stall.
+
 ### Document management: rename, delete any document, write a note
 - **Gap:** the app could only delete failed uploads, had no rename, and no way
   to type a note. Web has all three.
