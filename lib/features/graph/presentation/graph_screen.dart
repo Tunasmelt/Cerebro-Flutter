@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -12,6 +13,8 @@ import '../../../shared/tokens/app_colors.dart';
 import '../../../shared/tokens/app_radius.dart';
 import '../../../shared/tokens/app_spacing.dart';
 import '../../../shared/tokens/app_typography.dart';
+import '../../../shared/widgets/app_empty_state.dart';
+import '../../../shared/widgets/app_skeleton.dart';
 import '../../../shared/widgets/error_view.dart';
 import '../../chat/data/chat_controller.dart';
 import '../../chat/data/chat_history_api.dart';
@@ -20,6 +23,7 @@ import '../data/graph_expansion.dart';
 import '../data/graph_layout.dart';
 import '../data/graph_models.dart';
 import '../data/graph_pulse.dart';
+import 'models/graph_node.dart';
 import 'widgets/graph_answer_card.dart';
 import 'widgets/graph_ask_bar.dart';
 import 'widgets/graph_legend.dart';
@@ -64,6 +68,8 @@ class _GraphScreenState extends ConsumerState<GraphScreen>
   /// The latest answer is shown over the graph once a question has been asked
   /// from it (until dismissed).
   bool _showAnswer = false;
+  bool _listView = false;
+  bool _reduceMotion = false;
 
   /// The pulse animation: restarted by every pulse, 0 -> 1 over
   /// [pulseDuration]. The dots listen to it directly, so a pulse repaints only
@@ -72,6 +78,7 @@ class _GraphScreenState extends ConsumerState<GraphScreen>
 
   /// The documents of the pulse in flight.
   Set<String> _pulsingIds = const {};
+  Timer? _pulseClear;
 
   /// The package's graph for [_builtFrom]; rebuilt only when a new snapshot
   /// arrives, never on every frame.
@@ -89,6 +96,7 @@ class _GraphScreenState extends ConsumerState<GraphScreen>
     ref.listenManual<GraphPulseState>(graphPulseProvider, (previous, next) {
       final pulse = next.pulse;
       if (pulse == null && previous?.pulse != null) {
+        _pulseClear?.cancel();
         _pulsingIds = const {};
         _pulseAnim.value = 1;
         _controller?.needUpdate();
@@ -99,10 +107,21 @@ class _GraphScreenState extends ConsumerState<GraphScreen>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final reduced = MediaQuery.disableAnimationsOf(context);
+    if (_reduceMotion == reduced) return;
+    _reduceMotion = reduced;
+    if (reduced) _pulseAnim.stop();
+    _controller?.needUpdate();
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     _askController.dispose();
     _pulseAnim.dispose();
+    _pulseClear?.cancel();
     _controller?.dispose();
     super.dispose();
   }
@@ -184,6 +203,14 @@ class _GraphScreenState extends ConsumerState<GraphScreen>
     final node = _nodeFor(controller, id);
     if (node == null) return;
     final height = _canvasSize.height;
+    if (_usesSidePanel) {
+      final panelWidth = math.min(420.0, _canvasSize.width * 0.42);
+      controller.locateToPosition(
+        node.position.x + panelWidth / (2 * controller.scale),
+        node.position.y,
+      );
+      return;
+    }
     // The graph's origin is the middle of the view; y points up.
     final padding = MediaQuery.paddingOf(context);
     final panelTop =
@@ -192,6 +219,9 @@ class _GraphScreenState extends ConsumerState<GraphScreen>
     final targetY = (height / 2 - visibleMiddle) / controller.scale;
     controller.locateToPosition(node.position.x, node.position.y - targetY);
   }
+
+  bool get _usesSidePanel =>
+      _canvasSize.width >= 840 || _canvasSize.width > _canvasSize.height;
 
   void _nextMatch(GraphSnapshot snapshot) {
     final matches = snapshot.nodes.where(_matches).toList();
@@ -223,10 +253,20 @@ class _GraphScreenState extends ConsumerState<GraphScreen>
   /// start. The package builds its nodes only when told something changed, so
   /// it is told once here; after that the dots animate themselves.
   void _startPulse(GraphPulse pulse) {
+    _pulseClear?.cancel();
     _pulsingIds = pulse.documentIds.toSet();
     HapticFeedback.lightImpact();
-    _pulseAnim.forward(from: 0);
+    if (_reduceMotion) {
+      _pulseAnim.stop();
+    } else {
+      _pulseAnim.forward(from: 0);
+    }
     _controller?.needUpdate();
+    _pulseClear = Timer(pulseDuration, () {
+      if (!mounted) return;
+      _pulsingIds = const {};
+      _controller?.needUpdate();
+    });
   }
 
   void _handleAsk(String text) {
@@ -313,19 +353,60 @@ class _GraphScreenState extends ConsumerState<GraphScreen>
     };
     final expanded = expansion.nodeId == null ? null : byId[expansion.nodeId];
 
+    Widget nodePanel(
+      GraphNodeData node,
+      ScrollController? scrollController, {
+      bool sideSheet = false,
+    }) => NodeInfoPanel(
+      node: node,
+      expansion: expansion,
+      scrollController: scrollController,
+      sideSheet: sideSheet,
+      onClose: ref.read(graphExpansionProvider.notifier).collapse,
+      onRetry: ref.read(graphExpansionProvider.notifier).retry,
+      onSelectChunk: ref.read(graphExpansionProvider.notifier).selectChunk,
+      onChatAboutThis: () {
+        if (chat.busy || chat.loading) return;
+        if (node.type == GraphNodeType.sealed) {
+          _openDocument(node.id);
+          return;
+        }
+        ref.read(graphExpansionProvider.notifier).collapse();
+        ref
+            .read(chatControllerProvider.notifier)
+            .chatAboutDocument(node.id, node.title);
+        context.go(AppRoutes.chat);
+      },
+      onOpenInDocuments: () => _openDocument(node.id),
+    );
+
     return Scaffold(
       backgroundColor: AppColors.bgBase,
       body: LayoutBuilder(
         builder: (context, constraints) {
           _canvasSize = constraints.biggest;
+          final sidePanelWidth = math.min(420.0, constraints.maxWidth * 0.42);
           return Stack(
             children: [
-              Positioned.fill(child: _body(graph, snapshot, byId, expansion)),
+              Positioned.fill(
+                child: ExcludeSemantics(
+                  excluding: _listView,
+                  child: IgnorePointer(
+                    ignoring: _listView,
+                    child: _body(graph, snapshot, byId, expansion),
+                  ),
+                ),
+              ),
               Positioned.fill(
                 child: SafeArea(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.s4,
+                    padding: EdgeInsets.only(
+                      left: AppSpacing.s4,
+                      right:
+                          AppSpacing.s4 +
+                          (expanded != null && _usesSidePanel
+                              ? sidePanelWidth
+                              : 0),
                     ),
                     child: Column(
                       children: [
@@ -356,6 +437,24 @@ class _GraphScreenState extends ConsumerState<GraphScreen>
                               ),
                             ),
                             IconButton(
+                              key: const Key('graph_view_toggle'),
+                              tooltip: _listView ? 'Graph view' : 'List view',
+                              onPressed:
+                                  snapshot == null || snapshot.nodes.isEmpty
+                                  ? null
+                                  : () {
+                                      ref
+                                          .read(graphExpansionProvider.notifier)
+                                          .collapse();
+                                      setState(() => _listView = !_listView);
+                                    },
+                              icon: Icon(
+                                _listView
+                                    ? Icons.hub_outlined
+                                    : Icons.view_list_outlined,
+                              ),
+                            ),
+                            IconButton(
                               key: const Key('graph_refresh'),
                               tooltip: 'Refresh',
                               onPressed: graph.isLoading
@@ -369,6 +468,7 @@ class _GraphScreenState extends ConsumerState<GraphScreen>
                         ),
                         if (snapshot != null &&
                             snapshot.nodes.isNotEmpty &&
+                            !_listView &&
                             !_showAnswer &&
                             expanded == null)
                           Padding(
@@ -386,9 +486,28 @@ class _GraphScreenState extends ConsumerState<GraphScreen>
                               ),
                             ),
                           ),
-                        if (snapshot != null) _Notes(snapshot: snapshot),
+                        if (snapshot != null && !_listView)
+                          _Notes(snapshot: snapshot),
                         if (replaying) const _ReplayingPill(),
-                        const Spacer(),
+                        if (_listView && snapshot != null)
+                          Expanded(
+                            child: ColoredBox(
+                              color: AppColors.bgBase,
+                              child: _GraphList(
+                                nodes: _query.isEmpty
+                                    ? snapshot.nodes
+                                    : snapshot.nodes.where(_matches).toList(),
+                                onSelect: (node) {
+                                  setState(() => _listView = false);
+                                  ref
+                                      .read(graphExpansionProvider.notifier)
+                                      .toggle(node.id);
+                                },
+                              ),
+                            ),
+                          )
+                        else
+                          const Spacer(),
                         if (expanded == null && _showAnswer)
                           Padding(
                             padding: const EdgeInsets.only(
@@ -416,6 +535,7 @@ class _GraphScreenState extends ConsumerState<GraphScreen>
                 ),
               ),
               if (!_showAnswer &&
+                  !_listView &&
                   expanded == null &&
                   snapshot != null &&
                   snapshot.nodes.isNotEmpty)
@@ -430,7 +550,17 @@ class _GraphScreenState extends ConsumerState<GraphScreen>
                     ),
                   ),
                 ),
-              if (expanded != null)
+              if (expanded != null && _usesSidePanel)
+                Positioned(
+                  top: 0,
+                  bottom: 0,
+                  right: 0,
+                  width: sidePanelWidth,
+                  child: SafeArea(
+                    child: nodePanel(expanded, null, sideSheet: true),
+                  ),
+                ),
+              if (expanded != null && !_usesSidePanel)
                 Positioned.fill(
                   child: SafeArea(
                     child:
@@ -451,39 +581,7 @@ class _GraphScreenState extends ConsumerState<GraphScreen>
                             snapSizes: const [0.25, 0.45, 0.8],
                             shouldCloseOnMinExtent: false,
                             builder: (context, scrollController) =>
-                                NodeInfoPanel(
-                                  node: expanded,
-                                  expansion: expansion,
-                                  scrollController: scrollController,
-                                  onClose: ref
-                                      .read(graphExpansionProvider.notifier)
-                                      .collapse,
-                                  onRetry: ref
-                                      .read(graphExpansionProvider.notifier)
-                                      .retry,
-                                  onSelectChunk: ref
-                                      .read(graphExpansionProvider.notifier)
-                                      .selectChunk,
-                                  onChatAboutThis: () {
-                                    if (chat.busy || chat.loading) return;
-                                    if (expanded.type == GraphNodeType.sealed) {
-                                      _openDocument(expanded.id);
-                                      return;
-                                    }
-                                    ref
-                                        .read(graphExpansionProvider.notifier)
-                                        .collapse();
-                                    ref
-                                        .read(chatControllerProvider.notifier)
-                                        .chatAboutDocument(
-                                          expanded.id,
-                                          expanded.title,
-                                        );
-                                    context.go(AppRoutes.chat);
-                                  },
-                                  onOpenInDocuments: () =>
-                                      _openDocument(expanded.id),
-                                ),
+                                nodePanel(expanded, scrollController),
                           ),
                         ),
                   ),
@@ -513,23 +611,16 @@ class _GraphScreenState extends ConsumerState<GraphScreen>
           onRetry: () => ref.invalidate(graphProvider),
         );
       }
-      return const Center(
-        key: Key('graph_loading'),
-        child: CircularProgressIndicator(),
-      );
+      return const AppSkeletonList(key: Key('graph_loading'), rows: 5);
     }
     if (snapshot.nodes.isEmpty) {
-      return const Center(
+      return AppEmptyState(
         key: Key('graph_empty'),
-        child: Padding(
-          padding: EdgeInsets.all(AppSpacing.s8),
-          child: Text(
-            'Your graph is empty. Upload documents and they will appear '
-            'here.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: AppColors.textSecondary),
-          ),
-        ),
+        icon: Icons.hub_outlined,
+        title: 'Your graph is empty',
+        message: 'Upload a document to see it here.',
+        actionLabel: 'Go to Documents',
+        onAction: () => context.go(AppRoutes.documents),
       );
     }
 
@@ -557,12 +648,50 @@ class _GraphScreenState extends ConsumerState<GraphScreen>
                 _hiddenTypes.contains(node.type),
             pulsing: _pulsingIds.contains(node.id),
             pulse: _pulseAnim,
+            reduceMotion: _reduceMotion,
             onTap: () => toggle(node.id),
           );
         },
         edgesBuilder: (context, a, b, distance) =>
             GraphEdgeLine(length: distance),
       ),
+    );
+  }
+}
+
+class _GraphList extends StatelessWidget {
+  const _GraphList({required this.nodes, required this.onSelect});
+
+  final List<GraphNodeData> nodes;
+  final ValueChanged<GraphNodeData> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final sorted = [...nodes]
+      ..sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+    if (sorted.isEmpty) {
+      return const Center(child: Text('No matching documents'));
+    }
+    return ListView.builder(
+      key: const Key('graph_list'),
+      itemCount: sorted.length,
+      itemBuilder: (context, index) {
+        final node = sorted[index];
+        return Semantics(
+          label: '${node.title}, ${node.type.label}',
+          button: true,
+          onTap: () => onSelect(node),
+          child: ExcludeSemantics(
+            child: ListTile(
+              key: Key('graph_list_${node.id}'),
+              leading: Icon(Icons.circle, size: 16, color: node.type.color),
+              title: Text(node.title),
+              subtitle: Text(node.type.label),
+              onTap: () => onSelect(node),
+            ),
+          ),
+        );
+      },
     );
   }
 }

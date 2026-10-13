@@ -104,7 +104,7 @@ Future<void> _frames(WidgetTester tester, [int n = 4]) async {
   }
 }
 
-Future<_Rig> _pump(WidgetTester tester) async {
+Future<_Rig> _pump(WidgetTester tester, {bool reduceMotion = false}) async {
   final rig = _Rig();
   await tester.pumpWidget(
     ProviderScope(
@@ -118,7 +118,16 @@ Future<_Rig> _pump(WidgetTester tester) async {
           FakeDocumentsRepository(documents: const []),
         ),
       ],
-      child: MaterialApp(theme: AppTheme.dark, home: const GraphScreen()),
+      child: MaterialApp(
+        theme: AppTheme.dark,
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(disableAnimations: reduceMotion),
+          child: child!,
+        ),
+        home: const GraphScreen(),
+      ),
     ),
   );
   await _frames(tester);
@@ -146,6 +155,20 @@ double _dotWidth(WidgetTester tester, String id) =>
     tester.getSize(find.byKey(Key('graph_node_$id'))).width;
 
 void main() {
+  testWidgets('reduced motion keeps a retrieval ring static, then clears it', (
+    tester,
+  ) async {
+    await _pump(tester, reduceMotion: true);
+    _pulse(tester).trigger(['a']);
+    await tester.pump();
+    expect(_ring('a'), findsOneWidget);
+    final width = _ringWidth(tester, 'a');
+    await tester.pump(pulseDuration ~/ 2);
+    expect(_ringWidth(tester, 'a'), width);
+    await tester.pump(pulseDuration);
+    expect(_ring('a'), findsNothing);
+  });
+
   group('a live retrieval', () {
     testWidgets('one haptic impact per retrieval, not per document', (
       tester,

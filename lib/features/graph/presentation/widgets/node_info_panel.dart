@@ -31,6 +31,7 @@ class NodeInfoPanel extends StatelessWidget {
     required this.onChatAboutThis,
     required this.onOpenInDocuments,
     this.scrollController,
+    this.sideSheet = false,
   });
 
   final GraphNodeData node;
@@ -41,22 +42,27 @@ class NodeInfoPanel extends StatelessWidget {
   final VoidCallback onChatAboutThis;
   final VoidCallback onOpenInDocuments;
   final ScrollController? scrollController;
+  final bool sideSheet;
 
   @override
   Widget build(BuildContext context) {
-    final maxHeight = scrollController == null
+    final maxHeight = scrollController == null && !sideSheet
         ? MediaQuery.sizeOf(context).height * 0.5
         : double.infinity;
     return ConstrainedBox(
       constraints: BoxConstraints(maxHeight: maxHeight),
       child: DecoratedBox(
         key: const Key('node_panel'),
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: AppColors.bgElevated,
-          borderRadius: BorderRadius.vertical(
-            top: Radius.circular(AppRadius.lg),
-          ),
-          border: Border(top: BorderSide(color: AppColors.borderSubtle)),
+          borderRadius: sideSheet
+              ? const BorderRadius.horizontal(
+                  left: Radius.circular(AppRadius.lg),
+                )
+              : const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
+          border: sideSheet
+              ? const Border(left: BorderSide(color: AppColors.borderSubtle))
+              : const Border(top: BorderSide(color: AppColors.borderSubtle)),
         ),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(
