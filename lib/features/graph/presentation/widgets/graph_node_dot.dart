@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../shared/tokens/app_colors.dart';
+import '../../../../shared/tokens/app_motion.dart';
 import '../../../../shared/tokens/app_spacing.dart';
 import '../../data/graph_models.dart';
 import '../models/graph_node.dart';
@@ -81,6 +82,9 @@ class GraphNodeDot extends StatelessWidget {
     final glow = type.baseRadius * (matched ? 6 : (selected ? 5 : 4));
     const target = AppSpacing.minTouchTarget;
     final lit = Color.lerp(color, Colors.white, 0.55 * intensity)!;
+    // The ring leaves fast and settles (the shared pulse curve) while it fades
+    // evenly over the whole pulse, so it is still visible as it finishes.
+    final reach = AppMotion.pulse.transform(1 - intensity);
 
     return Stack(
       clipBehavior: Clip.none,
@@ -88,17 +92,23 @@ class GraphNodeDot extends StatelessWidget {
       children: [
         if (intensity > 0)
           IgnorePointer(
-            child: Container(
-              key: Key('graph_pulse_${node.id}'),
-              // The ring starts at the dot and grows as it fades.
-              width: type.baseRadius * 2 * (1.6 + 4.5 * (1 - intensity)),
-              height: type.baseRadius * 2 * (1.6 + 4.5 * (1 - intensity)),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: color.withValues(alpha: 0.18 * intensity),
-                border: Border.all(
-                  color: color.withValues(alpha: 0.75 * intensity),
-                  width: 2,
+            // The dot sits in a 44px touch target and a Stack would clamp the
+            // ring to it; the ring is allowed to grow past its box.
+            child: OverflowBox(
+              maxWidth: double.infinity,
+              maxHeight: double.infinity,
+              child: Container(
+                key: Key('graph_pulse_${node.id}'),
+                // The ring starts at the dot and grows as it fades.
+                width: type.baseRadius * 2 * (1.6 + 4.5 * reach),
+                height: type.baseRadius * 2 * (1.6 + 4.5 * reach),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: color.withValues(alpha: 0.18 * intensity),
+                  border: Border.all(
+                    color: color.withValues(alpha: 0.75 * intensity),
+                    width: 2,
+                  ),
                 ),
               ),
             ),

@@ -824,6 +824,7 @@ class _ReplayingPill extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final replay = ref.watch(graphPulseProvider);
     return Padding(
       key: const Key('graph_replaying'),
       padding: const EdgeInsets.only(top: AppSpacing.s2),
@@ -840,7 +841,7 @@ class _ReplayingPill extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'Replaying a conversation',
+                '${replay.replayIndex} of ${replay.replayTotal} ·',
                 style: AppTypography.xs.copyWith(
                   color: AppColors.textSecondary,
                 ),

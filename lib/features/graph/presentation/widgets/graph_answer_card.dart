@@ -34,67 +34,73 @@ class GraphAnswerCard extends ConsumerWidget {
       return const SizedBox.shrink();
     }
     final maxHeight = MediaQuery.sizeOf(context).height * 0.38;
-    return ConstrainedBox(
-      constraints: BoxConstraints(maxHeight: maxHeight),
-      child: DecoratedBox(
-        key: const Key('graph_answer'),
-        decoration: BoxDecoration(
-          color: AppColors.bgElevated.withValues(alpha: 0.96),
-          borderRadius: AppRadius.lgRadius,
-          border: Border.all(color: AppColors.borderDefault),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(
-                left: AppSpacing.s3,
-                top: AppSpacing.s1,
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Latest answer',
-                      style: AppTypography.xs.copyWith(
-                        color: AppColors.textSecondary,
+    return Dismissible(
+      key: Key('graph_answer_dismiss_${answer.id}'),
+      direction: DismissDirection.horizontal,
+      resizeDuration: null,
+      onDismissed: (_) => onClose(),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: maxHeight),
+        child: DecoratedBox(
+          key: const Key('graph_answer'),
+          decoration: BoxDecoration(
+            color: AppColors.bgElevated.withValues(alpha: 0.96),
+            borderRadius: AppRadius.lgRadius,
+            border: Border.all(color: AppColors.borderDefault),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(
+                  left: AppSpacing.s3,
+                  top: AppSpacing.s1,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Latest answer',
+                        style: AppTypography.xs.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                     ),
-                  ),
-                  TextButton(
-                    key: const Key('graph_answer_open_chat'),
-                    onPressed: onOpenInChat,
-                    child: const Text('Open in Chat'),
-                  ),
-                  IconButton(
-                    key: const Key('graph_answer_close'),
-                    tooltip: 'Close',
-                    onPressed: onClose,
-                    icon: const Icon(Icons.close, size: 18),
-                  ),
-                ],
-              ),
-            ),
-            Flexible(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.s2,
-                  0,
-                  AppSpacing.s2,
-                  AppSpacing.s2,
-                ),
-                child: ChatBubble(
-                  message: answer,
-                  canRetry: answer.status == ChatMessageStatus.failed,
-                  onRetry: ref.read(chatControllerProvider.notifier).retry,
-                  onOpenDocument: onOpenDocument,
-                  onOpenCitation: (part) =>
-                      context.push(AppRoutes.citationEvidence(part.chunkId)),
+                    TextButton(
+                      key: const Key('graph_answer_open_chat'),
+                      onPressed: onOpenInChat,
+                      child: const Text('Open in Chat'),
+                    ),
+                    IconButton(
+                      key: const Key('graph_answer_close'),
+                      tooltip: 'Close',
+                      onPressed: onClose,
+                      icon: const Icon(Icons.close, size: 18),
+                    ),
+                  ],
                 ),
               ),
-            ),
-          ],
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.s2,
+                    0,
+                    AppSpacing.s2,
+                    AppSpacing.s2,
+                  ),
+                  child: ChatBubble(
+                    message: answer,
+                    canRetry: answer.status == ChatMessageStatus.failed,
+                    onRetry: ref.read(chatControllerProvider.notifier).retry,
+                    onOpenDocument: onOpenDocument,
+                    onOpenCitation: (part) =>
+                        context.push(AppRoutes.citationEvidence(part.chunkId)),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

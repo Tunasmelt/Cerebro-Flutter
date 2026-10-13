@@ -14,6 +14,7 @@ import 'package:cerebro_mobile/features/graph/data/graph_api.dart';
 import 'package:cerebro_mobile/features/graph/data/graph_models.dart';
 import 'package:cerebro_mobile/features/graph/data/graph_pulse.dart';
 import 'package:cerebro_mobile/features/graph/presentation/graph_screen.dart';
+import 'package:cerebro_mobile/features/graph/presentation/models/graph_node.dart';
 import 'package:cerebro_mobile/shared/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -543,6 +544,160 @@ void main() {
       await tester.pump(replayInterval);
       expect(_pulsing(tester), isNot(contains('b')));
       expect(find.byKey(const Key('graph_replaying')), findsNothing);
+    });
+  });
+
+  group('UI pass F4: pulse polish', () {
+    Color ringColor(WidgetTester tester, String id) {
+      final box = tester.widget<Container>(_ring(id));
+      return (box.decoration! as BoxDecoration).border!.top.color;
+    }
+
+    Color opaque(Color c) => c.withValues(alpha: 1);
+
+    testWidgets('the ring is not clamped to the 44px touch target', (
+      tester,
+    ) async {
+      await _pump(tester);
+      _pulse(tester).trigger(['a']);
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(
+        _ringWidth(tester, 'a'),
+        greaterThan(44),
+        reason: 'the ring cannot grow past its box',
+      );
+      await tester.pump(pulseDuration);
+    });
+
+    testWidgets('the ring takes the colour of its node type', (tester) async {
+      await _pump(tester);
+      _pulse(tester).trigger(['a', 'd']); // a: document, d: image
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(
+        opaque(ringColor(tester, 'a')),
+        opaque(GraphNodeType.document.color),
+      );
+      expect(opaque(ringColor(tester, 'd')), opaque(GraphNodeType.image.color));
+      expect(
+        opaque(ringColor(tester, 'a')),
+        isNot(opaque(ringColor(tester, 'd'))),
+      );
+      await tester.pump(pulseDuration);
+    });
+
+    testWidgets('the ring leaves fast on the shared pulse curve', (
+      tester,
+    ) async {
+      await _pump(tester);
+      _pulse(tester).trigger(['b']);
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pump(const Duration(milliseconds: 150));
+      // 200ms into a 2000ms pulse is 10% of the way. Linear growth would give
+      // a ring of 2r * (1.6 + 4.5 * 0.1); the pulse curve is far ahead of that.
+      final base = GraphNodeType.document.baseRadius * 2;
+      final linear = base * (1.6 + 4.5 * 0.1);
+      expect(_ringWidth(tester, 'b'), greaterThan(linear * 1.4));
+      await tester.pump(pulseDuration);
+    });
+
+    testWidgets('while the ring grows it fades evenly, not with the curve', (
+      tester,
+    ) async {
+      await _pump(tester);
+      _pulse(tester).trigger(['b']);
+      await tester.pump(const Duration(milliseconds: 50));
+      // The clock starts on the first frame: 50 + 950 = half way (1000 of 2000).
+      await tester.pump(const Duration(milliseconds: 950));
+      final alpha = ringColor(tester, 'b').a;
+      // 0.75 * (1 - 0.5) = 0.375 if it fades linearly.
+      expect(alpha, closeTo(0.375, 0.06));
+      await tester.pump(pulseDuration);
+    });
+
+    testWidgets('a replay counts its steps: "1 of 3", then "2 of 3", and '
+        'Stop stays', (tester) async {
+      final rig = await _pump(tester);
+      rig.history.sessions = [
+        ChatSessionSummary(
+          id: 's1',
+          createdAt: DateTime.utc(2026, 10, 3, 21),
+          preview: 'Q',
+        ),
+      ];
+      ChatMessage answer(int id, String doc) => ChatMessage(
+        id: id,
+        role: ChatRole.assistant,
+        text: 'a',
+        retrievalDone: true,
+        retrievedDocumentIds: [doc],
+      );
+      rig.history.byId['s1'] = [
+        ChatMessage.user(id: 0, text: 'q'),
+        answer(1, 'a'),
+        answer(2, 'b'),
+        answer(3, 'c'),
+      ];
+      await tester.tap(find.byKey(const Key('graph_history')));
+      await _frames(tester);
+      await tester.tap(find.byKey(const Key('replay_s1')));
+      await _frames(tester, 2);
+
+      expect(find.textContaining('1 of 3'), findsOneWidget);
+      expect(find.byKey(const Key('graph_replay_stop')), findsOneWidget);
+
+      await tester.pump(replayInterval);
+      expect(find.textContaining('2 of 3'), findsOneWidget);
+
+      await tester.pump(replayInterval);
+      expect(find.textContaining('3 of 3'), findsOneWidget);
+
+      await tester.pump(replayInterval + const Duration(milliseconds: 100));
+      await tester.pump(pulseDuration);
+      expect(find.byKey(const Key('graph_replaying')), findsNothing);
+    });
+
+    testWidgets('swiping the answer card away dismisses it', (tester) async {
+      final rig = await _pump(tester);
+      await tester.enterText(find.byType(TextField).last, 'q');
+      await tester.pump();
+      await tester.tap(find.text('Ask'));
+      await _frames(tester, 2);
+      rig.stream.turns.single.events.add(const ChatToken('hello there'));
+      rig.stream.turns.single.events.add(const ChatDone());
+      await rig.stream.turns.single.events.close();
+      await _frames(tester);
+      expect(find.byKey(const Key('graph_answer')), findsOneWidget);
+
+      await tester.fling(
+        find.byKey(const Key('graph_answer')),
+        const Offset(600, 0),
+        2000,
+      );
+      await _frames(tester, 6);
+      expect(find.byKey(const Key('graph_answer')), findsNothing);
+    });
+
+    testWidgets('a short drag does not dismiss the answer card', (
+      tester,
+    ) async {
+      final rig = await _pump(tester);
+      await tester.enterText(find.byType(TextField).last, 'q');
+      await tester.pump();
+      await tester.tap(find.text('Ask'));
+      await _frames(tester, 2);
+      rig.stream.turns.single.events.add(const ChatToken('hello there'));
+      rig.stream.turns.single.events.add(const ChatDone());
+      await rig.stream.turns.single.events.close();
+      await _frames(tester);
+
+      await tester.drag(
+        find.byKey(const Key('graph_answer')),
+        const Offset(30, 0),
+      );
+      await _frames(tester, 6);
+      expect(find.byKey(const Key('graph_answer')), findsOneWidget);
     });
   });
 }
