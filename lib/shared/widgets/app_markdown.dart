@@ -6,6 +6,8 @@ import '../tokens/app_colors.dart';
 import '../tokens/app_radius.dart';
 import '../tokens/app_typography.dart';
 
+/// Renders Markdown (chat answers, file previews) in the app's type and colours.
+///
 /// Inline widgets use a delimiter absent from source text. Source Markdown
 /// cannot forge trusted citations by spelling our internal placeholders.
 class AppMarkdown extends StatelessWidget {

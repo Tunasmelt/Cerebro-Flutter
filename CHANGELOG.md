@@ -2350,3 +2350,38 @@ Owner-reported on a real device (see `UI-BACKLOG.md`).
   "Searching your documents..." for over 90 seconds while `/health` answered in
   0.5s; not diagnosed (see the PR).
 - **Still to do:** F5, the one approved `POST /graph/recluster` check.
+
+### UI/UX pass - G: cross-cutting QA and the design record
+- **QA harness** (`test/qa/`): one pass over nine screens (Sign in, Sign up,
+  Documents, Chat, Board/Tasks, Settings, Account settings, Graph) at a 320px
+  phone, a 400px phone and an 840px tablet, at normal and 1.3x text. It checks
+  that nothing overflows, that tappable things are at least 44pt (Flutter's
+  `iOSTapTargetGuideline`) and that every tappable thing has a spoken label
+  (`labeledTapTargetGuideline`). Adding a screen is one entry in a list. 56
+  checks.
+- **Two real findings, both on the Graph:** the search field was 42px tall (now
+  a 44px target), and the background tap-to-collapse / double-tap-to-zoom
+  gestures (F2) were announced to screen readers as a full-screen button with no
+  name; they are now excluded from semantics (the node panel's close button and
+  the zoom buttons are the accessible routes). Both failed the harness before
+  the fixes.
+- **Harness checked with injected faults:** a missing tooltip, the graph gesture
+  back in semantics and a 20px search field are caught. Two other mutations
+  survived and were right to: a 30px button (Material pads small buttons back to
+  a 48px hit area) and a 600px card (its width is clamped to the screen).
+- **`DESIGN.md`** is generated from the token files and shared widgets by
+  `dart tool/generate_design_md.dart`: 54 colours, 14 spacing, 4 radii, 9 type
+  styles, motion, elevation, 12 shared components, the patterns and the rules
+  the tests enforce. `test/shared/design_md_test.dart` fails if a token or shared
+  widget is missing from it (verified by removing one of each).
+- **Text contrast** stays measured from the tokens
+  (`test/shared/app_contrast_test.dart`), not from screenshots.
+- **Device verification so far (emulator unless noted):** Documents, Sign in,
+  Settings, Sealed card, Board, Tasks, Chat suggestions, Graph (A-F4) were each
+  looked at on the emulator in their own phase; the owner's Pixel has had builds
+  from D onward. A final all-screens pass on a **release** build is still the
+  owner's, with the real-device items already recorded: scroll feel on a profile
+  build, TalkBack on hardware, graph FPS.
+- **Not done / owner:** the recluster result (F5) and the chat generation stall
+  are backend issues recorded in the F5 entry; the recluster fix is a separate
+  PR in the web/API repo.

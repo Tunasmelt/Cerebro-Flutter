@@ -14,6 +14,9 @@ const _items = <(String, IconData)>[
   ('Settings', Icons.settings_outlined),
 ];
 
+/// The five-tab bottom bar (Docs, Chat, Graph, Board, Settings): fixed-size line
+/// icons so the labels never shift, an animated indicator, and a selection
+/// haptic. Replaced by [AppNavigationRail] on wide screens.
 class AppBottomNav extends StatelessWidget {
   const AppBottomNav({
     super.key,
@@ -107,6 +110,7 @@ class AppBottomNav extends StatelessWidget {
   }
 }
 
+/// The same five destinations as a side rail, for screens 600px wide and up.
 class AppNavigationRail extends StatelessWidget {
   const AppNavigationRail({
     super.key,
