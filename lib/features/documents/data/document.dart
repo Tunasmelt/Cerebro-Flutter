@@ -55,15 +55,16 @@ class DocumentSummary {
   final DocumentStatus status;
   final DateTime createdAt;
 
-  DocumentSummary copyWith({DocumentStatus? status}) => DocumentSummary(
-    id: id,
-    title: title,
-    mime: mime,
-    sizeBytes: sizeBytes,
-    originalSizeBytes: originalSizeBytes,
-    status: status ?? this.status,
-    createdAt: createdAt,
-  );
+  DocumentSummary copyWith({DocumentStatus? status, String? title}) =>
+      DocumentSummary(
+        id: id,
+        title: title ?? this.title,
+        mime: mime,
+        sizeBytes: sizeBytes,
+        originalSizeBytes: originalSizeBytes,
+        status: status ?? this.status,
+        createdAt: createdAt,
+      );
 }
 
 /// `GET /api/v1/documents/{id}`'s shape — a real subset/superset

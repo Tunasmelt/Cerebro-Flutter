@@ -23,6 +23,7 @@ class AppTextField extends StatefulWidget {
     this.onSubmitted,
     this.errorText,
     this.enabled = true,
+    this.autofocus = false,
   });
 
   final String label;
@@ -37,6 +38,10 @@ class AppTextField extends StatefulWidget {
   final ValueChanged<String>? onSubmitted;
   final String? errorText;
   final bool enabled;
+
+  /// Focus the field (and raise the keyboard) as soon as it appears; for a
+  /// dialog whose only job is to ask for this one value.
+  final bool autofocus;
 
   @override
   State<AppTextField> createState() => _AppTextFieldState();
@@ -60,6 +65,7 @@ class _AppTextFieldState extends State<AppTextField> {
           controller: widget.controller,
           obscureText: obscured,
           enabled: widget.enabled,
+          autofocus: widget.autofocus,
           keyboardType: widget.keyboardType,
           textInputAction: widget.textInputAction,
           autofillHints: widget.autofillHints,

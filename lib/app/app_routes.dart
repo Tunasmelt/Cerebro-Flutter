@@ -10,6 +10,7 @@ abstract final class AppRoutes {
   static const board = '/board';
   static const playground = '/settings/token-inspector';
   static const settings = '/settings';
+  static const newNote = '/notes/new';
 
   static String citationEvidence(String chunkId) =>
       '/evidence/${Uri.encodeComponent(chunkId)}';

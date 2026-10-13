@@ -43,11 +43,15 @@ class StatusPill extends StatelessWidget {
               Icon(icon, size: 12, color: color),
               const SizedBox(width: AppSpacing.s1),
             ],
-            Text(
-              label,
-              style: AppTypography.xs.copyWith(
-                color: color,
-                fontWeight: AppTypography.weightMedium,
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTypography.xs.copyWith(
+                  color: color,
+                  fontWeight: AppTypography.weightMedium,
+                ),
               ),
             ),
           ],

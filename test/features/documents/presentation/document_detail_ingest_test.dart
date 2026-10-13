@@ -75,7 +75,8 @@ Future<void> _pumpPushed(
                 key: const Key('open_detail'),
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
-                    builder: (_) => const DocumentDetailScreen(documentId: 'doc-1'),
+                    builder: (_) =>
+                        const DocumentDetailScreen(documentId: 'doc-1'),
                   ),
                 ),
                 child: const Text('open'),
@@ -450,10 +451,16 @@ void main() {
         expect(find.text('Incomplete'), findsOneWidget);
         expect(find.text('Processing'), findsNothing);
         expect(_stage(tester), 'Upload not finished');
-        expect(find.byKey(const Key('document_detail_abandoned')), findsOneWidget);
+        expect(
+          find.byKey(const Key('document_detail_abandoned')),
+          findsOneWidget,
+        );
         expect(find.byKey(const Key('document_detail_progress')), findsNothing);
-        expect(find.byKey(const Key('document_detail_retry')), findsNothing,
-            reason: 'there is no job to retry; the file must be uploaded again');
+        expect(
+          find.byKey(const Key('document_detail_retry')),
+          findsNothing,
+          reason: 'there is no job to retry; the file must be uploaded again',
+        );
       },
     );
 
@@ -503,7 +510,7 @@ void main() {
       expect(find.byKey(const Key('document_detail_delete')), findsOneWidget);
     });
 
-    testWidgets('is not offered while a document is processing or once ready', (
+    testWidgets('is offered for every document: processing, ready and sealed', (
       tester,
     ) async {
       await _pumpPushed(
@@ -511,8 +518,7 @@ void main() {
         ScriptedDocumentsRepository(details: [detailAt('embedding')]),
         _FakeDeleteApi(),
       );
-      expect(find.byKey(const Key('document_detail_delete')), findsNothing);
-      // (A ready document is deliberately not deletable from here yet.)
+      expect(find.byKey(const Key('document_detail_delete')), findsOneWidget);
       await tester.pumpWidget(const SizedBox());
       await _pumpPushed(
         tester,
@@ -521,7 +527,16 @@ void main() {
         ),
         _FakeDeleteApi(),
       );
-      expect(find.byKey(const Key('document_detail_delete')), findsNothing);
+      expect(find.byKey(const Key('document_detail_delete')), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
+      await _pumpPushed(
+        tester,
+        ScriptedDocumentsRepository(
+          details: [detailAt('ready', status: DocumentStatus.sealed)],
+        ),
+        _FakeDeleteApi(),
+      );
+      expect(find.byKey(const Key('document_detail_delete')), findsOneWidget);
     });
 
     testWidgets('asks first, and Cancel deletes nothing', (tester) async {

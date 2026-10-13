@@ -87,6 +87,17 @@ class DocumentsListNotifier extends AsyncNotifier<List<DocumentSummary>> {
     _pollIfProcessing(shown);
   }
 
+  /// The user renamed [documentId]: show the new name at once rather than
+  /// waiting for the next fetch.
+  void renameDocument(String documentId, String title) {
+    final current = state.valueOrNull;
+    if (current == null) return;
+    state = AsyncData([
+      for (final d in current)
+        if (d.id == documentId) d.copyWith(title: title) else d,
+    ]);
+  }
+
   /// The user deleted [documentId]: drop it from the list at once rather
   /// than waiting for the next fetch.
   void removeDocument(String documentId) {
