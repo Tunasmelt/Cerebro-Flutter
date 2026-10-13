@@ -2435,3 +2435,7 @@ The owner approved exactly one `POST /graph/recluster` on the test account.
   Ready TXT; renamed it (keyboard opens with the name selected, new name shown
   after save); deleted it through the menu (count 27 to 26). The test account
   is back to its original documents.
+- **Caught by the Phase G QA harness after merging main:** the new row
+  overflowed on a 320px screen at 1.3x text (the status pill is fixed-width and
+  the actions button takes 48px). The status and date now wrap instead of
+  sharing one line, and `StatusPill` ellipsizes its label rather than overflow.

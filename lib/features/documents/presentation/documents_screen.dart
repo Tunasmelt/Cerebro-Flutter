@@ -378,8 +378,13 @@ class _DocumentRow extends StatelessWidget {
                     const SizedBox(height: AppSpacing.s1),
                     // The status sits with the size and date, so the row has
                     // room for the title and the actions button on a small
-                    // phone.
-                    Row(
+                    // phone. A Wrap, not a Row: at large text on a 320px
+                    // screen the pill alone nearly fills the line, so the
+                    // date drops below it instead of overflowing.
+                    Wrap(
+                      spacing: AppSpacing.s2,
+                      runSpacing: AppSpacing.s1,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         StatusPill(
                           label: abandoned
@@ -387,17 +392,14 @@ class _DocumentRow extends StatelessWidget {
                               : documentStatusLabel(document.status),
                           color: statusColor,
                         ),
-                        const SizedBox(width: AppSpacing.s2),
-                        Flexible(
-                          child: Text(
-                            '${formatDocumentSize(document.sizeBytes)} · '
-                            '${formatDocumentDate(document.createdAt)}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppTypography.mono(
-                              AppTypography.xs,
-                            ).copyWith(color: AppColors.textSecondary),
-                          ),
+                        Text(
+                          '${formatDocumentSize(document.sizeBytes)} · '
+                          '${formatDocumentDate(document.createdAt)}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTypography.mono(
+                            AppTypography.xs,
+                          ).copyWith(color: AppColors.textSecondary),
                         ),
                       ],
                     ),
