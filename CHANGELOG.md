@@ -2368,7 +2368,7 @@ Owner-reported on a real device (see `UI-BACKLOG.md`).
   embed pipeline as an upload. A failed save keeps the text.
 - **Not done here:** no client-side rules beyond fast feedback; the server
   stays the authority. `AppTextField` gained `autofocus`.
-- **Tests:** 29 new (API contract against the real generated client, controller,
+- **Tests:** 52 new (API contract against the real generated client, controller,
   dialog, sheet, editor, row actions). 25 injected faults; one survivor (list
   not refreshed after a note) exposed a test fake that returned the same
   mutable list, fixed with a copying repository.
