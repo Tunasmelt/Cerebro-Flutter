@@ -157,6 +157,18 @@ void main() {
     }
   });
 
+  testWidgets('graph nodes expose title and type to accessibility', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      _FakeGraph()..nodeRows = [_n('a', title: 'Alpha', x: 0, y: 0)],
+    );
+    final semantics = tester.ensureSemantics();
+    expect(find.bySemanticsLabel('Alpha, document'), findsWidgets);
+    semantics.dispose();
+  });
+
   testWidgets('colors follow the document type: sealed amber, image teal, '
       'document violet', (tester) async {
     final api = _FakeGraph()
@@ -185,7 +197,48 @@ void main() {
   testWidgets('an empty library says so', (tester) async {
     await _pump(tester, _FakeGraph());
     expect(find.byKey(const Key('graph_empty')), findsOneWidget);
+    expect(find.text('Go to Documents'), findsOneWidget);
     expect(find.byKey(const Key('graph_canvas')), findsNothing);
+  });
+
+  testWidgets('list view exposes every document and opens its node panel', (
+    tester,
+  ) async {
+    final api = _FakeGraph()
+      ..nodeRows = [
+        _n('a', title: 'Alpha', x: -1, y: 0),
+        _n('b', title: 'Beta', x: 1, y: 0, mime: 'image/png'),
+      ];
+    await _pump(tester, api);
+    await tester.tap(find.byKey(const Key('graph_view_toggle')));
+    await tester.pump();
+    expect(find.byKey(const Key('graph_list')), findsOneWidget);
+    expect(find.byKey(const Key('graph_list_a')), findsOneWidget);
+    expect(find.byKey(const Key('graph_list_b')), findsOneWidget);
+    final semantics = tester.ensureSemantics();
+    expect(find.bySemanticsLabel('Beta, image'), findsWidgets);
+    semantics.dispose();
+    await tester.tap(find.byKey(const Key('graph_list_b')));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.byKey(const Key('graph_list')), findsNothing);
+    expect(find.byKey(const Key('node_panel')), findsOneWidget);
+  });
+
+  testWidgets('landscape opens a side panel instead of a draggable sheet', (
+    tester,
+  ) async {
+    await _pump(tester, _FakeGraph()..nodeRows = [_n('a', x: 0, y: 0)]);
+    await tester.tapAt(tester.getCenter(find.byKey(const Key('graph_canvas'))));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.byKey(const Key('node_panel')), findsOneWidget);
+    expect(find.byKey(const Key('node_sheet_handle')), findsNothing);
+    final panel = tester.getRect(find.byKey(const Key('node_panel')));
+    expect(panel.width, lessThan(420));
+    expect(tester.getCenter(_dot('a')).dx, lessThan(panel.left));
+    expect(
+      tester.getRect(find.byKey(const Key('graph_refresh'))).right,
+      lessThan(panel.left),
+    );
   });
 
   testWidgets('a failed load shows the error with a working retry', (
@@ -659,6 +712,9 @@ void main() {
     testWidgets(
       'sheet grows and snaps while the selected node stays above it',
       (tester) async {
+        tester.view.physicalSize = const Size(400, 800);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
         await _pump(tester, _FakeGraph()..nodeRows = [_n('a', x: 0, y: 0)]);
         final canvas = find.byKey(const Key('graph_canvas'));
         await tester.tapAt(tester.getCenter(canvas));

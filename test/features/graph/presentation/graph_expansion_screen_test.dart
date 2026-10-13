@@ -75,6 +75,12 @@ Future<void> _pump(
   _Api api, {
   List<String>? opened,
 }) async {
+  if (tester.view.physicalSize / tester.view.devicePixelRatio ==
+      const Size(800, 600)) {
+    tester.view.physicalSize =
+        const Size(400, 800) * tester.view.devicePixelRatio;
+    addTearDown(tester.view.resetPhysicalSize);
+  }
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
@@ -479,6 +485,7 @@ void main() {
       final middle = tester.getCenter(find.byKey(const Key('graph_canvas')));
       // Opens fitted to the view, not at 1.0.
       expect(c.scale, inInclusiveRange(0.3, 1.5));
+      final fittedScale = c.scale;
 
       // Above the legend (bottom left), which would swallow a touch.
       Future<void> pinch(double from, double to) async {
@@ -496,7 +503,11 @@ void main() {
       }
 
       await pinch(40, 80);
-      expect(c.scale, greaterThan(1.5), reason: 'pinch out did not zoom in');
+      expect(
+        c.scale,
+        greaterThan(fittedScale),
+        reason: 'pinch out did not zoom in',
+      );
       final zoomedIn = c.scale;
 
       await pinch(40, 60);

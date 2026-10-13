@@ -25,6 +25,7 @@ class GraphNodeDot extends StatelessWidget {
     required this.onTap,
     this.pulsing = false,
     this.pulse,
+    this.reduceMotion = false,
   });
 
   final GraphNodeData node;
@@ -38,23 +39,32 @@ class GraphNodeDot extends StatelessWidget {
 
   /// Progress of the current pulse, 0 (just started) to 1 (finished).
   final Animation<double>? pulse;
+  final bool reduceMotion;
 
   @override
   Widget build(BuildContext context) {
-    final animation = pulsing ? pulse : null;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
+    final animation = pulsing && !reduceMotion ? pulse : null;
+    return Semantics(
+      label: '${node.title}, ${node.type.label}',
+      button: true,
+      selected: selected,
       onTap: onTap,
-      child: SizedBox(
-        width: AppSpacing.minTouchTarget,
-        height: AppSpacing.minTouchTarget,
-        child: animation == null
-            ? _body(0)
-            : AnimatedBuilder(
-                animation: animation,
-                // 1 as the pulse starts, fading to 0 as it ends.
-                builder: (context, _) => _body(1 - animation.value),
-              ),
+      child: ExcludeSemantics(
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: SizedBox(
+            width: AppSpacing.minTouchTarget,
+            height: AppSpacing.minTouchTarget,
+            child: animation == null
+                ? _body(pulsing && reduceMotion ? 0.8 : 0)
+                : AnimatedBuilder(
+                    animation: animation,
+                    // 1 as the pulse starts, fading to 0 as it ends.
+                    builder: (context, _) => _body(1 - animation.value),
+                  ),
+          ),
+        ),
       ),
     );
   }
