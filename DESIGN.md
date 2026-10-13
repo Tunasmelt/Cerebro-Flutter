@@ -164,6 +164,7 @@ Soft and diffuse: `sm`, `md`, `lg`, `glowViolet`, `glowTeal`.
 | `AppNavigationRail` | `app_bottom_nav.dart` | The same five destinations as a side rail, for screens 600px wide and up. |
 | `showAppConfirmDialog()` | `app_confirm_dialog.dart` | Function: the app's one dialog of this kind. |
 | `AppEmptyState` | `app_empty_state.dart` | What a screen shows when there is nothing to show yet: a small icon, one line saying what this place is, one line saying what to do about it, and (optionally) the action that does it. |
+| `AppFormField` | `app_form_field.dart` | A label above any form control, with the same gap below as [AppTextField] uses. |
 | `AppMarkdown` | `app_markdown.dart` | Renders Markdown (chat answers, file previews) in the app's type and colours. |
 | `AppScreenHeader` | `app_screen_header.dart` | The title row at the top of a tab screen: the screen's name in the display face, an optional one-line subtitle (a count, a status), and the screen's actions on the right. |
 | `AppSectionHeader` | `app_section_header.dart` | A small caps label above a group of rows ("DATA & STORAGE"): the one section-heading style for settings-like lists, so the grouping reads without borders or boxes. |

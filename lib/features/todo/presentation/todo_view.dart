@@ -5,6 +5,7 @@ import '../../../app/app_routes.dart';
 import '../../../shared/tokens/app_colors.dart';
 import '../../../shared/tokens/app_spacing.dart';
 import '../../../shared/tokens/app_typography.dart';
+import '../../../shared/widgets/app_form_field.dart';
 import '../../../shared/widgets/app_skeleton.dart';
 import '../../../shared/widgets/error_view.dart';
 import '../../../shared/widgets/status_pill.dart';
@@ -322,41 +323,50 @@ class _TaskEditorState extends ConsumerState<_TaskEditor> {
     final busy = state.loading || state.saving;
     return AlertDialog(
       title: Text(widget.task == null ? 'Create task' : 'Edit task'),
-      content: SizedBox(
-        width: 360,
-        child: SingleChildScrollView(
-          child: Form(
-            key: _form,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  key: const Key('todo_title'),
-                  controller: _title,
-                  autofocus: true,
-                  enabled: !busy,
-                  decoration: const InputDecoration(labelText: 'Title'),
-                  validator: (value) => value == null || value.trim().isEmpty
-                      ? 'Enter a title.'
-                      : null,
-                ),
-                DropdownButtonFormField<TodoPriority>(
-                  initialValue: _priority,
-                  isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'Priority'),
-                  items: [
-                    for (final priority in TodoPriority.values)
-                      DropdownMenuItem(
-                        value: priority,
-                        child: Text(priorityStyle(priority).label),
-                      ),
-                  ],
-                  onChanged: busy
-                      ? null
-                      : (value) => setState(() => _priority = value!),
-                ),
-                if (state.error != null) ErrorView(exception: state.error!),
-              ],
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 360),
+        child: SizedBox(
+          width: double.maxFinite,
+          child: SingleChildScrollView(
+            child: Form(
+              key: _form,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AppFormField(
+                    label: 'Title',
+                    child: TextFormField(
+                      key: const Key('todo_title'),
+                      controller: _title,
+                      autofocus: true,
+                      enabled: !busy,
+                      textCapitalization: TextCapitalization.sentences,
+                      validator: (value) =>
+                          value == null || value.trim().isEmpty
+                          ? 'Enter a title.'
+                          : null,
+                    ),
+                  ),
+                  AppFormField(
+                    label: 'Priority',
+                    child: DropdownButtonFormField<TodoPriority>(
+                      initialValue: _priority,
+                      isExpanded: true,
+                      items: [
+                        for (final priority in TodoPriority.values)
+                          DropdownMenuItem(
+                            value: priority,
+                            child: Text(priorityStyle(priority).label),
+                          ),
+                      ],
+                      onChanged: busy
+                          ? null
+                          : (value) => setState(() => _priority = value!),
+                    ),
+                  ),
+                  if (state.error != null) ErrorView(exception: state.error!),
+                ],
+              ),
             ),
           ),
         ),
