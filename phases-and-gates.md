@@ -1039,6 +1039,11 @@ found that would embarrass a live demo.
 
 ## Cross-phase rules
 
+UI/UX cross-cutting (2026-10-13): phases A-F4 merged; G adds a QA harness
+(test/qa), a generated DESIGN.md and its drift test. F5's recluster check
+found a backend failure (see CHANGELOG). This records implementation
+verification and closes no owner gate.
+
 UI/UX cross-cutting progress (2026-10-12): F1 merged through PR #47. F2 adds
 draggable graph details, search-result navigation, double-tap zoom and shared
 question input. Clean analysis, 1,033 tests and the Android debug build pass;

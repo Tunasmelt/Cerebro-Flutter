@@ -78,6 +78,10 @@ class GraphSearchBar extends StatelessWidget {
                     contentPadding: const EdgeInsets.symmetric(
                       vertical: AppSpacing.s3,
                     ),
+                    // The text itself is 13px; the field is still a 44px target.
+                    constraints: const BoxConstraints(
+                      minHeight: AppSpacing.minTouchTarget,
+                    ),
                   ),
                 ),
               ),

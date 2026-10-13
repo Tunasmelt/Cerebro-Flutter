@@ -627,6 +627,11 @@ class _GraphScreenState extends ConsumerState<GraphScreen>
     final toggle = ref.read(graphExpansionProvider.notifier).toggle;
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
+      // Tap-the-background-to-collapse and double-tap-to-zoom are shortcuts
+      // for touch; a screen reader has the panel's close button and the zoom
+      // buttons. Left in, they were announced as a full-screen button with no
+      // name.
+      excludeFromSemantics: true,
       onTap: ref.read(graphExpansionProvider.notifier).collapse,
       onDoubleTap: () => _zoomBy(1.5),
       child: ForceDirectedGraphWidget<String>(
