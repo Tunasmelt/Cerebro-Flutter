@@ -2350,3 +2350,29 @@ Owner-reported on a real device (see `UI-BACKLOG.md`).
   "Searching your documents..." for over 90 seconds while `/health` answered in
   0.5s; not diagnosed (see the PR).
 - **Still to do:** F5, the one approved `POST /graph/recluster` check.
+
+### Document management: rename, delete any document, write a note
+- **Gap:** the app could only delete failed uploads, had no rename, and no way
+  to type a note. Web has all three.
+- **Rename:** `PATCH /documents/{id}` from a dialog (name preselected and
+  focused). Validates empty/over 500 characters before sending, shows the
+  server's own message when it refuses, and skips the request if the name did
+  not change. The list and detail view update without a refetch.
+- **Delete:** now offered for every document that is not failed/abandoned
+  (processing, ready, sealed), behind a confirmation. Each row has a visible
+  three-dot menu (Rename / Details / Delete); long-press opens the same sheet.
+  The file viewer has the same menu.
+- **Write a note:** a fourth choice in the Add sheet opens a full-screen editor
+  (optional title, 20,000-character counter, discard confirmation) that posts
+  to `POST /documents/capture`, so a note goes through the same extract and
+  embed pipeline as an upload. A failed save keeps the text.
+- **Not done here:** no client-side rules beyond fast feedback; the server
+  stays the authority. `AppTextField` gained `autofocus`.
+- **Tests:** 29 new (API contract against the real generated client, controller,
+  dialog, sheet, editor, row actions). 25 injected faults; one survivor (list
+  not refreshed after a note) exposed a test fake that returned the same
+  mutable list, fixed with a copying repository.
+- **Device (emulator, profile build, real backend):** wrote a note, it became a
+  Ready TXT; renamed it (keyboard opens with the name selected, new name shown
+  after save); deleted it through the menu (count 27 to 26). The test account
+  is back to its original documents.

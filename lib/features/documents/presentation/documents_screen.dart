@@ -19,6 +19,7 @@ import '../data/documents_list_notifier.dart';
 import '../data/ingest_status.dart';
 import '../data/upload/upload_controller.dart';
 import '../data/upload/upload_picker.dart';
+import 'document_actions_sheet.dart';
 import 'document_presentation.dart';
 import 'upload_list.dart';
 import 'upload_source_sheet.dart';
@@ -68,8 +69,23 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
   }
 
   Future<void> _onAddPressed(BuildContext context, WidgetRef ref) async {
-    final source = await showUploadSourceSheet(context);
-    if (source == null || !context.mounted) return;
+    final choice = await showUploadSourceSheet(context);
+    if (choice == null || !context.mounted) return;
+    if (choice is AddNote) {
+      final saved = await context.push<bool>(AppRoutes.newNote);
+      if (saved == true && context.mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            const SnackBar(
+              key: Key('note_saved_message'),
+              content: Text('Note saved. It will be ready in a moment.'),
+            ),
+          );
+      }
+      return;
+    }
+    final source = (choice as AddFromSource).source;
 
     try {
       final picked = await ref.read(uploadPickerProvider).pick(source);
@@ -310,8 +326,18 @@ class _DocumentRow extends StatelessWidget {
               ? AppRoutes.documentDetail(document.id)
               : AppRoutes.documentPreview(document.id),
         ),
+        onLongPress: () => showDocumentActionsSheet(
+          context,
+          documentId: document.id,
+          title: document.title,
+        ),
         child: Container(
-          padding: const EdgeInsets.all(AppSpacing.s3),
+          padding: const EdgeInsets.only(
+            left: AppSpacing.s3,
+            top: AppSpacing.s2,
+            bottom: AppSpacing.s2,
+            right: AppSpacing.s1,
+          ),
           decoration: BoxDecoration(
             border: Border.all(color: AppColors.borderDefault),
             borderRadius: AppRadius.lgRadius,
@@ -350,22 +376,44 @@ class _DocumentRow extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: AppSpacing.s1),
-                    Text(
-                      '${formatDocumentSize(document.sizeBytes)} · '
-                      '${formatDocumentDate(document.createdAt)}',
-                      style: AppTypography.mono(
-                        AppTypography.xs,
-                      ).copyWith(color: AppColors.textSecondary),
+                    // The status sits with the size and date, so the row has
+                    // room for the title and the actions button on a small
+                    // phone.
+                    Row(
+                      children: [
+                        StatusPill(
+                          label: abandoned
+                              ? 'Incomplete'
+                              : documentStatusLabel(document.status),
+                          color: statusColor,
+                        ),
+                        const SizedBox(width: AppSpacing.s2),
+                        Flexible(
+                          child: Text(
+                            '${formatDocumentSize(document.sizeBytes)} · '
+                            '${formatDocumentDate(document.createdAt)}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTypography.mono(
+                              AppTypography.xs,
+                            ).copyWith(color: AppColors.textSecondary),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: AppSpacing.s2),
-              StatusPill(
-                label: abandoned
-                    ? 'Incomplete'
-                    : documentStatusLabel(document.status),
-                color: statusColor,
+              IconButton(
+                key: Key('document_menu_${document.id}'),
+                tooltip: 'Document actions',
+                icon: const Icon(Icons.more_vert),
+                color: AppColors.textSecondary,
+                onPressed: () => showDocumentActionsSheet(
+                  context,
+                  documentId: document.id,
+                  title: document.title,
+                ),
               ),
             ],
           ),

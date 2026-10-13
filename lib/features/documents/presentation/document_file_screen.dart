@@ -18,6 +18,7 @@ import '../../auth/data/current_user_provider.dart';
 import '../data/document.dart';
 import '../data/document_detail_provider.dart';
 import '../data/document_file_provider.dart';
+import 'document_actions_sheet.dart';
 import 'extracted_text_preview.dart';
 
 class DocumentFileScreen extends ConsumerWidget {
@@ -46,6 +47,21 @@ class DocumentFileScreen extends ConsumerWidget {
             icon: const Icon(Icons.info_outline),
             onPressed: () => context.push(AppRoutes.documentDetail(documentId)),
           ),
+          if (document != null)
+            IconButton(
+              key: const Key('document_more'),
+              tooltip: 'Rename or delete',
+              icon: const Icon(Icons.more_vert),
+              onPressed: () => showDocumentActionsSheet(
+                context,
+                documentId: documentId,
+                title: document.title,
+                // The file it was showing is gone: leave.
+                onDeleted: () {
+                  if (context.mounted) context.pop();
+                },
+              ),
+            ),
         ],
       ),
       body: SafeArea(

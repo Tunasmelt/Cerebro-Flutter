@@ -6,12 +6,27 @@ import '../../../shared/tokens/app_spacing.dart';
 import '../../../shared/tokens/app_typography.dart';
 import '../data/upload/upload_picker.dart';
 
+/// What the user chose to add: a file from one of the pickers, or a note typed
+/// in the app.
+sealed class AddChoice {
+  const AddChoice();
+}
+
+final class AddFromSource extends AddChoice {
+  const AddFromSource(this.source);
+  final UploadSource source;
+}
+
+final class AddNote extends AddChoice {
+  const AddNote();
+}
+
 /// Where the new document comes from. The one upload UX mobile does
 /// better than desktop (architecture-and-spec.md §3): camera and photo
 /// library sit next to the plain file picker, all feeding the same
 /// three-call flow.
-Future<UploadSource?> showUploadSourceSheet(BuildContext context) {
-  return showModalBottomSheet<UploadSource>(
+Future<AddChoice?> showUploadSourceSheet(BuildContext context) {
+  return showModalBottomSheet<AddChoice>(
     context: context,
     // Over the app shell's bottom nav, not inside it.
     useRootNavigator: true,
@@ -57,19 +72,25 @@ class _UploadSourceSheet extends StatelessWidget {
               tileKey: Key('upload_source_file'),
               icon: Icons.folder_open_outlined,
               label: 'Choose a file',
-              source: UploadSource.file,
+              choice: AddFromSource(UploadSource.file),
             ),
             const _SourceTile(
               tileKey: Key('upload_source_photos'),
               icon: Icons.photo_library_outlined,
               label: 'Photo library',
-              source: UploadSource.photoLibrary,
+              choice: AddFromSource(UploadSource.photoLibrary),
             ),
             const _SourceTile(
               tileKey: Key('upload_source_camera'),
               icon: Icons.photo_camera_outlined,
               label: 'Take a photo',
-              source: UploadSource.camera,
+              choice: AddFromSource(UploadSource.camera),
+            ),
+            const _SourceTile(
+              tileKey: Key('upload_source_note'),
+              icon: Icons.edit_note_rounded,
+              label: 'Write a note',
+              choice: AddNote(),
             ),
           ],
         ),
@@ -83,13 +104,13 @@ class _SourceTile extends StatelessWidget {
     required this.tileKey,
     required this.icon,
     required this.label,
-    required this.source,
+    required this.choice,
   });
 
   final Key tileKey;
   final IconData icon;
   final String label;
-  final UploadSource source;
+  final AddChoice choice;
 
   @override
   Widget build(BuildContext context) {
@@ -102,7 +123,7 @@ class _SourceTile extends StatelessWidget {
         label,
         style: AppTypography.base.copyWith(color: AppColors.textPrimary),
       ),
-      onTap: () => Navigator.of(context).pop(source),
+      onTap: () => Navigator.of(context).pop(choice),
     );
   }
 }

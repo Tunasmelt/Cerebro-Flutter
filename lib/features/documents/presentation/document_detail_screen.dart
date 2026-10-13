@@ -15,6 +15,7 @@ import '../data/ingest_retry_controller.dart';
 import '../data/ingest_status.dart';
 import '../../sealed/presentation/sealed_document_controls.dart';
 import 'document_presentation.dart';
+import 'rename_document_dialog.dart';
 import 'package:go_router/go_router.dart';
 import '../../../app/app_routes.dart';
 import '../../../shared/widgets/app_confirm_dialog.dart';
@@ -124,6 +125,17 @@ class _DocumentDetailBody extends ConsumerWidget {
                     color: AppColors.textPrimary,
                     fontWeight: AppTypography.weightSemibold,
                   ),
+                ),
+              ),
+              IconButton(
+                key: const Key('document_detail_rename'),
+                tooltip: 'Rename',
+                icon: const Icon(Icons.edit_outlined),
+                color: AppColors.textSecondary,
+                onPressed: () => showRenameDocumentDialog(
+                  context,
+                  documentId: documentId,
+                  currentTitle: document.title,
                 ),
               ),
             ],
@@ -244,6 +256,12 @@ class _DocumentDetailBody extends ConsumerWidget {
                 ),
               ),
             const SizedBox(height: AppSpacing.s2),
+            _DeleteButton(documentId: documentId),
+          ],
+          // Every other document can be deleted too (a failed or unfinished one
+          // already has its own Delete above). Sealed ones need no passphrase.
+          if (!abandoned && status != DocumentStatus.failed) ...[
+            const SizedBox(height: AppSpacing.s4),
             _DeleteButton(documentId: documentId),
           ],
         ],
