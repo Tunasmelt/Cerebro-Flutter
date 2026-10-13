@@ -2324,3 +2324,29 @@ Owner-reported on a real device (see `UI-BACKLOG.md`).
 - **Still to do in Phase F:** accessibility (node Semantics, List view,
   reduce-motion), the node panel as a draggable sheet, pulse polish, and the
   approved one-time recluster check.
+
+### UI/UX pass - F4: Graph pulse polish
+(Started by Codex on `ui/f4-graph-pulse-polish`; finished here.)
+- **Replay counter:** during a replay the pill reads "1 of 3 ·" with **Stop**,
+  instead of a fixed "Replaying a conversation". The controller carries
+  `replayIndex` / `replayTotal`.
+- **Swipe to dismiss:** the answer card can be swiped away either way (a short
+  drag does not dismiss it); it still renders through the shared chat bubble
+  (Markdown and citation chips unchanged).
+- **Pulse ring:** grows on the shared `AppMotion.pulse` curve (fast out, then
+  settles) and fades evenly over the pulse, in the colour of its node type
+  (violet / teal / amber).
+- **Found by the tests:** since F3 wrapped every dot in a 44px touch target, the
+  ring was clamped to 44px by the surrounding Stack and could not grow past the
+  dot; two existing pulse tests started failing on it. The ring now sits in an
+  `OverflowBox`, and a test requires it to exceed 44px.
+- **Tests:** 7 new (ring not clamped, type colour, curve, even fade, replay
+  counter, swipe dismisses, short drag does not); 11 injected faults, all
+  caught. One redundant initial `replayTotal` removed after a mutation survived.
+- **Device (emulator, profile build):** Graph tab with F3's list toggle, filters
+  and zoom controls renders. The conversations on the test account have no
+  stored retrieval ("drew on no documents"), so the replay counter was verified
+  by widget tests only. A live question asked from the Graph tab stayed on
+  "Searching your documents..." for over 90 seconds while `/health` answered in
+  0.5s; not diagnosed (see the PR).
+- **Still to do:** F5, the one approved `POST /graph/recluster` check.

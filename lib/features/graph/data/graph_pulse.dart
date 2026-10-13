@@ -26,12 +26,19 @@ class GraphPulse {
 }
 
 class GraphPulseState {
-  const GraphPulseState({this.pulse, this.replaying = false});
+  const GraphPulseState({
+    this.pulse,
+    this.replaying = false,
+    this.replayIndex = 0,
+    this.replayTotal = 0,
+  });
 
   final GraphPulse? pulse;
 
   /// A past conversation's pulses are being played back one at a time.
   final bool replaying;
+  final int replayIndex;
+  final int replayTotal;
 }
 
 final graphPulseProvider =
@@ -82,9 +89,15 @@ class GraphPulseController extends Notifier<GraphPulseState> {
       return;
     }
     state = GraphPulseState(pulse: state.pulse, replaying: true);
-    for (final ids in steps) {
+    for (var index = 0; index < steps.length; index++) {
       if (run != _replay) return;
-      _emit(ids);
+      state = GraphPulseState(
+        pulse: state.pulse,
+        replaying: true,
+        replayIndex: index + 1,
+        replayTotal: steps.length,
+      );
+      _emit(steps[index]);
       await Future<void>.delayed(gap);
     }
     if (run == _replay) state = GraphPulseState(pulse: state.pulse);
@@ -111,6 +124,8 @@ class GraphPulseController extends Notifier<GraphPulseState> {
     state = GraphPulseState(
       pulse: GraphPulse(documentIds: distinct, key: ++_key),
       replaying: state.replaying,
+      replayIndex: state.replayIndex,
+      replayTotal: state.replayTotal,
     );
   }
 }
