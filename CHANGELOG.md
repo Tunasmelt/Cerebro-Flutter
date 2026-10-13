@@ -2385,3 +2385,27 @@ Owner-reported on a real device (see `UI-BACKLOG.md`).
 - **Not done / owner:** the recluster result (F5) and the chat generation stall
   are backend issues recorded in the F5 entry; the recluster fix is a separate
   PR in the web/API repo.
+
+### UI/UX pass - F5: the approved recluster check (result: the backend did not finish)
+The owner approved exactly one `POST /graph/recluster` on the test account.
+- **Before:** `GET /graph/nodes` returned 26 nodes, none placed (no cluster_id,
+  x or y); `GET /graph/edges` returned 0 edges. The app shows this as "Documents
+  are spread evenly until Cerebro groups them."
+- **The call:** `POST /graph/recluster` -> **202** `{"status":"recluster_started"}`.
+- **After:** polled both endpoints every 4s for 2 minutes (30 reads). Nothing
+  changed: still 26 nodes, 0 placed, 0 clusters, 0 edges. The background job did
+  not produce a layout in that time.
+- **Not repeated:** one call was approved, so there was no second attempt. The
+  same account's live chat question (asked from the Graph tab on the same day)
+  also stayed on "Searching your documents..." for over 90 seconds while
+  `/health` answered in 0.5s. Both depend on server-side work after the
+  response (embeddings / background tasks); a common cause on the server is
+  plausible but unconfirmed. The Render logs were not read (the tool needs the
+  owner to confirm a workspace).
+- **What this means for the app:** the graph's clustered view (positions and
+  edges) has still not been seen against real data. The fit-to-view, legend,
+  zoom and pulse work was verified on the unclustered layout and by widget
+  tests with clustered fixtures only. Nothing in the app changed for F5.
+- **Next step for the owner:** check the Render logs for the API around the
+  recluster and for `POST /chat/.../stream`; then a second recluster (needs a
+  fresh approval) will show whether it was a transient stall.
