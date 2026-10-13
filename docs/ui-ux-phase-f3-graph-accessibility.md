@@ -40,6 +40,9 @@ Validation on 2026-10-13:
   selected-node offset toward it. Both were corrected, then the rebuilt app
   was reinstalled and checked in landscape: search, List view and refresh stay
   visible beside the panel, and the selected node is placed in the graph area.
+- The same debug APK was installed on the connected Pixel 9 Pro XL
+  (`49041FDAS0015H`). List view loaded real graph documents, and selecting
+  `2507.18910v1.pdf` opened its panel and 1,000 real chunks on the phone.
 - The empty state and reduced-motion pulse passed widget checks; the test
   account has documents and the emulator's reduced-motion setting was not
   toggled, so these two states have not been witnessed in a live backend run.
