@@ -2439,3 +2439,19 @@ The owner approved exactly one `POST /graph/recluster` on the test account.
   overflowed on a 320px screen at 1.3x text (the status pill is fixed-width and
   the actions button takes 48px). The status and date now wrap instead of
   sharing one line, and `StatusPill` ellipsizes its label rather than overflow.
+
+### Board and Todo: tidier add forms
+- **Problem:** the Create card dialog had its fields flush against each other,
+  three different label styles (floating, inline, clipped by the border) and a
+  fixed 360px width; Create task shared the same flaws.
+- **Fix:** new shared `AppFormField` (label above the control, fixed gap below),
+  used for every field in both dialogs. Same width in both, sentence
+  capitalisation on titles and descriptions, a two-line description so Column
+  and Document stay in view with the keyboard up. Keys, validation and save
+  behaviour are unchanged. DESIGN.md regenerated (its guard test requires every
+  shared widget to be documented).
+- **Tests:** 2 new (`AppFormField`: label above, fields never touch); the
+  spacing test fails when the padding is removed.
+- **Device (emulator, profile build, real backend):** both dialogs checked with
+  the keyboard open; created a task and deleted it (account back to 0 open).
+  Not changed: the Add task button placement on the Todo tab.

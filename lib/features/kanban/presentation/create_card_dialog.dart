@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/app_exception.dart';
+import '../../../shared/widgets/app_form_field.dart';
 import '../../../shared/widgets/error_view.dart';
 import '../../auth/data/current_user_provider.dart';
 import '../../documents/data/documents_list_notifier.dart';
@@ -66,98 +67,109 @@ class _CreateCardDialogState extends ConsumerState<CreateCardDialog> {
     final busy = state.saving || state.loading || owner != _owner;
     return AlertDialog(
       title: const Text('Create card'),
-      content: SizedBox(
-        width: 360,
-        child: SingleChildScrollView(
-          child: Form(
-            key: _form,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  key: const Key('kanban_title'),
-                  controller: _title,
-                  enabled: !busy,
-                  autofocus: true,
-                  decoration: const InputDecoration(labelText: 'Title'),
-                  validator: (value) => value == null || value.trim().isEmpty
-                      ? 'Enter a title.'
-                      : null,
-                ),
-                TextFormField(
-                  key: const Key('kanban_description'),
-                  controller: _description,
-                  enabled: !busy,
-                  decoration: const InputDecoration(
-                    labelText: 'Description (optional)',
-                  ),
-                  maxLines: 3,
-                ),
-                DropdownButtonFormField<String>(
-                  initialValue: state.board!.columns.contains(_column)
-                      ? _column
-                      : null,
-                  validator: (value) => state.board!.columns.contains(value)
-                      ? null
-                      : 'Choose a column.',
-                  isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'Column'),
-                  items: [
-                    for (final column in state.board?.columns ?? <String>[])
-                      DropdownMenuItem(value: column, child: Text(column)),
-                  ],
-                  onChanged: busy
-                      ? null
-                      : (value) => setState(() => _column = value!),
-                ),
-                if (docs.isLoading) const LinearProgressIndicator(),
-                if (docs.hasError)
-                  ErrorView(
-                    exception: docs.error is AppException
-                        ? docs.error! as AppException
-                        : const UnknownApiException(
-                            'Could not load documents.',
-                          ),
-                    onRetry: () =>
-                        ref.read(documentsListProvider.notifier).refresh(),
-                  ),
-                SizedBox(
-                  key: const Key('kanban_document'),
-                  child: DropdownButtonFormField<String>(
-                    key: ValueKey(
-                      documentAvailable ? _document : 'unavailable',
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 360),
+        child: SizedBox(
+          width: double.maxFinite,
+          child: SingleChildScrollView(
+            child: Form(
+              key: _form,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AppFormField(
+                    label: 'Title',
+                    child: TextFormField(
+                      key: const Key('kanban_title'),
+                      controller: _title,
+                      enabled: !busy,
+                      autofocus: true,
+                      textCapitalization: TextCapitalization.sentences,
+                      textInputAction: TextInputAction.next,
+                      validator: (value) =>
+                          value == null || value.trim().isEmpty
+                          ? 'Enter a title.'
+                          : null,
                     ),
-                    initialValue: documentAvailable ? _document : null,
-                    validator: (_) => documentAvailable
-                        ? null
-                        : 'Choose an available document.',
-                    isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Document (optional)',
+                  ),
+                  AppFormField(
+                    label: 'Description (optional)',
+                    child: TextFormField(
+                      key: const Key('kanban_description'),
+                      controller: _description,
+                      enabled: !busy,
+                      textCapitalization: TextCapitalization.sentences,
+                      minLines: 2,
+                      maxLines: 4,
                     ),
-                    items: [
-                      const DropdownMenuItem(
-                        value: '',
-                        child: Text('No linked document'),
+                  ),
+                  AppFormField(
+                    label: 'Column',
+                    child: DropdownButtonFormField<String>(
+                      initialValue: state.board!.columns.contains(_column)
+                          ? _column
+                          : null,
+                      validator: (value) => state.board!.columns.contains(value)
+                          ? null
+                          : 'Choose a column.',
+                      isExpanded: true,
+                      items: [
+                        for (final column in state.board?.columns ?? <String>[])
+                          DropdownMenuItem(value: column, child: Text(column)),
+                      ],
+                      onChanged: busy
+                          ? null
+                          : (value) => setState(() => _column = value!),
+                    ),
+                  ),
+                  if (docs.isLoading) const LinearProgressIndicator(),
+                  if (docs.hasError)
+                    ErrorView(
+                      exception: docs.error is AppException
+                          ? docs.error! as AppException
+                          : const UnknownApiException(
+                              'Could not load documents.',
+                            ),
+                      onRetry: () =>
+                          ref.read(documentsListProvider.notifier).refresh(),
+                    ),
+                  AppFormField(
+                    key: const Key('kanban_document'),
+                    label: 'Document (optional)',
+                    child: DropdownButtonFormField<String>(
+                      key: ValueKey(
+                        documentAvailable ? _document : 'unavailable',
                       ),
-                      for (final doc in documents)
-                        DropdownMenuItem(
-                          value: doc.id,
-                          child: Text(
-                            doc.title,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                      initialValue: documentAvailable ? _document : null,
+                      validator: (_) => documentAvailable
+                          ? null
+                          : 'Choose an available document.',
+                      isExpanded: true,
+                      hint: const Text('No linked document'),
+                      items: [
+                        const DropdownMenuItem(
+                          value: '',
+                          child: Text('No linked document'),
                         ),
-                    ],
-                    onChanged: busy || docs.isLoading || docs.hasError
-                        ? null
-                        : (value) => setState(
-                            () => _document = value == '' ? null : value,
+                        for (final doc in documents)
+                          DropdownMenuItem(
+                            value: doc.id,
+                            child: Text(
+                              doc.title,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
+                      ],
+                      onChanged: busy || docs.isLoading || docs.hasError
+                          ? null
+                          : (value) => setState(
+                              () => _document = value == '' ? null : value,
+                            ),
+                    ),
                   ),
-                ),
-                if (state.error != null) ErrorView(exception: state.error!),
-              ],
+                  if (state.error != null) ErrorView(exception: state.error!),
+                ],
+              ),
             ),
           ),
         ),
